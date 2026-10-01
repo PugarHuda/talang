@@ -1,0 +1,252 @@
+module GadaiTest where
+
+import DA.Assert ((===))
+import DA.List (head)
+import DA.Optional (isNone, isSome)
+import DA.Time (addRelTime, days)
+import Daml.Script
+
+import Gadai
+
+data P = P
+  with
+    borrower : Party
+    lenderA : Party
+    lenderB : Party
+    regulator : Party
+    cashIssuer : Party
+    bondIssuer : Party
+    agent : Party
+
+loanAmount : Decimal
+loanAmount = 9500000.0
+
+setup : Script P
+setup = do
+  borrower <- allocateParty "Borrower"
+  lenderA <- allocateParty "LenderA"
+  lenderB <- allocateParty "LenderB"
+  regulator <- allocateParty "Regulator"
+  cashIssuer <- allocateParty "CashIssuer"
+  bondIssuer <- allocateParty "BondIssuer"
+  agent <- allocateParty "Agent"
+  pure P with ..
+
+cash : P -> Party -> Decimal -> Script (ContractId Holding)
+cash p owner amount = submit p.cashIssuer do
+  createCmd Holding with issuer = p.cashIssuer; owner; instrument = "USDC"; amount
+
+bond : P -> Text -> Decimal -> Script (ContractId Holding)
+bond p instrument amount = submit p.bondIssuer do
+  createCmd Holding with issuer = p.bondIssuer; owner = p.borrower; instrument; amount
+
+mark : P -> Text -> Decimal -> Script (ContractId Mark)
+mark p instrument price = do
+  now <- getTime
+  submit p.agent do
+    createCmd Mark with
+      agent = p.agent; instrument; price; asOf = now
+      audience = [p.borrower, p.lenderA, p.lenderB]
+
+stdTerms : P -> Terms
+stdTerms p = Terms with
+  cashIssuer = p.cashIssuer; cashInstrument = "USDC"; principal = loanAmount
+  collateralIssuer = p.bondIssuer; collateralInstrument = "UST10Y"
+  collateralQty = 100.0; termDays = 90
+
+rfq : P -> Script (ContractId RepoRFQ)
+rfq p = submit p.borrower do
+  createCmd RepoRFQ with
+    borrower = p.borrower; regulator = p.regulator; agent = p.agent
+    lenders = [p.lenderA, p.lenderB]; terms = stdTerms p; deadline = None
+
+quote : P -> ContractId RepoRFQ -> Party -> Decimal -> Decimal -> Script (ContractId RepoQuote)
+quote p r lender rateBps haircut = do
+  c <- cash p lender loanAmount
+  submit lender do exerciseCmd r SubmitQuote with lender; rateBps; haircut; cashCid = c
+
+-- Every position a party owns outright in one instrument (pledges excluded).
+held : Party -> Text -> Script Decimal
+held party instrument = do
+  hs <- query @Holding party
+  pure (sum [h.amount | (_, h) <- hs, h.owner == party, h.instrument == instrument])
+
+heldCid : Party -> Text -> Script (ContractId Holding)
+heldCid party instrument = do
+  hs <- query @Holding party
+  case [cid | (cid, h) <- hs, h.owner == party, h.instrument == instrument] of
+    cid :: _ -> pure cid
+    [] -> fail ("no " <> instrument <> " for " <> show party)
+
+events : P -> Script [Text]
+events p = map (\(_, r) -> r.event) <$> query @RepoReport p.regulator
+
+-- A repo opened at 98,000 per unit: 100 units lend 9,604,000 at a 2% haircut,
+-- against 9,500,000 of cash at 530 bp.
+opened : Script (P, ContractId RepoTrade)
+opened = do
+  p <- setup
+  r <- rfq p
+  qA <- quote p r p.lenderA 530.0 0.02
+  qB <- quote p r p.lenderB 545.0 0.03
+  col <- bond p "UST10Y" 100.0
+  m <- mark p "UST10Y" 98000.0
+  t <- submit p.borrower do
+    exerciseCmd r Award with winner = qA; losers = [qB]; collateralCid = col; markCid = m
+  pure (p, t)
+
+-- The whole life of a repo, and what each party can see along the way.
+lifecycle : Script ()
+lifecycle = do
+  p <- setup
+  r <- rfq p
+  qA <- quote p r p.lenderA 530.0 0.02
+  qB <- quote p r p.lenderB 545.0 0.03
+
+  -- Sealed: a rival lender and the regulator receive neither quote.
+  isNone <$> queryContractId p.lenderB qA >>= assert
+  isNone <$> queryContractId p.lenderA qB >>= assert
+  isNone <$> queryContractId p.regulator qA >>= assert
+  isSome <$> queryContractId p.borrower qA >>= assert
+
+  col <- bond p "UST10Y" 100.0
+  m <- mark p "UST10Y" 98000.0
+  t <- submit p.borrower do
+    exerciseCmd r Award with winner = qA; losers = [qB]; collateralCid = col; markCid = m
+
+  -- Opening leg: cash to the borrower, the loser's cash back, the bonds pledged.
+  held p.borrower "USDC" >>= (=== loanAmount)
+  held p.lenderB "USDC" >>= (=== loanAmount)
+  held p.lenderA "USDC" >>= (=== 0.0)
+  held p.borrower "UST10Y" >>= (=== 0.0)
+  isNone <$> queryContractId p.lenderB t >>= assert
+  isNone <$> queryContractId p.regulator t >>= assert
+
+  -- 30 days on the price falls to 95,000: 100 units now lend 9,310,000 against
+  -- 9,541,958.33 owed, so the lender may call. The opening mark is too old.
+  passTime (days 30)
+  now <- getTime
+  submitMustFail p.lenderA do
+    exerciseCmd t CallMargin with markCid = m; respondBy = addRelTime now (days 1)
+  m2 <- mark p "UST10Y" 95000.0
+  call <- submit p.lenderA do
+    exerciseCmd t CallMargin with markCid = m2; respondBy = addRelTime now (days 1)
+  Some mc <- queryContractId p.borrower call
+  mc.owed === 9541958.33
+  mc.unitsDue === 2.4915
+
+  -- Posting less than called is refused; posting the call is accepted.
+  short <- bond p "UST10Y" 2.0
+  submitMustFail p.borrower do exerciseCmd call PostMargin with holdingCid = short
+  rest <- bond p "UST10Y" 0.4915
+  enough <- submit p.borrower do exerciseCmd short Merge with other = rest
+  t2 <- submit p.borrower do exerciseCmd call PostMargin with holdingCid = enough
+
+  -- Covered again, so a second call is refused.
+  submitMustFail p.lenderA do
+    exerciseCmd t2 CallMargin with markCid = m2; respondBy = addRelTime now (days 1)
+
+  -- Swap the Treasuries for Bunds. A mark that leaves the Bunds short is
+  -- refused; at 85,000 they cover it and the Treasuries come home.
+  bunds <- bond p "BUND10" 120.0
+  sub <- submit p.borrower do exerciseCmd t2 ProposeSubstitution with holdingCid = bunds
+  low <- mark p "BUND10" 80000.0
+  submitMustFail p.lenderA do exerciseCmd sub Approve with markCid = low
+  bm <- mark p "BUND10" 85000.0
+  t3 <- submit p.lenderA do exerciseCmd sub Approve with markCid = bm
+  held p.borrower "UST10Y" >>= (=== 102.4915)
+  held p.borrower "BUND10" >>= (=== 0.0)
+
+  -- 60 days in all at 530 bp: 83,916.67 of interest, paid with change back.
+  passTime (days 30)
+  loan <- heldCid p.borrower "USDC"
+  submitMustFail p.borrower do exerciseCmd t3 Repurchase with cashCid = loan
+  topUp <- cash p p.borrower 100000.0
+  pot <- submit p.borrower do exerciseCmd loan Merge with other = topUp
+  _ <- submit p.borrower do exerciseCmd t3 Repurchase with cashCid = pot
+  held p.lenderA "USDC" >>= (=== 9583916.67)
+  held p.borrower "USDC" >>= (=== 16083.33)
+  held p.borrower "BUND10" >>= (=== 120.0)
+
+  -- The regulator saw the life of the repo, in order, and nothing before it.
+  evs <- events p
+  sortOnEvent evs === order
+  closes <- query @RepoReport p.regulator
+  [r.cashMoved | (_, r) <- closes, r.event == "CLOSE"] === [9583916.67]
+  where
+    order = ["OPEN", "MARGIN_CALL", "MARGIN_POSTED", "SUBSTITUTION", "CLOSE"]
+    sortOnEvent es = [e | o <- order, e <- es, e == o]
+
+-- An unanswered call: the lender cannot seize early, and can once the deadline passes.
+defaultOnUnmetCall : Script ()
+defaultOnUnmetCall = do
+  (p, t) <- opened
+  passTime (days 10)
+  now <- getTime
+  m <- mark p "UST10Y" 90000.0
+  call <- submit p.lenderA do
+    exerciseCmd t CallMargin with markCid = m; respondBy = addRelTime now (days 2)
+  submitMustFail p.lenderA do exerciseCmd call Default
+  passTime (days 3)
+  _ <- submit p.lenderA do exerciseCmd call Default
+  held p.lenderA "UST10Y" >>= (=== 100.0)
+  held p.borrower "USDC" >>= (=== loanAmount)
+  evs <- events p
+  assert ("DEFAULT" `elem` evs)
+
+-- Not repurchased by maturity: the lender keeps the collateral, not before.
+claimAfterMaturity : Script ()
+claimAfterMaturity = do
+  (p, t) <- opened
+  passTime (days 89)
+  submitMustFail p.lenderA do exerciseCmd t ClaimAfterMaturity
+  passTime (days 2)
+  _ <- submit p.lenderA do exerciseCmd t ClaimAfterMaturity
+  held p.lenderA "UST10Y" >>= (=== 100.0)
+
+-- Everything the desk must refuse.
+refusals : Script ()
+refusals = do
+  p <- setup
+  r <- rfq p
+  outsider <- allocateParty "Outsider"
+  c <- cash p outsider loanAmount
+  submitMustFail outsider do
+    exerciseCmd r SubmitQuote with lender = outsider; rateBps = 500.0; haircut = 0.02; cashCid = c
+
+  -- A quote must be fully funded.
+  thin <- cash p p.lenderA 9000000.0
+  submitMustFail p.lenderA do
+    exerciseCmd r SubmitQuote with lender = p.lenderA; rateBps = 500.0; haircut = 0.02; cashCid = thin
+
+  qA <- quote p r p.lenderA 530.0 0.02
+  qB <- quote p r p.lenderB 545.0 0.04
+  col <- bond p "UST10Y" 100.0
+
+  -- A mark from anyone but the named agent is refused.
+  now <- getTime
+  fake <- submit p.borrower do
+    createCmd Mark with
+      agent = p.borrower; instrument = "UST10Y"; price = 200000.0; asOf = now
+      audience = [p.lenderA, p.lenderB]
+  submitMustFail p.borrower do
+    exerciseCmd r Award with winner = qA; losers = []; collateralCid = col; markCid = fake
+
+  -- At 97,000, a 4% haircut lends 9,312,000: not enough for 9,500,000.
+  m <- mark p "UST10Y" 97000.0
+  submitMustFail p.borrower do
+    exerciseCmd r Award with winner = qB; losers = [qA]; collateralCid = col; markCid = m
+
+  -- Naming the same quote twice is refused.
+  submitMustFail p.borrower do
+    exerciseCmd r Award with winner = qA; losers = [qA]; collateralCid = col; markCid = m
+
+  -- The pledge cannot be pulled back by the borrower alone.
+  t <- submit p.borrower do
+    exerciseCmd r Award with winner = qA; losers = [qB]; collateralCid = col; markCid = m
+  Some trade <- queryContractId p.borrower t
+  submitMustFail p.borrower do
+    exerciseCmd (head trade.collateral) Release with recipient = p.borrower
+
+  -- The losing lender withdrew nothing: it got its cash back in the award.
+  held p.lenderB "USDC" >>= (=== loanAmount)

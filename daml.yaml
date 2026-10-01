@@ -1,0 +1,13 @@
+sdk-version: 3.4.11
+name: gadai-desk
+version: 0.1.0
+source: daml
+dependencies:
+  - daml-prim
+  - daml-stdlib
+# Canton Token Standard (CIP-0056) interface packages, the frozen 1.0.0 DARs.
+# Holdings and pledged collateral implement HoldingV1, so a standard wallet reads
+# a pledge as a LOCKED position without knowing this package exists.
+data-dependencies:
+  - dars/splice-api-token-metadata-v1-1.0.0.dar
+  - dars/splice-api-token-holding-v1-1.0.0.dar

@@ -1,0 +1,507 @@
+-- Gadai - a sealed-bid repo desk on Canton.
+--
+-- A borrower asks a panel of lenders for cash against bonds. Each lender's rate
+-- and haircut reach the borrower and nobody else: rival lenders never receive a
+-- quote, and neither does the regulator. The quote the borrower takes opens a
+-- repo that lives on the ledger until it is repurchased. Interest accrues on the
+-- ledger, margin calls are computed from a valuation agent's signed mark,
+-- collateral can be swapped with the lender's consent, and a call left unanswered
+-- lets the lender keep the collateral. The regulator receives every lifecycle
+-- event of an open repo and none of the quotes that lost.
+module Gadai where
+
+import DA.Action (foldlA)
+import DA.Foldable (forA_)
+import DA.List (dedup)
+import DA.Time (RelTime, addRelTime, convertRelTimeToMicroseconds, days, hours, subTime)
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1 (InstrumentId(..))
+import Splice.Api.Token.HoldingV1 qualified as HoldingV1
+
+-- ---------------------------------------------------------------------------
+-- Assets
+-- ---------------------------------------------------------------------------
+
+-- A fungible position: cash for the lender, bonds for the borrower.
+template Holding
+  with
+    issuer : Party
+    owner : Party
+    instrument : Text
+    amount : Decimal
+  where
+    signatory issuer
+    observer owner
+    ensure amount > 0.0
+
+    interface instance HoldingV1.Holding for Holding where
+      view = HoldingV1.HoldingView with
+        owner
+        instrumentId = InstrumentId with admin = issuer; id = instrument
+        amount
+        lock = None
+        meta = emptyMetadata
+
+    choice Transfer : ContractId Holding
+      with newOwner : Party
+      controller owner
+      do create this with owner = newOwner
+
+    choice Split : (ContractId Holding, ContractId Holding)
+      with splitAmount : Decimal
+      controller owner
+      do assertMsg "split must be inside the holding" (splitAmount > 0.0 && splitAmount < amount)
+         part <- create this with amount = splitAmount
+         rest <- create this with amount = amount - splitAmount
+         pure (part, rest)
+
+    choice Merge : ContractId Holding
+      with other : ContractId Holding
+      controller owner
+      do o <- fetch other
+         assertMsg "can only merge the same position"
+           (o.issuer == issuer && o.owner == owner && o.instrument == instrument)
+         archive other
+         create this with amount = amount + o.amount
+
+    -- Park the position where the counterparty can see it and neither side can
+    -- take it back alone. Used for the cash behind a quote and for every pledge.
+    choice Lock : ContractId Escrow
+      with
+        counterparty : Party
+        purpose : Text
+      controller owner
+      do create Escrow with issuer; owner; counterparty; instrument; amount; purpose
+
+-- Still the owner's, reserved for the counterparty. Release needs both of them,
+-- and every legitimate release happens inside a quote or repo choice, where both
+-- are present as signatories.
+template Escrow
+  with
+    issuer : Party
+    owner : Party
+    counterparty : Party
+    instrument : Text
+    amount : Decimal
+    purpose : Text
+  where
+    signatory issuer, owner
+    observer counterparty
+    ensure amount > 0.0
+
+    -- A standard wallet shows the pledge as a LOCKED position (CIP-0056).
+    interface instance HoldingV1.Holding for Escrow where
+      view = HoldingV1.HoldingView with
+        owner
+        instrumentId = InstrumentId with admin = issuer; id = instrument
+        amount
+        lock = Some HoldingV1.Lock with
+          holders = [counterparty]
+          expiresAt = None
+          expiresAfter = None
+          context = Some purpose
+        meta = emptyMetadata
+
+    choice Release : ContractId Holding
+      with recipient : Party
+      controller owner, counterparty
+      do create Holding with issuer; owner = recipient; instrument; amount
+
+-- A valuation agent's price for one unit of an instrument, published to the
+-- parties that need it. Margin and substitution are computed from these, never
+-- from a number either side of the trade types in.
+template Mark
+  with
+    agent : Party
+    instrument : Text
+    price : Decimal
+    asOf : Time
+    audience : [Party]
+  where
+    signatory agent
+    observer audience
+    ensure price > 0.0
+
+-- ---------------------------------------------------------------------------
+-- Money arithmetic
+-- ---------------------------------------------------------------------------
+
+-- How old a mark may be when a trade relies on it.
+markMaxAge : RelTime
+markMaxAge = hours 24
+
+-- What the collateral lends against once the haircut is taken off.
+lendable : Decimal -> Decimal -> Decimal -> Decimal
+lendable haircut qty price = qty * price * (1.0 - haircut)
+
+-- ACT/360, the money-market convention: whole days elapsed, over 360, with a
+-- floor of one day so a repo closed the day it opens still pays the lender.
+interest : Decimal -> Decimal -> Time -> Time -> Decimal
+interest principal rateBps from to =
+  let elapsed = convertRelTimeToMicroseconds (subTime to from) / 86400000000
+      d = intToDecimal (max 1 elapsed)
+  in roundCommercial 2 (principal * rateBps / 10000.0 * d / 360.0)
+
+-- Round a unit count UP to 4 places, so posting exactly what is asked covers it.
+ceil4 : Decimal -> Decimal
+ceil4 x = let r = roundCommercial 4 x in if r < x then r + 0.0001 else r
+
+freshMark : Party -> Text -> ContractId Mark -> Update Mark
+freshMark agent instrument cid = do
+  m <- fetch cid
+  now <- getTime
+  assertMsg "mark from the wrong agent" (m.agent == agent)
+  assertMsg "mark for the wrong instrument" (m.instrument == instrument)
+  assertMsg "mark is stale" (m.asOf <= now && subTime now m.asOf <= markMaxAge)
+  pure m
+
+-- ---------------------------------------------------------------------------
+-- The request and the sealed quotes
+-- ---------------------------------------------------------------------------
+
+data Terms = Terms
+  with
+    cashIssuer : Party
+    cashInstrument : Text
+    principal : Decimal          -- cash the borrower wants
+    collateralIssuer : Party
+    collateralInstrument : Text
+    collateralQty : Decimal      -- units the borrower will pledge
+    termDays : Int
+  deriving (Eq, Show)
+
+-- The borrower asks a chosen panel. Nobody outside the panel sees the request,
+-- and it carries no rate: the rate is what the lenders compete on.
+template RepoRFQ
+  with
+    borrower : Party
+    regulator : Party
+    agent : Party
+    lenders : [Party]
+    terms : Terms
+    deadline : Optional Time
+  where
+    signatory borrower
+    observer lenders
+    ensure terms.principal > 0.0 && terms.collateralQty > 0.0 && terms.termDays > 0
+      && not (null lenders) && length (dedup lenders) == length lenders
+      && borrower `notElem` lenders
+
+    -- A lender answers with a rate and a haircut and locks the full principal
+    -- behind it, so a quote cannot be taken by a lender who could not fund it.
+    -- The quote is signed by the lender and the borrower and observed by nobody.
+    nonconsuming choice SubmitQuote : ContractId RepoQuote
+      with
+        lender : Party
+        rateBps : Decimal
+        haircut : Decimal
+        cashCid : ContractId Holding
+      controller lender
+      do assertMsg "lender not invited" (lender `elem` lenders)
+         assertMsg "rate must be between 0 and 100%" (rateBps > 0.0 && rateBps <= 10000.0)
+         assertMsg "haircut must be below 50%" (haircut >= 0.0 && haircut < 0.5)
+         now <- getTime
+         assertMsg "RFQ has expired" (optional True (now <) deadline)
+         cash <- fetch cashCid
+         assertMsg "cash not owned by the lender" (cash.owner == lender)
+         assertMsg "cash from the wrong issuer" (cash.issuer == terms.cashIssuer)
+         assertMsg "wrong cash instrument" (cash.instrument == terms.cashInstrument)
+         assertMsg "cash must equal the principal" (cash.amount == terms.principal)
+         escrowCid <- exercise cashCid Lock with
+           counterparty = borrower; purpose = "gadai: cash behind a sealed repo quote"
+         create RepoQuote with
+           rfqId = self; borrower; lender; regulator; agent; terms
+           rateBps; haircut; escrowCid; sealedAt = now
+
+    -- Take one quote. The losers named here get their cash back in the same
+    -- transaction, unrevealed. Repo is first-price: the borrower pays the rate
+    -- it takes, and may weigh a lower haircut against a higher rate.
+    choice Award : ContractId RepoTrade
+      with
+        winner : ContractId RepoQuote
+        losers : [ContractId RepoQuote]
+        collateralCid : ContractId Holding
+        markCid : ContractId Mark
+      controller borrower
+      do let named = winner :: losers
+         assertMsg "duplicate quote ids" (length (dedup named) == length named)
+         forA_ named \cid -> do
+           q <- fetch cid
+           assertMsg "quote from another RFQ" (q.rfqId == self)
+         forA_ losers \cid -> exercise cid RejectQuote
+         exercise winner Open with collateralCid; markCid
+
+    choice CancelRFQ : ()
+      controller borrower
+      do pure ()
+
+template RepoQuote
+  with
+    rfqId : ContractId RepoRFQ
+    borrower : Party
+    lender : Party
+    regulator : Party
+    agent : Party
+    terms : Terms
+    rateBps : Decimal
+    haircut : Decimal
+    escrowCid : ContractId Escrow
+    sealedAt : Time
+  where
+    signatory lender, borrower
+
+    choice WithdrawQuote : ContractId Holding
+      controller lender
+      do exercise escrowCid Release with recipient = lender
+
+    choice RejectQuote : ContractId Holding
+      controller borrower
+      do exercise escrowCid Release with recipient = lender
+
+    -- Opening leg, atomic: the borrower's bonds go into a pledge for the lender
+    -- and the lender's cash goes to the borrower, or neither happens. Reached
+    -- through RepoRFQ.Award.
+    choice Open : ContractId RepoTrade
+      with
+        collateralCid : ContractId Holding
+        markCid : ContractId Mark
+      controller borrower
+      do col <- fetch collateralCid
+         assertMsg "collateral not the borrower's" (col.owner == borrower)
+         assertMsg "collateral from the wrong issuer" (col.issuer == terms.collateralIssuer)
+         assertMsg "wrong collateral instrument" (col.instrument == terms.collateralInstrument)
+         assertMsg "wrong collateral quantity" (col.amount == terms.collateralQty)
+         m <- freshMark agent terms.collateralInstrument markCid
+         assertMsg "collateral does not cover the cash after the haircut"
+           (lendable haircut col.amount m.price >= terms.principal)
+         pledge <- exercise collateralCid Lock with
+           counterparty = lender; purpose = "gadai: pledged under an open repo"
+         _ <- exercise escrowCid Release with recipient = borrower
+         now <- getTime
+         let trade = RepoTrade with
+               borrower; lender; regulator; agent; terms; rateBps; haircut
+               openedAt = now; maturity = addRelTime now (days terms.termDays)
+               collateralIssuer = terms.collateralIssuer
+               collateralInstrument = terms.collateralInstrument
+               collateralQty = terms.collateralQty
+               collateral = [pledge]
+         report trade "OPEN" terms.principal now
+         create trade
+
+-- ---------------------------------------------------------------------------
+-- The live repo
+-- ---------------------------------------------------------------------------
+
+template RepoTrade
+  with
+    borrower : Party
+    lender : Party
+    regulator : Party
+    agent : Party
+    terms : Terms
+    rateBps : Decimal
+    haircut : Decimal
+    openedAt : Time
+    maturity : Time
+    -- The collateral can change under substitution, so it lives here, not in terms.
+    collateralIssuer : Party
+    collateralInstrument : Text
+    collateralQty : Decimal
+    collateral : [ContractId Escrow]
+  where
+    signatory borrower, lender
+
+    -- Closing leg, atomic: principal plus interest to the lender, every pledged
+    -- unit back to the borrower. Any cash above what is due comes back as change.
+    choice Repurchase : ContractId Holding
+      with cashCid : ContractId Holding
+      controller borrower
+      do now <- getTime
+         let due = terms.principal + interest terms.principal rateBps openedAt now
+         cash <- fetch cashCid
+         assertMsg "cash not the borrower's" (cash.owner == borrower)
+         assertMsg "cash from the wrong issuer" (cash.issuer == terms.cashIssuer)
+         assertMsg "wrong cash instrument" (cash.instrument == terms.cashInstrument)
+         assertMsg "not enough cash to repurchase" (cash.amount >= due)
+         payCid <- if cash.amount == due then pure cashCid
+                   else fst <$> exercise cashCid Split with splitAmount = due
+         paid <- exercise payCid Transfer with newOwner = lender
+         forA_ collateral \c -> exercise c Release with recipient = borrower
+         report this "CLOSE" due now
+         pure paid
+
+    -- The lender asks for more collateral when the latest mark says the pledge
+    -- no longer covers what is owed. The shortfall is computed here, from the
+    -- agent's mark, so the lender cannot call more than the mark justifies.
+    nonconsuming choice CallMargin : ContractId MarginCall
+      with
+        markCid : ContractId Mark
+        respondBy : Time
+      controller lender
+      do m <- freshMark agent collateralInstrument markCid
+         now <- getTime
+         assertMsg "the borrower must get time to respond" (respondBy > now)
+         let owed = terms.principal + interest terms.principal rateBps openedAt now
+             needed = owed / (1.0 - haircut) / m.price
+         assertMsg "collateral still covers what is owed"
+           (lendable haircut collateralQty m.price < owed)
+         let unitsDue = ceil4 (needed - collateralQty)
+         report this "MARGIN_CALL" 0.0 now
+         create MarginCall with
+           tradeCid = self; borrower; lender; regulator
+           issuer = collateralIssuer; instrument = collateralInstrument
+           unitsDue; price = m.price; owed; respondBy
+
+    -- The borrower offers different collateral. It is locked now, and the swap
+    -- happens only if the lender approves against a fresh mark.
+    nonconsuming choice ProposeSubstitution : ContractId Substitution
+      with holdingCid : ContractId Holding
+      controller borrower
+      do h <- fetch holdingCid
+         assertMsg "collateral not the borrower's" (h.owner == borrower)
+         pledge <- exercise holdingCid Lock with
+           counterparty = lender; purpose = "gadai: offered as substitute collateral"
+         create Substitution with
+           tradeCid = self; borrower; lender
+           newCollateral = pledge; newIssuer = h.issuer
+           newInstrument = h.instrument; newQty = h.amount
+
+    -- Past maturity and not repurchased: the lender keeps the collateral.
+    choice ClaimAfterMaturity : ContractId Holding
+      controller lender
+      do now <- getTime
+         assertMsg "the repo has not matured" (now > maturity)
+         seize this now
+
+    choice TopUp : ContractId RepoTrade
+      with
+        extra : ContractId Escrow
+        qty : Decimal
+      controller borrower, lender
+      do now <- getTime
+         let next = this with collateralQty = collateralQty + qty; collateral = extra :: collateral
+         report next "MARGIN_POSTED" 0.0 now
+         create next
+
+    choice Swap : ContractId RepoTrade
+      with
+        newCollateral : ContractId Escrow
+        newIssuer : Party
+        newInstrument : Text
+        newQty : Decimal
+      controller borrower, lender
+      do forA_ collateral \c -> exercise c Release with recipient = borrower
+         now <- getTime
+         let next = this with
+               collateralIssuer = newIssuer; collateralInstrument = newInstrument
+               collateralQty = newQty; collateral = [newCollateral]
+         report next "SUBSTITUTION" 0.0 now
+         create next
+
+    choice Seize : ContractId Holding
+      controller borrower, lender
+      do now <- getTime
+         seize this now
+
+-- Every pledged unit to the lender, merged into one holding, and the default reported.
+seize : RepoTrade -> Time -> Update (ContractId Holding)
+seize t now = do
+  released <- forA t.collateral \c -> exercise c Release with recipient = t.lender
+  report t "DEFAULT" 0.0 now
+  case released of
+    [] -> abort "a repo always holds collateral"
+    first :: rest -> foldlA (\acc c -> exercise acc Merge with other = c) first rest
+
+template MarginCall
+  with
+    tradeCid : ContractId RepoTrade
+    borrower : Party
+    lender : Party
+    regulator : Party
+    issuer : Party
+    instrument : Text
+    unitsDue : Decimal
+    price : Decimal
+    owed : Decimal
+    respondBy : Time
+  where
+    signatory borrower, lender
+
+    choice PostMargin : ContractId RepoTrade
+      with holdingCid : ContractId Holding
+      controller borrower
+      do h <- fetch holdingCid
+         assertMsg "margin not the borrower's" (h.owner == borrower)
+         assertMsg "margin from the wrong issuer" (h.issuer == issuer)
+         assertMsg "margin in the wrong instrument" (h.instrument == instrument)
+         assertMsg "margin below what was called" (h.amount >= unitsDue)
+         pledge <- exercise holdingCid Lock with
+           counterparty = lender; purpose = "gadai: margin under an open repo"
+         exercise tradeCid TopUp with extra = pledge; qty = h.amount
+
+    -- Unanswered past the deadline: the lender keeps the collateral.
+    choice Default : ContractId Holding
+      controller lender
+      do now <- getTime
+         assertMsg "the borrower still has time to respond" (now > respondBy)
+         exercise tradeCid Seize
+
+template Substitution
+  with
+    tradeCid : ContractId RepoTrade
+    borrower : Party
+    lender : Party
+    newCollateral : ContractId Escrow
+    newIssuer : Party
+    newInstrument : Text
+    newQty : Decimal
+  where
+    signatory borrower, lender
+
+    choice Approve : ContractId RepoTrade
+      with markCid : ContractId Mark
+      controller lender
+      do t <- fetch tradeCid
+         m <- freshMark t.agent newInstrument markCid
+         now <- getTime
+         let owed = t.terms.principal + interest t.terms.principal t.rateBps t.openedAt now
+         assertMsg "the substitute does not cover what is owed"
+           (lendable t.haircut newQty m.price >= owed)
+         exercise tradeCid Swap with newCollateral; newIssuer; newInstrument; newQty
+
+    choice Decline : ContractId Holding
+      controller lender
+      do exercise newCollateral Release with recipient = borrower
+
+-- ---------------------------------------------------------------------------
+-- What the regulator sees
+-- ---------------------------------------------------------------------------
+
+-- One row per lifecycle event of an open repo. The regulator observes these and
+-- nothing upstream of them: no request, no quote, no losing rate.
+template RepoReport
+  with
+    regulator : Party
+    borrower : Party
+    lender : Party
+    event : Text
+    terms : Terms
+    rateBps : Decimal
+    haircut : Decimal
+    collateralInstrument : Text
+    collateralQty : Decimal
+    cashMoved : Decimal
+    at : Time
+  where
+    signatory borrower, lender
+    observer regulator
+
+report : RepoTrade -> Text -> Decimal -> Time -> Update ()
+report t event cashMoved at = do
+  _ <- create RepoReport with
+    regulator = t.regulator; borrower = t.borrower; lender = t.lender; event
+    terms = t.terms; rateBps = t.rateBps; haircut = t.haircut
+    collateralInstrument = t.collateralInstrument; collateralQty = t.collateralQty
+    cashMoved; at
+  pure ()

@@ -1,0 +1,24 @@
+.daml/
+*.dar
+# …except the interface DARs the build reads and the previous version it upgrades
+# from. They are 2.5 MB in total, they are inputs rather than outputs, and without
+# them `daml build` cannot resolve its data-dependencies on a fresh clone or in CI.
+!dars/*.dar
+node_modules/
+.env
+.env.local
+dist/
+
+log/
+
+# secrets
+.env
+.env.*
+*.token
+!*.example
+
+.vercel
+
+# recorder output: the raw silent capture is an intermediate, the narrated mp4 ships
+media/*.webm
+log/*.log

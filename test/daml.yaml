@@ -1,0 +1,12 @@
+sdk-version: 3.4.11
+name: gadai-test
+version: 0.1.0
+source: daml
+dependencies:
+  - daml-prim
+  - daml-stdlib
+  - daml-script
+data-dependencies:
+  - ../.daml/dist/gadai-desk-0.1.0.dar
+  - ../dars/splice-api-token-metadata-v1-1.0.0.dar
+  - ../dars/splice-api-token-holding-v1-1.0.0.dar
