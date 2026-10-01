@@ -1,4 +1,4 @@
-module GadaiTest where
+module TalangTest where
 
 import DA.Assert ((===))
 import DA.List (head)
@@ -6,7 +6,7 @@ import DA.Optional (isNone, isSome)
 import DA.Time (addRelTime, days)
 import Daml.Script
 
-import Gadai
+import Talang
 
 data P = P
   with

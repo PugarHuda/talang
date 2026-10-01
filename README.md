@@ -1,4 +1,4 @@
-# Gadai
+# Talang
 
 A sealed-bid repo desk on Canton. A borrower asks a panel of lenders for cash
 against bonds; each lender's rate and haircut reach the borrower and nobody else.
@@ -28,8 +28,8 @@ cd test && daml test
 
 ## Prior work disclosure
 
-Gadai reuses patterns from [Tirai](https://github.com/PugarHuda/tirai) (HackCanton
+Talang reuses patterns from [Tirai](https://github.com/PugarHuda/tirai) (HackCanton
 Season 2): escrow-on-quote, sealed quotes with no observers, regulator reports.
 The repo model, margin, substitution, default and interest logic in
-`daml/Gadai.daml` are new. Work started on 2 October 2026, before the Season 4
+`daml/Talang.daml` are new. Work started on 2 October 2026, before the Season 4
 delivery phase; commits from 13 November 2026 onward are the delivery-phase work.

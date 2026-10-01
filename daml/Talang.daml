@@ -1,4 +1,4 @@
--- Gadai - a sealed-bid repo desk on Canton.
+-- Talang - a sealed-bid repo desk on Canton.
 --
 -- A borrower asks a panel of lenders for cash against bonds. Each lender's rate
 -- and haircut reach the borrower and nobody else: rival lenders never receive a
@@ -8,7 +8,7 @@
 -- collateral can be swapped with the lender's consent, and a call left unanswered
 -- lets the lender keep the collateral. The regulator receives every lifecycle
 -- event of an open repo and none of the quotes that lost.
-module Gadai where
+module Talang where
 
 import DA.Action (foldlA)
 import DA.Foldable (forA_)
@@ -209,7 +209,7 @@ template RepoRFQ
          assertMsg "wrong cash instrument" (cash.instrument == terms.cashInstrument)
          assertMsg "cash must equal the principal" (cash.amount == terms.principal)
          escrowCid <- exercise cashCid Lock with
-           counterparty = borrower; purpose = "gadai: cash behind a sealed repo quote"
+           counterparty = borrower; purpose = "talang: cash behind a sealed repo quote"
          create RepoQuote with
            rfqId = self; borrower; lender; regulator; agent; terms
            rateBps; haircut; escrowCid; sealedAt = now
@@ -276,7 +276,7 @@ template RepoQuote
          assertMsg "collateral does not cover the cash after the haircut"
            (lendable haircut col.amount m.price >= terms.principal)
          pledge <- exercise collateralCid Lock with
-           counterparty = lender; purpose = "gadai: pledged under an open repo"
+           counterparty = lender; purpose = "talang: pledged under an open repo"
          _ <- exercise escrowCid Release with recipient = borrower
          now <- getTime
          let trade = RepoTrade with
@@ -361,7 +361,7 @@ template RepoTrade
       do h <- fetch holdingCid
          assertMsg "collateral not the borrower's" (h.owner == borrower)
          pledge <- exercise holdingCid Lock with
-           counterparty = lender; purpose = "gadai: offered as substitute collateral"
+           counterparty = lender; purpose = "talang: offered as substitute collateral"
          create Substitution with
            tradeCid = self; borrower; lender
            newCollateral = pledge; newIssuer = h.issuer
@@ -437,7 +437,7 @@ template MarginCall
          assertMsg "margin in the wrong instrument" (h.instrument == instrument)
          assertMsg "margin below what was called" (h.amount >= unitsDue)
          pledge <- exercise holdingCid Lock with
-           counterparty = lender; purpose = "gadai: margin under an open repo"
+           counterparty = lender; purpose = "talang: margin under an open repo"
          exercise tradeCid TopUp with extra = pledge; qty = h.amount
 
     -- Unanswered past the deadline: the lender keeps the collateral.

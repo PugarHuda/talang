@@ -1,5 +1,5 @@
 sdk-version: 3.4.11
-name: gadai-test
+name: talang-test
 version: 0.1.0
 source: daml
 dependencies:
@@ -7,6 +7,6 @@ dependencies:
   - daml-stdlib
   - daml-script
 data-dependencies:
-  - ../.daml/dist/gadai-desk-0.1.0.dar
+  - ../.daml/dist/talang-desk-0.1.0.dar
   - ../dars/splice-api-token-metadata-v1-1.0.0.dar
   - ../dars/splice-api-token-holding-v1-1.0.0.dar
