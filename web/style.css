@@ -42,5 +42,5 @@ input, select.in { font: inherit; padding: 6px 8px; border: 1px solid var(--line
 .banner { background: #fff7e6; border: 1px solid #f5d9a8; padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; }
 .toast { position: fixed; right: 20px; bottom: 20px; background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 10px; max-width: 440px; }
 .toast.err { background: var(--bad); }
-.readonly button, .readonly .form { display: none; }
+.readonly button, .readonly .form, .readonly select.in { display: none; }
 @media (max-width: 760px) { body { flex-direction: column; } .rail { width: auto; } main { padding: 16px; } }

@@ -22,3 +22,5 @@ log/
 # recorder output: the raw silent capture is an intermediate, the narrated mp4 ships
 media/*.webm
 log/*.log
+
+.env*

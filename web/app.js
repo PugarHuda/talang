@@ -99,7 +99,7 @@ function borrowerView() {
   const rfqs = of('RepoRFQ'), quotes = of('RepoQuote'), trades = of('RepoTrade');
   const calls = of('MarginCall'), subs = of('Substitution');
   const instruments = [...new Set(of('Mark').map((m) => m.arg.instrument))];
-  let h = `<h2>New request</h2><div class="card"><div class="form">
+  let h = CFG.readOnly ? '' : `<h2>New request</h2><div class="card"><div class="form">
     <label>Collateral<select class="in" id="n-inst">${instruments.map((i) => `<option>${esc(i)}</option>`).join('')}</select></label>
     <label>Units<input id="n-qty" type="number" value="50" /></label>
     <label>Cash wanted (USDC)<input id="n-cash" type="number" value="4800000" /></label>
@@ -205,9 +205,9 @@ function regulatorView() {
 
 function agentView() {
   const marks = of('Mark').sort((a, b) => b.arg.asOf.localeCompare(a.arg.asOf));
-  return `<h2>Publish a mark</h2><div class="card"><div class="form">
+  return (CFG.readOnly ? '' : `<h2>Publish a mark</h2><div class="card"><div class="form">
     <label>Instrument<input id="m-inst" value="GILT10" /></label><label>Price per unit<input id="m-price" type="number" value="96000" /></label>
-    <button data-act="mark">Publish to borrower and lenders</button></div></div>
+    <button data-act="mark">Publish to borrower and lenders</button></div></div>`) + `
     <h2>Marks</h2><div class="card"><table><tr><th>Instrument</th><th>Price</th><th>As of</th><th></th></tr>
     ${marks.map((m) => `<tr><td>${esc(m.arg.instrument)}</td><td>${money(m.arg.price)}</td><td>${when(m.arg.asOf)}</td>
       <td>${Date.now() - Date.parse(m.arg.asOf) < DAY ? '<span class="pill ok">fresh</span>' : '<span class="pill mute">stale</span>'}</td></tr>`).join('')}</table></div>`;
