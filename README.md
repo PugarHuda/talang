@@ -26,6 +26,20 @@ daml build --all
 cd test && daml test
 ```
 
+## Run the desk on DevNet
+
+The package `talang-desk` is live on the NODERS HackCanton DevNet participant.
+Put the M2M client settings in `.env.noders` (gitignored), then:
+
+```
+npm run seed     # one repo in every state: sealed quotes, live, under margin call, closed
+npm run desk     # http://localhost:8090, switch roles in the sidebar
+npm run marks    # re-publish fresh marks; the contract refuses marks older than 24h
+```
+
+The hosted copy is read-only: `api/` exposes reads only, scoped to this desk's
+parties, and has no submit endpoint.
+
 ## Prior work disclosure
 
 Talang reuses patterns from [Tirai](https://github.com/PugarHuda/tirai) (HackCanton

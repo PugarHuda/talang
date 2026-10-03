@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Talang · sealed repo desk</title>
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 rx=%223%22 fill=%22%230e1116%22/%3E%3Ccircle cx=%2211.5%22 cy=%2211.5%22 r=%222%22 fill=%22%234fc3e0%22/%3E%3C/svg%3E" />
+</head>
+<body>
+  <aside class="rail">
+    <div class="brand">talang<span>.</span></div>
+    <p class="tag">Sealed-bid repo on Canton</p>
+    <label class="who">Acting as
+      <select id="role">
+        <option value="borrower">Borrower · fund</option>
+        <option value="lenderA">Lender A · bank</option>
+        <option value="lenderB">Lender B · bank</option>
+        <option value="regulator">Regulator</option>
+        <option value="agent">Valuation agent</option>
+      </select>
+    </label>
+    <div id="party" class="party"></div>
+    <div id="status" class="status">connecting…</div>
+    <p class="note">Each role reads only its own node's view of the ledger. Nothing is hidden by the page: what a role cannot see never reached it.</p>
+    <a class="link" href="https://github.com/PugarHuda/talang">GitHub ↗</a>
+  </aside>
+  <main>
+    <div id="readonly" class="banner" hidden>Read-only public view of live DevNet data. Run the desk locally to act.</div>
+    <div id="toast" class="toast" hidden></div>
+    <div id="view"></div>
+  </main>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

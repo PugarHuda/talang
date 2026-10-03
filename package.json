@@ -1,0 +1,11 @@
+{
+  "name": "talang",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "desk": "node server.mjs",
+    "seed": "node scripts/seed.mjs",
+    "marks": "node scripts/seed.mjs marks"
+  }
+}
