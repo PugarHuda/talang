@@ -15,7 +15,8 @@ const pct = (n) => (N(n) * 100).toFixed(2) + '%';
 const when = (t) => new Date(t).toLocaleString();
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const roleOf = (party) => Object.entries(CFG.parties).find(([, v]) => v === party)?.[0] ?? party.split('::')[0];
-const NAMES = { borrower: 'Borrower', lenderA: 'Lender A', lenderB: 'Lender B', regulator: 'Regulator', agent: 'Agent' };
+const NAMES = { borrower: 'Borrower', lenderA: 'Lender A', lenderB: 'Lender B', lenderC: 'Lender C', regulator: 'Regulator', agent: 'Agent' };
+const LENDERS = ['lenderA', 'lenderB', 'lenderC'];
 const name = (party) => esc(NAMES[roleOf(party)] ?? roleOf(party));
 const me = () => CFG.parties[ROLE];
 const of = (tpl) => DATA.filter((c) => c.tpl === tpl);
@@ -104,7 +105,8 @@ function borrowerView() {
     <label>Units<input id="n-qty" type="number" value="50" /></label>
     <label>Cash wanted (USDC)<input id="n-cash" type="number" value="4800000" /></label>
     <label>Term (days)<input id="n-term" type="number" value="30" /></label>
-    <button data-act="request">Ask lenders A and B</button>
+    <label>Ask<span>${LENDERS.map((l) => `<label style="display:inline;flex-direction:row"><input type="checkbox" class="n-lender" value="${l}" ${l === 'lenderC' ? '' : 'checked'} style="width:auto" /> ${NAMES[l]}</label>`).join(' ')}</span></label>
+    <button data-act="request">Send request</button>
     <button class="ghost" data-act="bonds">Demo issuer: give me bonds</button></div></div>`;
 
   h += `<h2>Requests and sealed quotes</h2>`;
@@ -213,18 +215,18 @@ function agentView() {
       <td>${Date.now() - Date.parse(m.arg.asOf) < DAY ? '<span class="pill ok">fresh</span>' : '<span class="pill mute">stale</span>'}</td></tr>`).join('')}</table></div>`;
 }
 
-const VIEWS = { borrower: borrowerView, lenderA: lenderView, lenderB: lenderView, regulator: regulatorView, agent: agentView };
+const VIEWS = { borrower: borrowerView, lenderA: lenderView, lenderB: lenderView, lenderC: lenderView, regulator: regulatorView, agent: agentView };
 
 // ---- actions ----
 const val = (id) => $(id)?.value;
 const ACTIONS = {
   async request() {
     await act(create('RepoRFQ', { borrower: me(), regulator: CFG.parties.regulator, agent: CFG.parties.agent,
-      lenders: [CFG.parties.lenderA, CFG.parties.lenderB], deadline: null, terms: {
+      lenders: [...document.querySelectorAll('.n-lender:checked')].map((x) => CFG.parties[x.value]), deadline: null, terms: {
         cashIssuer: CFG.parties.cashIssuer, cashInstrument: 'USDC', principal: val('#n-cash'),
         collateralIssuer: CFG.parties.bondIssuer, collateralInstrument: val('#n-inst'),
         collateralQty: val('#n-qty'), termDays: val('#n-term') } }));
-    return 'Request sent to lenders A and B';
+    return 'Request sent to the panel';
   },
   async bonds() { await faucet('bondIssuer', val('#n-inst'), val('#n-qty')); return 'Bonds issued to you'; },
   async 'bonds-for'(b) { await faucet('bondIssuer', b.dataset.inst, b.dataset.amount); return 'Bonds issued to you'; },
@@ -280,7 +282,7 @@ const ACTIONS = {
   async claim(b) { await act(exercise('RepoTrade', b.dataset.cid, 'ClaimAfterMaturity')); return 'Collateral claimed'; },
   async mark() {
     await act(create('Mark', { agent: me(), instrument: val('#m-inst'), price: val('#m-price'), asOf: new Date().toISOString(),
-      audience: [CFG.parties.borrower, CFG.parties.lenderA, CFG.parties.lenderB] }));
+      audience: [CFG.parties.borrower, ...LENDERS.map((l) => CFG.parties[l])] }));
     return 'Mark published';
   },
 };

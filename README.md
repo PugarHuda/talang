@@ -47,3 +47,27 @@ Season 2): escrow-on-quote, sealed quotes with no observers, regulator reports.
 The repo model, margin, substitution, default and interest logic in
 `daml/Talang.daml` are new. Work started on 2 October 2026, before the Season 4
 delivery phase; commits from 13 November 2026 onward are the delivery-phase work.
+
+## AI desk agent (MCP)
+
+`mcp/server.mjs` puts Claude at one lender's desk. It reads only that lender's node,
+so it is bound by the same privacy as a human trader: it never sees a rival's rate.
+
+| Tool | What it does |
+|---|---|
+| `portfolio` | Every repo the lender funded: owed now, mark, coverage, units short, open calls, substitutions to review |
+| `open_requests` | Requests to quote, with collateral value and the largest haircut that still covers |
+| `quote` | Seal a rate and haircut, locking the principal |
+| `call_margin` | Call margin at the latest fresh mark; the contract computes the units and refuses if covered |
+| `review_substitution` | Approve or decline offered collateral; approval re-checks coverage |
+| `privacy_check` | Count what the node holds that is not the lender's own |
+
+Claude Desktop / Claude Code config:
+
+```json
+{ "mcpServers": { "talang-lenderB": {
+  "command": "node", "args": ["<repo>/mcp/server.mjs"], "env": { "TALANG_ROLE": "lenderB" } } } }
+```
+
+`npm run e2e:mcp` drives it end to end on DevNet: rival quotes invisible, a margin call
+on a covered repo refused by the ledger, then accepted after a 6% markdown.

@@ -14,7 +14,7 @@ const PRICES = { UST10Y: 98000, BUND10: 85000, GILT10: 100000, UST2Y: 99500 };
 async function publishMarks(prices = PRICES) {
   for (const [instrument, price] of Object.entries(prices)) {
     await submit(p.agent, create('Mark', { agent: p.agent, instrument, price: dec(price), asOf: now(),
-      audience: [p.borrower, ...lenders] }));
+      audience: [p.borrower, p.lenderA, p.lenderB, p.lenderC] }));
   }
   console.log('marks published:', Object.entries(prices).map(([i, v]) => `${i} ${v}`).join(', '));
 }
