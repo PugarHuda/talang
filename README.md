@@ -44,9 +44,10 @@ parties, and has no submit endpoint.
 
 Talang reuses patterns from [Tirai](https://github.com/PugarHuda/tirai) (HackCanton
 Season 2): escrow-on-quote, sealed quotes with no observers, regulator reports.
-The repo model, margin, substitution, default and interest logic in
-`daml/Talang.daml` are new. Work started on 2 October 2026, before the Season 4
-delivery phase; commits from 13 November 2026 onward are the delivery-phase work.
+Talang itself is new work for HackCanton Season 3: the first commit is 2 October
+2026, inside the delivery phase (18 September to 9 October). The repo model, margin,
+substitution, default and interest logic in `daml/Talang.daml`, the desk, the seed
+and the MCP agent were all written in that window; `git log` is the record.
 
 ## AI desk agent (MCP)
 
