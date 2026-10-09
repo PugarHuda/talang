@@ -13,6 +13,7 @@ copyFileSync('devnet/talang-repo-1.0.0.dar', '.daml/dist/talang-repo-1.0.0.dar')
 copyFileSync('devnet/talang-test-0.1.0.dar', 'test/.daml/dist/talang-test-0.1.0.dar');
 
 const STEPS = [
+  ['rights', 'scripts/devnet-rights.mjs'],
   ['upload', 'scripts/upload.mjs'],
   ['seed', 'scripts/seed.mjs'],
   ['e2e-mcp', 'scripts/e2e-mcp.mjs'],
