@@ -243,7 +243,7 @@ Upload `media/talang-pitch-deck.pdf` (max 10 MB).
 - **On DevNet (NODERS):** `talang-repo` 1.0.0 vetted and seeded; a repo with both legs in real tokens — Canton Coin cash and CBTC collateral, allocated through their registries, awarded and repurchased (docs/evidence/token-repo-amulet-cbtc-devnet.json).
 - **BitSafe:** valuation committee onboarded through DecMan on a 3-participant LocalNet, one command (`bash localnet/demo.sh reset`); 1-of-3 refused, 2-of-3 executed, survives one node down; the same flow in DecMan's own UI in `media/decman-demo-captioned.mp4`.
 - **Wallet:** CIP-0103 wallet key authorises desk commands (signed single-use challenges); venue fee payable in USDCx/CC via Grofty.
-- **Not yet:** governance committee on DevNet (waiting on rights from NODERS), `talang-repo` 1.1.0 on DevNet, USDCx on DevNet, a live Grofty wallet run, user validation.
+- **Not yet:** USDCx on DevNet, a live Grofty wallet run, user validation.
 
 ---
 

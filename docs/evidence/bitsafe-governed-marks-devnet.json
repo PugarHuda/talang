@@ -1,0 +1,59 @@
+{
+  "ledger": "NODERS HackCanton DevNet participant",
+  "ranAt": "2026-10-09T11:27:28.523Z",
+  "packages": [
+    "talang-repo (1.0.0, or its 1.1.0 upgrade where vetted)",
+    "governance-core-v1-0.1.0 (BitSafe, unmodified)",
+    "governance-action-v1-0.1.0 (BitSafe, unmodified)"
+  ],
+  "steps": [
+    {
+      "step": "governance-core-v1-0.1.0 upload refused (403): using the copy vetted on the participant"
+    },
+    {
+      "step": "GovernanceRules: committee of 3 pricers, threshold 2",
+      "updateId": "122097c24fecdfdd3a621a0288862e57211d3a53955be3425e296c48f5bda85a6617",
+      "offset": 2728984,
+      "committee": "ecaf163a-talang-valuation-committee::12204a9d883d1158141d8f099d06dd2e42cb52615deb42da5a46f042c8d0e1dbdf0e",
+      "members": [
+        "ecaf163a-talang-pricerA::12204a9d883d1158141d8f099d06dd2e42cb52615deb42da5a46f042c8d0e1dbdf0e",
+        "ecaf163a-talang-pricerB::12204a9d883d1158141d8f099d06dd2e42cb52615deb42da5a46f042c8d0e1dbdf0e",
+        "ecaf163a-talang-pricerC::12204a9d883d1158141d8f099d06dd2e42cb52615deb42da5a46f042c8d0e1dbdf0e"
+      ]
+    },
+    {
+      "step": "MarkProposal UST10Y 98,000 with 1 of 3 confirmations",
+      "refused": true,
+      "reason": "Interpretation error: Error: User failure: UNHANDLED_EXCEPTION/DA.Exception.AssertionFailed:AssertionFailed (error category 9): The requirement 'Enough confirmations to execute action' was not met."
+    },
+    {
+      "step": "MarkProposal UST10Y 98,000 executed with 2 of 3: Mark signed by the committee",
+      "updateId": "1220165a52c6b35d3762239242efb3a8438dbc1e6fbab63182f07ca4dcdcf29c6613",
+      "offset": 2729080,
+      "mark": "002db56d4a852ed54e935b5dffad0a80e20eb511893f0b7f886e70c8d1b1b378f8ca121220c4cf3a8dceae3214c8676e5b36d5aa49d1d07265a2842d5c1c17e01409aa36aa"
+    },
+    {
+      "step": "repo opened on the committee mark (agent = the decentralized party)",
+      "updateId": "1220fe92bcd1083e09a6dfc6ab200ac00a4319642782b0d1fa201a2cd7cfda016d1a",
+      "offset": 2729113,
+      "trade": "004e342c3b1d26a0a392a6be6b4d0ad07e16c007b5d4cb0e96ff7bcd5adf8c89d6ca1212209418c04944e622968e639d7e162aac6d18888e8034ae3cea8681452e015bf1d0"
+    },
+    {
+      "step": "margin call on one pricer's own mark at 50,000",
+      "refused": true,
+      "reason": "Interpretation error: Error: User failure: UNHANDLED_EXCEPTION/DA.Exception.AssertionFailed:AssertionFailed (error category 9): mark from the wrong agent"
+    },
+    {
+      "step": "governed markdown UST10Y 92,000 executed with 2 of 3",
+      "updateId": "1220cebaf0b0678861e50dd70f18bbfd9ed7ac3eb68044b3f08ed5e9defe0ee3768e",
+      "offset": 2729183,
+      "mark": "0067da657a91519ee992eab4f6b15fe4aecc87435a4439f5fd7216f25c5c03034bca1212201cf22eb299efe15348fb33c2960e6784c669d850e21dbdf3bec96de810d547cd"
+    },
+    {
+      "step": "margin call issued on the governed mark",
+      "updateId": "1220dafea1cd3ec3968bcfd4334f0602f579c579ee089a43b5dfedd83cf6a526eec7",
+      "offset": 2729195,
+      "marginCall": "002947990b7b5345d05d12ff6c4ffeaf12b9a043bd4c4331581e5e1ae790e142a8ca1212207b7058887c9779f478543e63c0325d526090e41ced6588705d2ebd0abb825456"
+    }
+  ]
+}

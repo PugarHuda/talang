@@ -50,7 +50,7 @@ One command, from a clean checkout after `daml build --all`: `bash localnet/demo
 
 The same flow in DecMan's own UI, recorded by `scripts/record-decman.mjs`: [media/decman-demo-captioned.mp4](../media/decman-demo-captioned.mp4) (79 s). A pricer on node 1 proposes a UST10Y markdown, nodes 1 and 2 confirm, node 1 executes, node 3's audit trail shows every step, and the desk calls margin on the committee's mark.
 
-On the NODERS DevNet participant: **not yet**. The app user may not grant itself act-as for the committee's parties (403, [run log](evidence/devnet-run.log)).
+On the NODERS DevNet participant: the committee flow ran on 9 October with the committee and its three pricers as parties on that one participant ([evidence](evidence/bitsafe-governed-marks-devnet.json), 8 of 8 steps). That shows shared control (no single pricer can publish) on DevNet; distributed hosting is shown on the LocalNet, since the hackathon participant is a single node.
 
 The committee hosted on three participants, set up through BitSafe DecMan's own
 API, then driven by the same scripts as above. Everything is in `localnet/`:
