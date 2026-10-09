@@ -3,7 +3,7 @@
 **Track:** Financial Applications / DeFi
 **Sponsor challenges:** BitSafe Decentralization Manager (Contribution Pool); CIP-0056 token settlement (USDCx, CBTC)
 **Repo:** https://github.com/PugarHuda/talang
-**Demo video:** _to record, script below_
+**Desk walkthrough:** `media/talang-desk-captioned.mp4` (73 s, captioned, recorded against a seeded local ledger by `scripts/record-desk.mjs`). A narrated pitch video: not yet, script below.
 
 ## One line
 
@@ -88,9 +88,13 @@ repurchase and every roll, so it cannot be skipped. Built and tested.
 - **Runs without credentials:** `npm run local` + sandbox reproduces everything; CI
   does it on every push.
 
-**Not yet:** the 1.0.0 package on DevNet; a live USDCx or CBTC registry; the
-three-participant DecMan LocalNet run; Grofty Wallet. The first version (0.1.0) is
-live on the NODERS DevNet participant.
+**Also run:** the valuation committee onboarded through BitSafe DecMan and hosted on a
+three-participant LocalNet; it publishes with one node down and cannot with two.
+Marks come from live sources (US Treasury par yields, three BTC exchanges).
+
+**Not yet:** the 1.0.0 package on DevNet; a live USDCx or CBTC registry; Grofty Wallet. The first version (0.1.0) was
+uploaded to the NODERS DevNet participant and driven through the desk on 3 October
+(commit `900da46`; package `237ad836…54f78194b`, vetted since 3 October), with no update ids recorded.
 
 ## Pitch: 4-minute demo script
 

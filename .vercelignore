@@ -1,0 +1,9 @@
+node_modules
+.env*
+parties.local.json
+parties.localnet.json
+localnet
+.git
+.daml/package-database
+test/.daml
+docs/img

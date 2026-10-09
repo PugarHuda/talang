@@ -1,0 +1,94 @@
+# Talang DecMan LocalNet: Postgres, one Canton process (synchronizer "global" +
+# participant1..3, see canton.conf) and three BitSafe DecMan nodes from the
+# published image (no source build). Insecure mode: no IdP, DecMan signs
+# Canton's unsafe HS256 token. Local development only: every published port is
+# bound to 127.0.0.1.
+x-decman: &decman
+  image: public.ecr.aws/dlc-link/decentralization-manager:v1.13.0
+  depends_on: [canton]
+  restart: unless-stopped
+  entrypoint: ["dec-party-manager", "serve"]
+
+x-env: &env
+  DECPM_DIR: /app
+  DECPM_HOST: 0.0.0.0
+  DECPM_INSECURE: "true"
+  DECPM_LOG_FORMAT: text
+  DECPM_CANTON_ADMIN_HOST: canton
+  DECPM_CANTON_LEDGER_HOST: canton
+  DECPM_CANTON_SYNCHRONIZER: global
+  DECPM_CANTON_NETWORK: devnet
+  # One Canton process, topology settles in well under a second (DecMan's own
+  # localnet test uses the same value; the production default is 30s).
+  DECPM_TOPOLOGY_PROPAGATION_DELAY_SECS: "3"
+  DECPM_PEER_WAIT_POLL_DELAY_MS: "500"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    command: ["postgres", "-c", "max_connections=500"]
+    environment: { POSTGRES_USER: canton, POSTGRES_PASSWORD: canton }
+    ports: ["127.0.0.1:5433:5432"]
+    volumes:
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  canton:
+    image: ghcr.io/digital-asset/decentralized-canton-sync/docker/canton:0.6.12
+    depends_on: [postgres]
+    working_dir: /talang/localnet
+    entrypoint: ["/app/bin/canton", "daemon", "--no-tty", "-c", "canton.conf",
+      "--bootstrap", "bootstrap.canton", "--log-file-name", "log/canton.log"]
+    environment: { JAVA_OPTS: "-Xmx2g" }
+    volumes: ["..:/talang"]
+    ports:
+      - "127.0.0.1:5001:5001"
+      - "127.0.0.1:5002:5002"
+      - "127.0.0.1:5011:5011"
+      - "127.0.0.1:5012:5012"
+      - "127.0.0.1:5021:5021"
+      - "127.0.0.1:5022:5022"
+      - "127.0.0.1:7601:7601"
+      - "127.0.0.1:7611:7611"
+      - "127.0.0.1:7621:7621"
+    restart: unless-stopped
+
+  participant-1:
+    <<: *decman
+    ports: ["127.0.0.1:8081:8081"]
+    volumes: ["./decman/participant-1:/app/data"]
+    environment:
+      <<: *env
+      DECPM_PORT: "8081"
+      DECPM_NOISE_PORT: "9001"
+      DECPM_PUBLIC_ADDRESS: participant-1
+      DECPM_CANTON_LEDGER_PORT: "5001"
+      DECPM_CANTON_ADMIN_PORT: "5002"
+
+  participant-2:
+    <<: *decman
+    ports: ["127.0.0.1:8082:8082"]
+    volumes: ["./decman/participant-2:/app/data"]
+    environment:
+      <<: *env
+      DECPM_PORT: "8082"
+      DECPM_NOISE_PORT: "9002"
+      DECPM_PUBLIC_ADDRESS: participant-2
+      DECPM_CANTON_LEDGER_PORT: "5011"
+      DECPM_CANTON_ADMIN_PORT: "5012"
+
+  participant-3:
+    <<: *decman
+    ports: ["127.0.0.1:8083:8083"]
+    volumes: ["./decman/participant-3:/app/data"]
+    environment:
+      <<: *env
+      DECPM_PORT: "8083"
+      DECPM_NOISE_PORT: "9003"
+      DECPM_PUBLIC_ADDRESS: participant-3
+      DECPM_CANTON_LEDGER_PORT: "5021"
+      DECPM_CANTON_ADMIN_PORT: "5022"
+
+volumes:
+  pgdata:

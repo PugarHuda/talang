@@ -93,11 +93,13 @@ marks, and wallets for the parties (CIP-0103).
   and the 2-of-3 committee flow with its update ids (`docs/evidence/`). CI repeats it.
 - Privacy read from each node: lenders see 0 rival quotes and 0 other lenders' loss
   notices; the regulator sees reports and best-execution records, 0 requests, 0 quotes.
-- The first version (`talang-desk` 0.1.0) is live on the NODERS HackCanton DevNet
-  participant: requests, sealed quotes, open repos, a margin call, a substitution and
-  a repurchase, created through the desk. MCP agent 11/11 checks there.
-- Not yet: the 1.0.0 package on DevNet, a live USDCx or CBTC registry, the
-  three-participant DecMan LocalNet run.
+- The first version (`talang-desk` 0.1.0) was uploaded to the NODERS HackCanton DevNet
+  participant and driven through the desk on 3 October (commit `900da46`): requests,
+  sealed quotes, open repos, a margin call, a substitution and a repurchase. Package
+  `237ad836…54f78194b` is vetted there since 3 October; no update ids were recorded for that run.
+- The valuation committee onboarded through BitSafe DecMan and hosted on three
+  participants: it publishes with one node down and cannot with two (`docs/evidence/`).
+- Not yet: the 1.0.0 package on DevNet, a live USDCx or CBTC registry.
 
 ## Validation log
 

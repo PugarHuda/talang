@@ -1,0 +1,42 @@
+[
+  {
+    "at": 0,
+    "label": "Borrower: a request for 5.4M USDC against Treasury notes, priced at today's US Treasury yield"
+  },
+  {
+    "at": 3.88,
+    "label": "Lender C was asked too. It seals its own quote, locking the cash"
+  },
+  {
+    "at": 17.2,
+    "label": "Its node shows one quote, its own. The rivals' quotes never reached it"
+  },
+  {
+    "at": 19.86,
+    "label": "Lender A, in its own session: still only its own quote"
+  },
+  {
+    "at": 26.43,
+    "label": "Back to the borrower: three sealed quotes, checked against the mark"
+  },
+  {
+    "at": 35.21,
+    "label": "It takes the cheapest quote whose haircut covers the loan"
+  },
+  {
+    "at": 40.48,
+    "label": "A losing lender is told its rank, and nothing else"
+  },
+  {
+    "at": 49.39,
+    "label": "The regulator: a best-execution record, with no lender names and no losing rates"
+  },
+  {
+    "at": 57.53,
+    "label": "Every node side by side, each reading only its own ledger"
+  },
+  {
+    "at": 69.05,
+    "label": "end"
+  }
+]

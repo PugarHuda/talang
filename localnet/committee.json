@@ -1,0 +1,66 @@
+{
+  "committee": "talang-valuation-committee::12204843e66ceded5e65fe3086bccc1f44831f43c13164f30174c9cdb33a09ac7772",
+  "members": [
+    "talang-valuation-committee-member-p1::12208b354f67b399f7d46bd55acaae9b99de1f73a98b4dd5a51d0234c2d53c57ee7a",
+    "talang-valuation-committee-member-p2::12200d60d316044b6e87ccafc5c0defc4ebe3c04abcff85786a87b9ccab10d6147e2",
+    "talang-valuation-committee-member-p3::1220846922ed0b508d5385a0c10a897db4ce7869d633c17a6c6e13720b2327e06b6f"
+  ],
+  "rules": "00da6f3a315b1b1a7a35ad1bcdc3a2af2edce39645edd563dbd73e5acea14869afca12122097567f5bb7ca84e62f4d3e8db1e4146eeec1faa3cd13d17c1b89743a58250344",
+  "participants": [
+    "participant1::12208b354f67b399f7d46bd55acaae9b99de1f73a98b4dd5a51d0234c2d53c57ee7a",
+    "participant2::12200d60d316044b6e87ccafc5c0defc4ebe3c04abcff85786a87b9ccab10d6147e2",
+    "participant3::1220846922ed0b508d5385a0c10a897db4ce7869d633c17a6c6e13720b2327e06b6f"
+  ],
+  "governanceState": {
+    "contract_id": "00da6f3a315b1b1a7a35ad1bcdc3a2af2edce39645edd563dbd73e5acea14869afca12122097567f5bb7ca84e62f4d3e8db1e4146eeec1faa3cd13d17c1b89743a58250344",
+    "governance_party": "talang-valuation-committee::12204843e66ceded5e65fe3086bccc1f44831f43c13164f30174c9cdb33a09ac7772",
+    "members": [
+      "talang-valuation-committee-member-p1::12208b354f67b399f7d46bd55acaae9b99de1f73a98b4dd5a51d0234c2d53c57ee7a",
+      "talang-valuation-committee-member-p2::12200d60d316044b6e87ccafc5c0defc4ebe3c04abcff85786a87b9ccab10d6147e2",
+      "talang-valuation-committee-member-p3::1220846922ed0b508d5385a0c10a897db4ce7869d633c17a6c6e13720b2327e06b6f"
+    ],
+    "threshold": 2,
+    "additional_proposers": [],
+    "action_confirmation_timeout_microseconds": 1800000000,
+    "package_ref": "#governance-core-v1",
+    "out_of_date": false
+  },
+  "decmanParty": {
+    "party_id": "talang-valuation-committee::12204843e66ceded5e65fe3086bccc1f44831f43c13164f30174c9cdb33a09ac7772",
+    "threshold": 2,
+    "owners": [
+      "12201777886ddcbded28d78bc7552fe4e9873c7048608b36c7b9a7daa150ba921d10",
+      "12202fbc1efe1b0e284f7f68255e1edc72c047e38cdaa63f422c1ddabb4e2228dc4c",
+      "12208ef4bfc7e07cf429faa6a9e9e4febc8eda038e1d3b248c6edff59790eec091d3"
+    ],
+    "my_owner_key": "12208ef4bfc7e07cf429faa6a9e9e4febc8eda038e1d3b248c6edff59790eec091d3",
+    "participants": [
+      {
+        "participant_uid": "participant1::12208b354f67b399f7d46bd55acaae9b99de1f73a98b4dd5a51d0234c2d53c57ee7a",
+        "permission": "confirmation",
+        "owner_key": "12208ef4bfc7e07cf429faa6a9e9e4febc8eda038e1d3b248c6edff59790eec091d3"
+      },
+      {
+        "participant_uid": "participant2::12200d60d316044b6e87ccafc5c0defc4ebe3c04abcff85786a87b9ccab10d6147e2",
+        "permission": "confirmation",
+        "owner_key": "12201777886ddcbded28d78bc7552fe4e9873c7048608b36c7b9a7daa150ba921d10"
+      },
+      {
+        "participant_uid": "participant3::1220846922ed0b508d5385a0c10a897db4ce7869d633c17a6c6e13720b2327e06b6f",
+        "permission": "confirmation",
+        "owner_key": "12202fbc1efe1b0e284f7f68255e1edc72c047e38cdaa63f422c1ddabb4e2228dc4c"
+      }
+    ],
+    "contracts": [
+      {
+        "contract_id": "00da6f3a315b1b1a7a35ad1bcdc3a2af2edce39645edd563dbd73e5acea14869afca12122097567f5bb7ca84e62f4d3e8db1e4146eeec1faa3cd13d17c1b89743a58250344",
+        "template_id": "Governance.Rules:GovernanceRules",
+        "package_id": "361d1f2857f833f8094caf86ecdd5daaa3e2075c22dafe2bf18cde63ee98d488",
+        "package_name": "governance-core-v1",
+        "package_version": "0.1.0",
+        "created_at": "2026-10-09T08:37:46.585298000Z"
+      }
+    ]
+  },
+  "at": "2026-10-09T08:37:58.322Z"
+}

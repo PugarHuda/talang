@@ -1,0 +1,43 @@
+// Runs once per Canton start (idempotent): bootstraps the "global" synchronizer,
+// connects the three participants, uploads Talang's and BitSafe's DARs to each,
+// and starts a small control loop so a node can be stopped and restarted from
+// outside (touch ctl/stop-participant3, ctl/start-participant3) for the
+// node-offline demonstration.
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.version.ProtocolVersion
+
+if (!sequencer1.health.initialized()) {
+  val params = StaticSynchronizerParameters.defaults(sequencer1.config.crypto, ProtocolVersion.v35,
+    topologyChangeDelay = NonNegativeFiniteDuration.Zero)
+  bootstrap.synchronizer("global", Seq(sequencer1), Seq(mediator1), Seq(sequencer1, mediator1), PositiveInt.one, params)
+}
+
+val dars = Seq("../.daml/dist/talang-repo-1.0.0.dar", "../dars/governance-action-v1-0.1.0.dar", "../dars/governance-core-v1-0.1.0.dar")
+participants.local.foreach { p =>
+  if (!p.synchronizers.list_registered().exists(_._1.synchronizerAlias.unwrap == "global"))
+    p.synchronizers.connect_local(sequencer1, "global")
+  p.synchronizers.reconnect_all()
+  dars.foreach(d => p.dars.upload(d))
+}
+utils.retry_until_true(participants.local.forall(_.synchronizers.active("global")))
+participants.local.foreach(p => println(s"${p.name} ${p.id.toProtoPrimitive} connected=${p.synchronizers.active("global")}"))
+
+val ctl = new java.io.File("ctl"); ctl.mkdirs()
+val byName = participants.local.map(p => p.name -> p).toMap
+val loop = new Thread(() => while (true) {
+  Option(ctl.listFiles()).getOrElse(Array.empty[java.io.File]).filter(f => f.getName.matches("(stop|start)-participant[123]")).foreach { f =>
+    val Array(cmd, name) = f.getName.split("-", 2)
+    val p = byName(name)
+    val result = try {
+      if (cmd == "stop") p.stop() else { p.start(); p.synchronizers.reconnect_all() }
+      s"$cmd $name ok at ${java.time.Instant.now}"
+    } catch { case e: Throwable => s"$cmd $name failed: $e" }
+    println(result)
+    f.delete()
+    java.nio.file.Files.writeString(new java.io.File(ctl, s"$name.status").toPath, result + "\n")
+  }
+  Thread.sleep(1000)
+})
+loop.setDaemon(true)
+loop.start()
+println("Talang DecMan LocalNet Canton is ready.")

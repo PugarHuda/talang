@@ -1,0 +1,94 @@
+{
+  "ledger": "local Canton sandbox 3.4.11",
+  "ranAt": "2026-10-09T08:26:02.658Z",
+  "tolerancePct": 1,
+  "steps": [
+    {
+      "step": "committee of 3 pricers, one per exchange (coinbase, kraken, bitstamp), threshold 2",
+      "updateId": "12204276f245d209543ae22c730bff3aba19765dc0a13df71b22cc3bb5110c43d6d5",
+      "offset": 189,
+      "committee": "talang-oracle-committee-mv0pasw6::1220f1cdb029e35b855a98d7a1ec3f202ee3bd514c5ceac72d714d82dcbffc0668a5",
+      "members": [
+        {
+          "source": "coinbase",
+          "party": "talang-pricer-coinbase-mv0pat0u::1220f1cdb029e35b855a98d7a1ec3f202ee3bd514c5ceac72d714d82dcbffc0668a5"
+        },
+        {
+          "source": "kraken",
+          "party": "talang-pricer-kraken-mv0pat2y::1220f1cdb029e35b855a98d7a1ec3f202ee3bd514c5ceac72d714d82dcbffc0668a5"
+        },
+        {
+          "source": "bitstamp",
+          "party": "talang-pricer-bitstamp-mv0pat6g::1220f1cdb029e35b855a98d7a1ec3f202ee3bd514c5ceac72d714d82dcbffc0668a5"
+        }
+      ]
+    },
+    {
+      "step": "honest round: CBTC 82517.4 published by the committee (3 of 3 sources agree)",
+      "votes": [
+        {
+          "member": "coinbase",
+          "ownPrice": 82517.395,
+          "gapPct": 0,
+          "confirms": true
+        },
+        {
+          "member": "kraken",
+          "ownPrice": 82525,
+          "gapPct": 0.01,
+          "confirms": true
+        },
+        {
+          "member": "bitstamp",
+          "ownPrice": 82522.68,
+          "gapPct": 0.01,
+          "confirms": true
+        }
+      ],
+      "mark": "00425158059b8159dc48243c2591237cafe5ef2ece25d33461cc938fc8ea931c87ca1212202bf4f5d9809a02e9fe18c07b3f245e958696310406e3d04bef30abfb6f8f5171",
+      "updateId": "12202bd750a261dbabc34dd4cb48a2ae50b77cfb6166fec58e53368afe6d12f1e732",
+      "offset": 204
+    },
+    {
+      "step": "manipulated round: CBTC 89118.79 refused by GovernanceRules (0 of 3 sources agree: Enough confirmations to execute action)",
+      "votes": [
+        {
+          "member": "coinbase",
+          "ownPrice": 82517.395,
+          "gapPct": 8,
+          "confirms": false
+        },
+        {
+          "member": "kraken",
+          "ownPrice": 82525.1,
+          "gapPct": 7.99,
+          "confirms": false
+        },
+        {
+          "member": "bitstamp",
+          "ownPrice": 82522.68,
+          "gapPct": 7.99,
+          "confirms": false
+        }
+      ],
+      "refused": true
+    },
+    {
+      "step": "Treasury notes priced from the US Treasury daily par yield curve",
+      "notes": {
+        "UST2Y": {
+          "price": 98349.17,
+          "source": "US Treasury par yield 2 Yr 4.75% on 10/08/2026, 3.875% coupon, 100,000 face"
+        },
+        "UST5Y": {
+          "price": 95666.61,
+          "source": "US Treasury par yield 5 Yr 4.99% on 10/08/2026, 4% coupon, 100,000 face"
+        },
+        "UST10Y": {
+          "price": 92517.23,
+          "source": "US Treasury par yield 10 Yr 5.22% on 10/08/2026, 4.25% coupon, 100,000 face"
+        }
+      }
+    }
+  ]
+}

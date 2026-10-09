@@ -1,0 +1,36 @@
+1
+00:00:00,000 --> 00:00:03,880
+Borrower: a request for 5.4M USDC against Treasury notes, priced at today's US Treasury yield
+
+2
+00:00:03,880 --> 00:00:17,200
+Lender C was asked too. It seals its own quote, locking the cash
+
+3
+00:00:17,200 --> 00:00:19,860
+Its node shows one quote, its own. The rivals' quotes never reached it
+
+4
+00:00:19,860 --> 00:00:26,430
+Lender A, in its own session: still only its own quote
+
+5
+00:00:26,430 --> 00:00:35,210
+Back to the borrower: three sealed quotes, checked against the mark
+
+6
+00:00:35,210 --> 00:00:40,480
+It takes the cheapest quote whose haircut covers the loan
+
+7
+00:00:40,480 --> 00:00:49,390
+A losing lender is told its rank, and nothing else
+
+8
+00:00:49,390 --> 00:00:57,530
+The regulator: a best-execution record, with no lender names and no losing rates
+
+9
+00:00:57,530 --> 00:01:09,050
+Every node side by side, each reading only its own ledger
+

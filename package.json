@@ -14,9 +14,14 @@
     "local": "node scripts/local.mjs",
     "governance": "node scripts/governance.mjs",
     "upload": "node scripts/upload.mjs",
-    "token-rail": "node scripts/token-rail.mjs"
+    "token-rail": "node scripts/token-rail.mjs",
+    "oracle": "node scripts/oracle.mjs",
+    "test:proxy": "node scripts/test-readonly-proxy.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.0"
   }
 }

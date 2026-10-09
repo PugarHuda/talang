@@ -115,9 +115,11 @@ const callTx = await submit(p.lenderA, exercise('RepoTrade', trade, 'CallMargin'
 step('margin call issued on the governed mark', callTx, { marginCall: created(callTx, 'MarginCall') });
 
 mkdirSync('docs/evidence', { recursive: true });
-const where = /localhost|127\.0\.0\.1/.test(LEDGER) ? 'local-sandbox' : 'devnet';
+const where = process.env.EVIDENCE_TAG ?? (/localhost|127\.0\.0\.1/.test(LEDGER) ? 'local-sandbox' : 'devnet');
 const file = `docs/evidence/bitsafe-governed-marks-${where}.json`;
-writeFileSync(file, JSON.stringify({ ledger: where === 'devnet' ? LEDGER : 'local Canton sandbox 3.4.11', ranAt: new Date().toISOString(),
+const ledgers = { devnet: LEDGER, 'local-sandbox': 'local Canton sandbox 3.4.11',
+  localnet: 'DecMan LocalNet: 3 Canton 3.5.8 participants, committee hosted on all three (threshold 2)' };
+writeFileSync(file, JSON.stringify({ ledger: ledgers[where] ?? LEDGER, ranAt: new Date().toISOString(),
   packages: ['talang-repo-1.0.0', 'governance-core-v1-0.1.0 (BitSafe, unmodified)', 'governance-action-v1-0.1.0 (BitSafe, unmodified)'],
   steps: log }, null, 2) + '\n');
 console.log(`\nevidence written to ${file}`);

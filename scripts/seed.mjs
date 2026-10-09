@@ -1,26 +1,39 @@
-// Seed the desk on the DevNet node with one of every state a repo can be in:
-// an open request with three sealed quotes, a live repo with a substitution
-// waiting for the lender, a live repo under an outstanding margin call, a live
-// repo with a roll offer, a closed repo that paid the venue its fee, and the
-// best-execution record and loss notices every award leaves behind.
+// Seed the desk with one of every state a repo can be in, at today's real prices:
+// an open request with sealed quotes, a live repo with a substitution waiting for
+// the lender, a live repo under a margin call, a live repo with a roll offer, a
+// closed repo that paid the venue its fee, and the best-execution record and loss
+// notices every award leaves behind.
+//
+// Marks are live (lib/prices.mjs: US Treasury par yields for the notes), and every
+// principal is sized from them. The one number that is not today's market is the
+// margin-call scenario's stress mark, labelled as such: a call needs the price to fall.
 //   node scripts/seed.mjs          seed (refuses if repos already exist)
-//   node scripts/seed.mjs marks    re-publish fresh marks (they go stale after 24h)
+//   node scripts/seed.mjs marks    re-publish fresh live marks (they go stale after 24h)
 import { PARTIES as p, acs, submit, created, create, exercise, NO_CONTEXTS } from '../lib/ledger.mjs';
+import { livePrices } from '../lib/prices.mjs';
 
 const now = () => new Date().toISOString();
 const dec = (n) => String(n);
+const down = (x, step) => Math.floor(x / step) * step;
 const LENDERS = [p.lenderA, p.lenderB, p.lenderC].filter(Boolean);
 // The venue operator collects 10 bp a year; without a venue party the desk runs fee-free.
 const VENUE = p.venue ? { operator: p.venue, feeBps: '10.0' } : null;
+const BONDS = ['UST2Y', 'UST5Y', 'UST10Y'];
 
-const PRICES = { UST10Y: 98000, BUND10: 85000, GILT10: 100000, UST2Y: 99500 };
-
-async function publishMarks(prices = PRICES) {
+async function publishMarks(prices) {
   for (const [instrument, price] of Object.entries(prices)) {
     await submit(p.agent, create('Mark', { agent: p.agent, instrument, price: dec(price), asOf: now(),
       audience: [p.borrower, ...LENDERS] }));
   }
   console.log('marks published:', Object.entries(prices).map(([i, v]) => `${i} ${v}`).join(', '));
+}
+
+async function liveMarks() {
+  const live = await livePrices();
+  for (const i of BONDS) console.log(`  ${i} ${live[i].price}  (${live[i].source})`);
+  const prices = Object.fromEntries(BONDS.map((i) => [i, live[i].price]));
+  await publishMarks(prices);
+  return prices;
 }
 
 async function latestMark(instrument) {
@@ -51,8 +64,7 @@ async function quote(rfq, lender, principal, rateBps, haircut) {
 
 // Every lender quotes; the borrower takes `winner` (an index into the quotes).
 async function openRepo(instrument, qty, principal, termDays, quotes, winner) {
-  const lenders = quotes.map(([l]) => l);
-  const rfq = await request(instrument, qty, principal, termDays, lenders);
+  const rfq = await request(instrument, qty, principal, termDays, quotes.map(([l]) => l));
   const qs = [];
   for (const [lender, rate, haircut] of quotes) qs.push(await quote(rfq, lender, principal, rate, haircut));
   const col = await mint(p.bondIssuer, p.borrower, instrument, qty);
@@ -66,47 +78,58 @@ async function seed() {
   const { contracts } = await acs(p.borrower);
   if (contracts.some((c) => c.tpl === 'RepoTrade' || c.tpl === 'RepoRFQ'))
     throw new Error('already seeded: repos exist for this borrower');
-  await publishMarks();
+  const px = await liveMarks();
+  const fmt = (n) => (n / 1e6).toFixed(2) + 'M';
 
-  // 1. Live repo, then a substitution the lender has not answered yet.
-  const t1 = await openRepo('UST10Y', 100, 9500000, 90, [[p.lenderA, 530, 0.02], [p.lenderB, 545, 0.03]], 0);
-  const bunds = await mint(p.bondIssuer, p.borrower, 'BUND10', 120);
-  await submit(p.borrower, exercise('RepoTrade', t1, 'ProposeSubstitution', { holdingCid: bunds }));
-  console.log('· repo 1  UST10Y x100 for 9.5M @ 530bp (lender A), substitution to BUND10 pending');
+  // 1. Live repo, then a substitution into 5-year notes the lender has not answered yet.
+  const p1 = down(100 * px.UST10Y * 0.98 * 0.99, 100000);
+  const t1 = await openRepo('UST10Y', 100, p1, 90, [[p.lenderA, 530, 0.02], [p.lenderB, 545, 0.03]], 0);
+  const subQty = Math.ceil(p1 * 1.03 / (0.98 * px.UST5Y));
+  const sub = await mint(p.bondIssuer, p.borrower, 'UST5Y', subQty);
+  await submit(p.borrower, exercise('RepoTrade', t1, 'ProposeSubstitution', { holdingCid: sub }));
+  console.log(`· repo 1  UST10Y x100 for ${fmt(p1)} @ 530bp (lender A), substitution to UST5Y x${subQty} pending`);
 
-  // 2. Live repo whose collateral fell: the agent marks Gilts down and lender B calls.
-  const t2 = await openRepo('GILT10', 50, 4800000, 30, [[p.lenderA, 560, 0.02], [p.lenderB, 520, 0.02]], 1);
-  await publishMarks({ GILT10: 96000 });
+  // 2. Live repo sized tight to its 2% haircut; then a stress mark 4% below today's
+  //    price (a scenario, not today's market) and lender B calls.
+  const p2 = down(50 * px.UST2Y * 0.98 * 0.995, 10000);
+  const t2 = await openRepo('UST2Y', 50, p2, 30, [[p.lenderA, 560, 0.02], [p.lenderB, 520, 0.02]], 1);
+  await publishMarks({ UST2Y: Math.round(px.UST2Y * 0.96 * 100) / 100 });
   await submit(p.lenderB, exercise('RepoTrade', t2, 'CallMargin',
-    { markCid: await latestMark('GILT10'), respondBy: new Date(Date.now() + 2 * 864e5).toISOString() }));
-  console.log('· repo 2  GILT10 x50 for 4.8M @ 520bp (lender B), margin call outstanding');
+    { markCid: await latestMark('UST2Y'), respondBy: new Date(Date.now() + 2 * 864e5).toISOString() }));
+  await publishMarks({ UST2Y: px.UST2Y });
+  console.log(`· repo 2  UST2Y x50 for ${fmt(p2)} @ 520bp (lender B), margin call after a -4% stress mark`);
 
-  // 3. Three lenders quote; the cheapest rate's haircut does not cover, so the
+  // 3. Three lenders quote; the cheapest rate's 4% haircut does not cover, so the
   //    borrower takes the second-cheapest. Losers learn their rank, nothing more.
   if (p.lenderC) {
-    const t3 = await openRepo('UST10Y', 60, 5700000, 30,
+    const p3 = down(60 * px.UST10Y * 0.97, 1000);
+    const t3 = await openRepo('UST10Y', 60, p3, 30,
       [[p.lenderA, 540, 0.01], [p.lenderB, 515, 0.04], [p.lenderC, 525, 0.02]], 2);
     await submit(p.lenderC, create('RollOffer', { tradeCid: t3, borrower: p.borrower, lender: p.lenderC,
       newRateBps: '505.0', extraDays: '30', expiresAt: new Date(Date.now() + 3 * 864e5).toISOString() }));
-    console.log('· repo 3  UST10Y x60 for 5.7M @ 525bp (lender C, rank 2 of 3), roll offer at 505bp pending');
+    console.log(`· repo 3  UST10Y x60 for ${fmt(p3)} @ 525bp (lender C, rank 2 of 3), roll offer at 505bp pending`);
   }
 
-  // 4. Open request, sealed quotes, not yet awarded.
-  const rfq = await request('BUND10', 60, 4900000, 14, LENDERS);
-  await quote(rfq, p.lenderA, 4900000, 495, 0.025);
-  await quote(rfq, p.lenderB, 4900000, 505, 0.02);
-  console.log('· request BUND10 x60 for 4.9M, 2 sealed quotes waiting for the borrower');
+  // 4. Open request, sealed quotes, not yet awarded. The borrower holds the notes it
+  //    offers, so it can take a quote straight from the desk.
+  const p4 = down(60 * px.UST5Y * 0.95, 100000);
+  await mint(p.bondIssuer, p.borrower, 'UST5Y', 60);
+  const rfq = await request('UST5Y', 60, p4, 14, LENDERS);
+  await quote(rfq, p.lenderA, p4, 495, 0.025);
+  await quote(rfq, p.lenderB, p4, 505, 0.02);
+  console.log(`· request UST5Y x60 for ${fmt(p4)}, 2 sealed quotes waiting for the borrower`);
 
   // 5. Closed repo: opened and repurchased (one day of interest, the floor, plus the venue fee).
-  const t5 = await openRepo('UST2Y', 30, 2900000, 7, [[p.lenderA, 480, 0.01], [p.lenderB, 470, 0.015]], 1);
+  const p5 = down(30 * px.UST2Y * 0.98 * 0.98, 100000);
+  const t5 = await openRepo('UST2Y', 30, p5, 7, [[p.lenderA, 480, 0.01], [p.lenderB, 470, 0.015]], 1);
   const pay = await mint(p.cashIssuer, p.borrower, 'USDC', 2000);
   const { contracts: mine } = await acs(p.borrower);
   const loan = mine.find((c) => c.tpl === 'Holding' && c.arg.owner === p.borrower && c.arg.instrument === 'USDC'
-    && Number(c.arg.amount) === 2900000);
+    && Number(c.arg.amount) === p5);
   const pot = loan ? created(await submit(p.borrower, exercise('Holding', loan.cid, 'Merge', { other: pay })), 'Holding') : pay;
   await submit(p.borrower, exercise('RepoTrade', t5, 'Repurchase', { cashCid: pot, contexts: NO_CONTEXTS }));
-  console.log(`· repo 5  UST2Y x30 for 2.9M @ 470bp (lender B), repurchased${VENUE ? ', venue fee paid' : ''}`);
+  console.log(`· repo 5  UST2Y x30 for ${fmt(p5)} @ 470bp (lender B), repurchased${VENUE ? ', venue fee paid' : ''}`);
 }
 
 const cmd = process.argv[2];
-(cmd === 'marks' ? publishMarks() : seed()).catch((e) => { console.error('ERR', e.message); process.exit(1); });
+(cmd === 'marks' ? liveMarks() : seed()).catch((e) => { console.error('ERR', e.message); process.exit(1); });

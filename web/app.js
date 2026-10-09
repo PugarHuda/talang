@@ -263,7 +263,7 @@ function regulatorView() {
 function agentView() {
   const marks = of('Mark').sort((a, b) => b.arg.asOf.localeCompare(a.arg.asOf));
   return (!canAct() ? '' : `<h2>Publish a mark</h2><div class="card"><div class="form">
-    <label>Instrument<input id="m-inst" value="GILT10" /></label><label>Price per unit<input id="m-price" type="number" value="96000" /></label>
+    <label>Instrument<input id="m-inst" value="UST10Y" /></label><label>Price per unit<input id="m-price" type="number" value="${marks.find((m) => m.arg.instrument === 'UST10Y')?.arg.price ?? ''}" /></label>
     <button data-act="mark">Publish to borrower and lenders</button></div></div>`) + `
     <h2>Marks</h2><div class="card"><table><tr><th>Instrument</th><th>Price</th><th>As of</th><th></th></tr>
     ${marks.map((m) => `<tr><td>${esc(m.arg.instrument)}</td><td>${money(m.arg.price)}</td><td>${when(m.arg.asOf)}</td>
@@ -273,6 +273,78 @@ function agentView() {
 const venueView = () => `<div class="card emptystate"><h3>No venue screen yet</h3>
   <p class="empty">The operator's fee is collected inside each repurchase and roll; the regulator's lifecycle reports show every fee paid.</p></div>`;
 const VIEWS = { borrower: borrowerView, lenderA: lenderView, lenderB: lenderView, lenderC: lenderView, regulator: regulatorView, agent: agentView };
+
+// ---- side by side ----
+// Each role's column is that role's own /api/acs read, one request per role, the same
+// call the desk makes when acting as it. A count of 0 means the contract never reached
+// that party's node, not that the page filtered it out.
+let SBS = new URLSearchParams(location.search).get('view') === 'side-by-side';
+const deskRoles = () => [...$('#role').options].map((o) => o.value).filter((r) => CFG.parties[r]);
+
+function sbsCounts(role, contracts) {
+  const party = CFG.parties[role], n = (tpl) => contracts.filter((c) => c.tpl === tpl).length;
+  const quotes = contracts.filter((c) => c.tpl === 'RepoQuote');
+  // A quote is a lender's own when it names that lender; for anyone else every quote is someone else's.
+  const own = quotes.filter((q) => q.arg.lender === party).length;
+  return { requests: n('RepoRFQ'), quotes: quotes.length, own, rivals: quotes.length - own, repos: n('RepoTrade'),
+    losses: n('LossNotice'), bex: n('BestExecution'), reports: n('RepoReport'), total: contracts.length };
+}
+
+// One plain sentence per role, stated from the counts above.
+function sbsVerdict(role, c) {
+  if (LENDERS.includes(role)) return c.rivals === 0
+    ? `<span class="pill ok">0 rival quotes</span> ${c.own ? `Sees ${c.own} quote${c.own === 1 ? '' : 's'}, all its own.` : 'Sees no quote at all.'}`
+    : `<span class="pill bad">${c.rivals} rival quote${c.rivals === 1 ? '' : 's'} visible</span>`;
+  if (role === 'regulator') return c.requests + c.quotes === 0
+    ? `<span class="pill ok">0 requests, 0 quotes</span> Sees ${c.reports} report${c.reports === 1 ? '' : 's'} and ${c.bex} best-execution record${c.bex === 1 ? '' : 's'}, no names on the latter.`
+    : `<span class="pill bad">${c.requests} requests, ${c.quotes} quotes visible</span>`;
+  if (role === 'borrower') return `Sees the ${c.quotes} quote${c.quotes === 1 ? '' : 's'} sent to its own requests.`;
+  return '';
+}
+
+function sbsCard(role, res) {
+  const head = `<h3><span class="mono ${role}" aria-hidden="true">${MONO[role] ?? '?'}</span>${esc(NAMES[role] ?? role)}</h3>`;
+  if (res.status === 'rejected') return `<div class="card" data-role="${role}">${head}<p class="verdict"><span class="pill bad">${esc(res.reason.message)}</span></p></div>`;
+  const c = sbsCounts(role, res.value.contracts), lender = LENDERS.includes(role);
+  const row = (label, v, sub) => `<dt${sub ? ' class="sub"' : ''}>${label}</dt><dd class="${sub ? 'sub ' : ''}${v ? '' : 'zero'}" data-k="${label}">${v}</dd>`;
+  return `<div class="card" data-role="${role}">${head}<dl>
+    ${row('Open requests', c.requests)}${row('Quotes', c.quotes)}
+    ${lender ? row('its own', c.own, true) + row('from rivals', c.rivals, true) : ''}
+    ${row('Repos', c.repos)}${row('Loss notices', c.losses)}${row('Best-execution records', c.bex)}${row('Reports', c.reports)}
+    ${row('All contracts', c.total)}</dl>
+    <p class="verdict">${sbsVerdict(role, c)}</p><p class="off">offset ${esc(res.value.offset)}</p></div>`;
+}
+
+async function sideBySide() {
+  const roles = deskRoles();
+  const res = await Promise.allSettled(roles.map((role) => post('/api/acs', { role })));
+  const ok = res.filter((r) => r.status === 'fulfilled');
+  if (!ok.length) throw res[0]?.reason ?? new Error('no roles');
+  $('#status').textContent = `● live · ${Math.max(...ok.map((r) => r.value.offset))}`; $('#status').className = 'status';
+  if (!SBS) return; // left the view while the reads were in flight
+  $('#view').innerHTML = `<section class="sbs-head"><div><p class="kicker">Side by side</p><h1>Every role, its own node</h1></div>
+    <p class="note">Each column is one read of that party's active contracts, the same read the desk makes when acting as it. Nothing is filtered by this page.</p></section>
+    <div class="sbs" id="sbs">${roles.map((r, i) => sbsCard(r, res[i])).join('')}</div>`;
+}
+
+// Flag, button, heading and URL; ?view=side-by-side reopens this view on reload.
+function markSbs(on) {
+  SBS = on;
+  $('#side-by-side').setAttribute('aria-pressed', String(on));
+  $('#who').hidden = on;
+  document.body.classList.toggle('sbs-mode', on);
+  const u = new URL(location.href);
+  on ? u.searchParams.set('view', 'side-by-side') : u.searchParams.delete('view');
+  history.replaceState(null, '', u);
+}
+
+function setSbs(on) {
+  markSbs(on);
+  if (on) $('#roles').querySelectorAll('[data-role]').forEach((b) => b.setAttribute('aria-pressed', 'false'));
+  else rolePills();
+  $('#view').innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel short"></div>';
+  refresh(true);
+}
 
 // ---- actions ----
 const val = (id) => $(id)?.value;
@@ -378,7 +450,9 @@ async function refresh(force) {
   // Never repaint under a field being typed in.
   if (!force && document.activeElement?.matches('input, select.in')) return;
   try {
+    if (SBS) return await sideBySide();
     const r = await post('/api/acs', { role: ROLE });
+    if (SBS) return; // switched to side by side while this read was in flight
     DATA = r.contracts;
     $('#status').textContent = `● live · ${r.offset}`; $('#status').className = 'status';
     $('#view').innerHTML = (VIEWS[ROLE] ?? venueView)();
@@ -395,6 +469,7 @@ function rolePills() {
     <span class="mono" aria-hidden="true">${MONO[o.value] ?? '?'}</span>${esc(o.text.split(' · ')[0])}</button>`).join('');
   $('#roles').onclick = (e) => {
     const b = e.target.closest('[data-role]');
+    if (b && SBS && b.dataset.role === ROLE) return setSbs(false);
     if (b && b.dataset.role !== ROLE) { $('#role').value = b.dataset.role; $('#role').dispatchEvent(new Event('change')); }
   };
   if ($('#role-name')) $('#role-name').textContent = $('#role').selectedOptions[0]?.text ?? ROLE;
@@ -408,8 +483,9 @@ async function start() {
     try {
       const party = await wallet.connect();
       const role = Object.entries(CFG.parties).find(([, v]) => v === party)?.[0];
-      $('#wallet').textContent = role ? `Wallet · ${NAMES[role] ?? role}` : 'Wallet connected';
-      if (!role) return toast('Connected, but this wallet\'s party is not a party on this desk', true);
+      $('#wallet').textContent = role ? `Wallet · ${NAMES[role] ?? role}` : `Wallet · ${party.split('::')[0].slice(0, 18)}`;
+      $('#wallet').title = party;
+      if (!role) return toast(`Wallet connected as ${party.slice(0, 40)}…: not a party on this desk's ledger, so it cannot act here yet`, true);
       ROLE = role; $('#role').value = role; $('#role').dispatchEvent(new Event('change'));
       toast(`Signing as ${NAMES[role] ?? role} with your wallet`);
     } catch (err) { toast('Wallet: ' + err.message, true); }
@@ -417,12 +493,14 @@ async function start() {
   $('#role').value = ROLE;
   $('#party').textContent = me();
   rolePills();
+  $('#side-by-side').onclick = () => setSbs(!SBS);
   $('#role').onchange = () => {
+    if (SBS) markSbs(false);
     ROLE = $('#role').value; try { localStorage.setItem('talang.role', ROLE); } catch {}
     $('#party').textContent = me(); rolePills(); syncReadOnly();
     $('#view').innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel short"></div>'; refresh(true);
   };
-  await refresh(true);
+  if (SBS) setSbs(true); else await refresh(true);
   timer = setInterval(refresh, 5000);
 }
 start();

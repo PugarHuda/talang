@@ -27,3 +27,9 @@ log/*.log
 
 # local sandbox run (scripts/local.mjs)
 parties.local.json
+
+# DecMan LocalNet run (localnet/decman-setup.mjs): node data, keys, generated parties
+parties.localnet.json
+localnet/decman/
+localnet/ctl/
+media/.capture/

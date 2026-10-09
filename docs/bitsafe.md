@@ -39,32 +39,37 @@ The DARs in `dars/` are BitSafe's releases, unmodified:
 | 1 of 3 confirmations refused; 2 of 3 publish; repo opens on the committee mark; one pricer's own mark cannot drive a margin call; a governed markdown can | `test/daml/GovernanceTest.daml` `valuationCommittee` | passes |
 | Syndicate quote refused with 1 of 3, executed with 2 of 3; rival lender sees nothing; margin call refused with 1, issued with 2 | `test/daml/GovernanceTest.daml` `lenderSyndicate` | passes |
 | The committee flow above on a running Canton 3.4.11 participant through the JSON Ledger API, BitSafe's DAR uploaded as released | `scripts/governance.mjs` | [evidence](evidence/bitsafe-governed-marks-local-sandbox.json): refusal reason is BitSafe's own *"The requirement 'Enough confirmations to execute action' was not met"* |
+| Price oracle: one pricer per exchange (Coinbase, Kraken, Bitstamp). A member confirms only if its own exchange is within 1% of the proposal. A live CBTC price publishes; a proposal 8% off the market is refused | `scripts/oracle.mjs` | [evidence](evidence/oracle-local-sandbox.json): every source quote, vote and update id |
 
 On a single participant the committee and its members share one node. That proves
 the threshold and the authority flow, not the hosting topology.
 
-## DecMan LocalNet: three participants (not yet run)
+## DecMan LocalNet: three participants
 
-This is the run the BitSafe Contribution Pool asks for. It needs Docker, which the
-machine this was built on does not have yet.
+The committee hosted on three participants, set up through BitSafe DecMan's own
+API, then driven by the same scripts as above. Everything is in `localnet/`:
+one Canton 3.5.8 process (the build in Splice 0.6.12; DecMan v1.13.0 needs protocol
+version 35) with a synchronizer and three participants, Postgres, and three DecMan
+nodes from the published image. Insecure mode, local only: every port is bound to
+127.0.0.1.
 
-1. Bring up the Splice LocalNet and DecMan's three participant instances as in the
-   DecMan README (`docker compose up` in the DecMan repo starts DecMan on 8081,
-   8082 and 8083 against Canton participants on `5001/5002`, `5011/5012`,
-   `5021/5022`).
-2. Upload `talang-repo-1.0.0.dar`, `governance-action-v1-0.1.0.dar` and
-   `governance-core-v1-0.1.0.dar` to all three participants.
-3. In DecMan, create the valuation committee: one owner party per participant,
-   hosting threshold 2, governance threshold 2. Note the committee party, the three
-   owner parties and the `GovernanceRules` contract id.
-4. Point `.env.localnet` at participant 1's JSON Ledger API and run:
+```
+cd localnet && docker compose up -d       # wait for "participant3 ... connected=true"
+bash localnet/peers.sh                    # each DecMan node learns the other two
+node localnet/decman-setup.mjs            # committee, members, GovernanceRules, .env.localnet
+ENV_FILE=.env.localnet node scripts/governance.mjs
+ENV_FILE=.env.localnet node scripts/localnet-offline.mjs
+```
 
-   ```
-   ENV_FILE=.env.localnet COMMITTEE_PARTY=... COMMITTEE_MEMBERS=a,b,c COMMITTEE_RULES=... \
-     node scripts/governance.mjs
-   ```
+`decman-setup.mjs` makes DecMan onboard `talang-valuation-committee` with owners on
+all three participants (threshold 2), allocates one member party per participant,
+and creates `GovernanceRules` (members = the three, threshold 2) through DecMan's
+contracts workflow. Each member's commands go to the node that hosts it.
 
-5. Stop one participant and run it again: with two of three nodes up the committee
-   still publishes; with one, confirmations cannot reach the threshold.
+| What | Where | Result |
+|---|---|---|
+| 1 of 3 refused, 2 of 3 publish, repo opens on the committee mark, a pricer's own mark cannot drive a margin call, a governed markdown does, with the committee hosted on three nodes | `scripts/governance.mjs` | [evidence](evidence/bitsafe-governed-marks-localnet.json) |
+| Participant 3 stopped: members on nodes 1 and 2 still publish a mark. Participant 2 stopped as well: the publish stops at the first confirmation, because `GovernanceRules` is signed by the committee and one node cannot confirm for it | `scripts/localnet-offline.mjs` | [evidence](evidence/bitsafe-node-offline-localnet.json) |
 
-Each run writes its update ids and offsets to `docs/evidence/`.
+Offsets in the evidence are per participant (each member submits through its own
+node); update ids are global.
