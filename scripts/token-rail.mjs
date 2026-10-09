@@ -50,8 +50,8 @@ async function allocateLeg(registry, tag, holding, sender, receiver, amount, set
 }
 const owns = async (party, registry, tag) => {
   const r = await api('/v2/state/active-contracts', { method: 'POST', json: {
-    filter: { filtersByParty: { [party]: { cumulative: [{ identifierFilter: { TemplateFilter: { value: { templateId: REG('MockHolding'), includeCreatedEventBlob: false } } } }] } } },
-    verbose: true, activeAtOffset: (await api('/v2/state/ledger-end')).data.offset } });
+    eventFormat: { verbose: true, filtersByParty: { [party]: { cumulative: [{ identifierFilter: { TemplateFilter: { value: { templateId: REG('MockHolding'), includeCreatedEventBlob: false } } } }] } } },
+    activeAtOffset: (await api('/v2/state/ledger-end')).data.offset } });
   return r.data.map((x) => x.contractEntry?.JsActiveContract?.createdEvent?.createArgument).filter(Boolean)
     .filter((h) => h.owner === party && h.registry === registry && h.instrumentTag === tag).reduce((s, h) => s + Number(h.amount), 0);
 };
@@ -87,8 +87,8 @@ step('award: USDCx allocation executed to the borrower, B\'s cancelled back to B
 const noticeTx = await submit(p.borrower, exercise('RepoTrade', trade, 'NoticeRepurchase', { settleBefore: inDays(1) }));
 const notice = created(noticeTx, 'RepurchaseNotice');
 const view = await api('/v2/state/active-contracts', { method: 'POST', json: {
-  filter: { filtersByParty: { [p.borrower]: { cumulative: [{ identifierFilter: { InterfaceFilter: { value: { interfaceId: REQ, includeInterfaceView: true, includeCreatedEventBlob: false } } } }] } } },
-  verbose: true, activeAtOffset: (await api('/v2/state/ledger-end')).data.offset } });
+  eventFormat: { verbose: true, filtersByParty: { [p.borrower]: { cumulative: [{ identifierFilter: { InterfaceFilter: { value: { interfaceId: REQ, includeInterfaceView: true, includeCreatedEventBlob: false } } } }] } } },
+  activeAtOffset: (await api('/v2/state/ledger-end')).data.offset } });
 const req = view.data.map((x) => x.contractEntry?.JsActiveContract?.createdEvent).find((e) => e?.contractId === notice)?.interfaceViews?.[0]?.viewValue;
 const legs = Object.entries(req?.transferLegs ?? {}).map(([k, l]) => ({ leg: k, to: l.receiver === p.lenderA ? 'lenderA' : 'venue', amount: Number(l.amount) }));
 step('repurchase notice read through the standard AllocationRequest interface', noticeTx, { legs });
