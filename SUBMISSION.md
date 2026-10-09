@@ -81,7 +81,7 @@ repurchase and every roll, so it cannot be skipped. Built and tested.
   execution, margin calls from fresh marks, substitution, rolls, repurchase in desk
   cash or as a standard allocation request, venue fee, default, regulator reports;
   BitSafe-governed marks and lender syndicates.
-- **Tests:** 19 Daml scripts including every refusal, the token rail against a
+- **Tests:** 22 Daml scripts including every refusal, the token rail against a
   registry implementing the Splice interfaces, and BitSafe's own `GovernanceRules`.
 - **Desk** (`web/`, `server.mjs`): one page per role, each reading only its own node.
 - **AI agents** (`mcp/server.mjs`): lender, borrower and regulator desks over MCP.

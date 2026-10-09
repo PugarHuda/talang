@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Talang · pitch deck</title>
+<meta name="description" content="Talang, a sealed-bid repo desk on Canton. HackCanton Season 3, Financial Applications." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@200..700&family=Geist+Mono:wght@400;500&display=swap" />
+<style>
+/* Talang deck. Same tokens, typeface and lavender glass as web/landing.css.
+   1rem tracks the viewport (min of width/height, so 16:9 never overflows);
+   print pins it to a 1280x720 page, so the PDF matches the screen proportionally.
+   Every number on a slide comes from README.md, BRIEF.md or docs/evidence/. */
+:root{
+  --bg:#e9e5f6; --ink:#120d24; --ink-2:#3b3552; --muted:#6c6683;
+  --violet:#6a2cf0; --violet-2:#8b5cff; --lilac:#ddd0ff; --yellow:#e6ff4f;
+  --coral:#ffb3a7; --mint:#b9f3d6; --dark:#0f0b1c; --dark-2:#1d1830;
+  --on-dark:#f3f0ff; --on-dark-muted:#a49cc4;
+  --glass:rgba(255,255,255,.58); --glass-line:rgba(255,255,255,.95);
+  --mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+*{ box-sizing:border-box }
+html{ font-size:min(1vw,1.7778vh) }
+body{ margin:0; color:var(--ink); background:var(--bg); overflow:hidden;
+  font-family:"Geist",ui-sans-serif,system-ui,"Segoe UI",sans-serif; -webkit-font-smoothing:antialiased }
+.slide{
+  position:fixed; inset:0; width:100vw; height:100vh; opacity:0; visibility:hidden; transition:opacity .22s ease;
+  padding:6.4rem 6rem 5rem; display:flex; flex-direction:column; justify-content:center; overflow:hidden;
+  background:
+    radial-gradient(60% 55% at 88% 8%, rgba(173,140,255,.42), transparent 70%),
+    radial-gradient(45% 40% at 0% 70%, rgba(255,190,230,.30), transparent 70%),
+    radial-gradient(70% 50% at 50% 115%, rgba(150,120,255,.32), transparent 70%),
+    var(--bg);
+}
+.slide::before{ content:""; position:absolute; inset:0; z-index:0; opacity:.5; pointer-events:none;
+  background-image:linear-gradient(rgba(120,100,200,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(120,100,200,.08) 1px,transparent 1px);
+  background-size:4.4rem 4.4rem; mask-image:radial-gradient(60% 70% at 30% 40%,#000,transparent 75%); -webkit-mask-image:radial-gradient(60% 70% at 30% 40%,#000,transparent 75%) }
+.slide > *{ position:relative; z-index:1 }
+.slide.on{ opacity:1; visibility:visible }
+
+/* running head */
+.meta{ position:absolute; top:2.4rem; left:6rem; right:6rem; display:flex; justify-content:space-between; align-items:center;
+  font:500 .95rem var(--mono); letter-spacing:.08em; text-transform:uppercase; color:var(--muted) }
+.meta .brand{ display:flex; align-items:center; gap:.6rem; font:500 1.35rem "Geist"; letter-spacing:-.03em; text-transform:none; color:var(--ink) }
+.meta .brand svg{ width:1.9rem; height:1.9rem }
+.foot{ position:absolute; bottom:2.2rem; left:6rem; right:6rem; font:.88rem var(--mono); color:var(--muted); display:flex; justify-content:space-between }
+
+/* type */
+.eyebrow{ display:inline-flex; align-items:center; gap:.7rem; margin:0 0 1.4rem; font-size:1.3rem; color:var(--ink-2); font-weight:400 }
+.eyebrow .dot{ width:1.3rem; height:1.3rem; border-radius:50%; background:radial-gradient(circle at 35% 35%,#c7b2ff,var(--violet) 60%,#2a0e8a); box-shadow:0 0 0 .25rem #fff,0 0 0 .32rem rgba(255,150,180,.5) }
+h1{ margin:0; font-weight:250; font-size:8.6rem; line-height:.95; letter-spacing:-.055em }
+h2{ margin:0 0 2.2rem; font-weight:300; font-size:4.1rem; line-height:1.02; letter-spacing:-.045em; max-width:80rem }
+h2 em, h1 em{ font-style:normal; color:var(--violet) }
+h3{ margin:0 0 .7rem; font-size:1.55rem; font-weight:500; letter-spacing:-.02em }
+p{ margin:0 0 1rem; font-size:1.45rem; line-height:1.45; color:var(--ink-2); font-weight:350 }
+.lede{ font-size:1.9rem; line-height:1.4; max-width:62rem }
+.small{ font-size:1.15rem; color:var(--muted) }
+code,.mono{ font-family:var(--mono); font-size:.9em }
+b,strong{ font-weight:600; color:var(--ink) }
+
+/* glass surfaces */
+.card{ background:var(--glass); border:1px solid var(--glass-line); border-radius:1.6rem; padding:1.8rem 2rem;
+  box-shadow:0 2.2rem 5rem -2.4rem rgba(70,40,160,.35); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px) }
+.card p{ font-size:1.25rem; margin:0 }
+.dark{ background:var(--dark); color:var(--on-dark); border-color:#2a2342 }
+.dark p{ color:var(--on-dark-muted) } .dark b{ color:var(--on-dark) } .dark h3{ color:var(--on-dark) }
+.grid{ display:grid; gap:1.6rem }
+.g2{ grid-template-columns:1fr 1fr } .g3{ grid-template-columns:repeat(3,1fr) } .g4{ grid-template-columns:repeat(4,1fr) }
+.card .num,.num{ font:300 3.6rem/1 "Geist"; letter-spacing:-.04em; margin:0 0 .6rem; color:var(--ink) }
+.dark .num{ color:var(--on-dark) }
+
+/* pills and tags, as on the landing */
+.pill{ display:inline-block; padding:.25rem .8rem; border-radius:.7rem; font:500 1rem var(--mono); color:var(--dark); white-space:nowrap }
+.p-y{ background:var(--yellow) } .p-l{ background:var(--lilac) } .p-c{ background:var(--coral) } .p-m{ background:var(--mint) }
+.p-d{ background:var(--dark); color:var(--on-dark) }
+.notyet{ display:inline-block; padding:.18rem .7rem; border-radius:.6rem; font:600 .95rem var(--mono); letter-spacing:.04em;
+  text-transform:uppercase; color:#7a1d0d; background:var(--coral); white-space:nowrap }
+.ok{ display:inline-block; padding:.18rem .7rem; border-radius:.6rem; font:600 .95rem var(--mono); letter-spacing:.04em;
+  text-transform:uppercase; color:#0e4a2e; background:var(--mint); white-space:nowrap }
+
+/* tables */
+table{ width:100%; border-collapse:collapse; font-size:1.2rem }
+th{ text-align:left; font:500 .95rem var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--muted); padding:.7rem 1rem; border-bottom:1px solid rgba(108,102,131,.25) }
+td{ padding:.8rem 1rem; border-bottom:1px solid rgba(108,102,131,.15); vertical-align:top; color:var(--ink-2); line-height:1.35 }
+tr:last-child td{ border-bottom:0 }
+td:first-child{ color:var(--ink); font-weight:500 }
+.tw{ padding:.6rem 1rem; border-radius:1.6rem }
+
+/* steps */
+.steps{ display:grid; grid-template-columns:repeat(4,1fr); gap:1.2rem; counter-reset:s }
+.step{ counter-increment:s }
+.step::before{ content:counter(s,decimal-leading-zero); display:block; font:500 1rem var(--mono); color:var(--violet); margin-bottom:.8rem }
+.dark.step::before{ color:var(--yellow) }
+
+.ids{ font:1rem/1.6 var(--mono); color:var(--muted) }
+.ids span{ color:var(--ink) }
+td.mono{ white-space:nowrap; font-size:1.05rem }
+.ids li{ list-style:none }
+ul.ids{ margin:0; padding:0 }
+ul.list{ margin:0; padding-left:1.4rem } ul.list li{ font-size:1.3rem; line-height:1.45; color:var(--ink-2); margin-bottom:.5rem }
+.dark ul.list li{ color:var(--on-dark-muted) }
+
+.shot{ border-radius:1.4rem; overflow:hidden; border:1px solid var(--glass-line); box-shadow:0 2.2rem 5rem -2.4rem rgba(70,40,160,.45) }
+.shot img{ display:block; width:100%; height:100%; object-fit:cover; object-position:top left }
+
+.cover h1{ margin-bottom:2rem }
+
+/* deck chrome */
+#rail{ position:fixed; left:0; right:0; bottom:0; height:.3rem; background:rgba(106,44,240,.12); z-index:40 }
+#rail i{ display:block; height:100%; background:var(--violet); transition:width .22s ease }
+#hint{ position:fixed; right:2rem; bottom:1.2rem; z-index:40; font:500 .95rem var(--mono); color:var(--muted); user-select:none }
+@page{ size:1280px 720px; margin:0 }
+@media (prefers-reduced-motion:reduce){ .slide{ transition:none } }
+@media print{
+  html{ font-size:12.8px }
+  .slide{ position:relative; opacity:1; visibility:visible; inset:auto; width:1280px; height:720px; break-after:page; page-break-after:always }
+  .slide:last-child{ break-after:auto; page-break-after:auto }
+  #rail,#hint{ display:none }
+  .card{ backdrop-filter:none; -webkit-backdrop-filter:none; background:rgba(255,255,255,.7) }
+  .dark{ background:var(--dark) }
+}
+</style>
+</head>
+<body>
+
+<!-- 1 · COVER -->
+<section class="slide cover">
+  <div class="meta"><span class="brand"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 28 10v12L16 29 4 22V10z" fill="#120d24"/><path d="M16 3 28 10 16 17 4 10z" fill="#3a2b66"/><path d="M16 17v12L4 22V10z" fill="#1d1538"/><circle cx="16" cy="17" r="3.2" fill="#8b5cff"/></svg>talang</span><span>HackCanton S3 · Financial Applications</span></div>
+  <p class="eyebrow"><span class="dot"></span>Sealed-bid repo on Canton</p>
+  <h1>Repo quotes,<br />behind glass</h1>
+  <p class="lede">A borrower asks a panel of lenders for cash against collateral. Each lender's rate and haircut reach the borrower and nobody else, and the repo then lives on the ledger until it is repurchased.</p>
+  <p style="margin-top:1.6rem"><span class="pill p-d">talang-desk.vercel.app</span> &nbsp;<span class="pill p-l">github.com/PugarHuda/talang</span></p>
+  <div class="foot"><span>Pugar Huda Mantoro</span><span>NODERS · BitSafe DecMan · CIP-0056 · Grofty</span></div>
+</section>
+
+<!-- 2 · PROBLEM -->
+<section class="slide">
+  <div class="meta"><span>01 · The problem</span><span>2 / 14</span></div>
+  <h2>Asking for a repo price <em>is itself information</em></h2>
+  <div class="grid g3">
+    <div class="card"><p class="num">5 → 4</p><h3>The ask leaks</h3><p>A fund asks five dealers for cash against a block of Treasuries. All five learn it needs liquidity and what it holds. The four that lose keep that knowledge.</p></div>
+    <div class="card"><p class="num">rate</p><h3>Hiding it costs</h3><p>Large holders split requests across days or stay with one dealer to avoid the leak, and pay for it in rate.</p></div>
+    <div class="card"><p class="num">email</p><h3>After the trade, by hand</h3><p>Margin calls argued from each side's own spreadsheet and price, substitutions by email, the regulator's report rebuilt after the fact.</p></div>
+  </div>
+  <p class="small" style="margin-top:2rem">Source: BRIEF.md. No user interviews are claimed; the validation log there records only conversations that happened, and is empty.</p>
+</section>
+
+<!-- 3 · SOLUTION -->
+<section class="slide">
+  <div class="meta"><span>02 · Talang</span><span>3 / 14</span></div>
+  <h2>A quote signed by <em>one lender and the borrower</em>, and nobody else</h2>
+  <div class="grid g2" style="align-items:start">
+    <div>
+      <p class="lede" style="font-size:1.6rem">On Canton a contract is sent only to its stakeholders' nodes. A sealed quote has two, so it never reaches a rival lender or the regulator. Not hidden by the page: never received.</p>
+      <p style="font-size:1.35rem">The quote the borrower takes opens a repo that the contract runs until it is repurchased.</p>
+    </div>
+    <div class="card tw">
+      <table>
+        <tr><th>Pain</th><th>What the ledger enforces</th></tr>
+        <tr><td>Quotes that cannot be funded</td><td>Full principal locked behind the quote</td></tr>
+        <tr><td>Settlement risk at open</td><td>Collateral pledged, cash delivered, losers refunded: one transaction</td></tr>
+        <tr><td>Disputed margin calls</td><td>Units due from a signed mark; refused while covered</td></tr>
+        <tr><td>Substitution by email</td><td>Lender consent, and only if the substitute covers at a fresh mark</td></tr>
+        <tr><td>Rolling = close + reopen</td><td>Interest so far paid, new rate from today</td></tr>
+        <tr><td>Default</td><td>After an unanswered call or maturity, pledge to the lender</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- 4 · HOW IT WORKS -->
+<section class="slide">
+  <div class="meta"><span>03 · How it works</span><span>4 / 14</span></div>
+  <h2>Sealed quotes, atomic award, <em>proof without leaks</em></h2>
+  <div class="steps">
+    <div class="card step"><h3>Request</h3><p>Borrower invites a panel. Only invited lenders see it, and it carries no rate.</p></div>
+    <div class="card step"><h3>Sealed quote</h3><p>Lender locks the full principal: desk escrow or a CIP-0056 allocation. Rivals and the regulator never receive it.</p></div>
+    <div class="card step"><h3>Award</h3><p>Opening leg atomic: collateral pledged, cash delivered, losing quotes refunded unrevealed.</p></div>
+    <div class="card dark step"><h3>Loss notice · best execution</h3><p>Each loser gets its rank and nothing else. The regulator gets quotes weighed, winner's rank, gap to best in bp. No lender named.</p></div>
+  </div>
+  <div class="grid g2" style="margin-top:1.8rem; grid-template-columns:1.1fr 1fr; align-items:center">
+    <div class="shot" style="height:13rem"><img src="../docs/img/desk-regulator.png" alt="Regulator desk: best execution table with quotes weighed, winner's rank, rate taken, haircut and gap over best rate; no lender names." style="object-position:0 23.5%" /></div>
+    <p style="font-size:1.25rem">The demo case on the seeded ledger: the cheapest rate's haircut does not cover, so the borrower takes rank 2. Regulator: <b>3 quotes weighed, winner rank 2, 10 bp over best</b>. The losing lender: <b>rank 3 of 3</b>. Neither learns a losing rate or a name.</p>
+  </div>
+</section>
+
+<!-- 5 · PRIVACY -->
+<section class="slide">
+  <div class="meta"><span>04 · What each node sees</span><span>5 / 14</span></div>
+  <h2>Privacy is read <em>from each node</em></h2>
+  <div class="card tw">
+    <table>
+      <tr><th>Node</th><th>Receives</th><th>Never receives</th></tr>
+      <tr><td>Borrower</td><td>Its requests; every quote made to it, ranked with coverage</td><td>&mdash;</td></tr>
+      <tr><td>Lender A / B / C</td><td>Requests it was invited to; its own quote; its own loss notice (rank only)</td><td>Rival quotes: <b>0</b> on any lender node · other lenders' loss notices: <b>0</b></td></tr>
+      <tr><td>Regulator</td><td><code>RepoReport</code> for every lifecycle event, <code>BestExecution</code> records</td><td>Requests <b>0</b> · quotes <b>0</b> · loss notices <b>0</b></td></tr>
+    </table>
+  </div>
+  <p class="small" style="margin-top:1.6rem">Checked on every run: <code>privacy_check</code> from each MCP desk in <code>npm run e2e:mcp</code>, and in page and API by <code>npm run qa:desk</code>. Token rail on a participant: lender B's node held 0 rival quotes.</p>
+</section>
+
+<!-- 6 · BITSAFE -->
+<section class="slide">
+  <div class="meta"><span>05 · BitSafe Decentralization Manager</span><span>6 / 14</span></div>
+  <h2>No single key moves <em>a margin call</em></h2>
+  <div class="grid" style="grid-template-columns:1fr 1.15fr; align-items:start">
+    <div>
+      <p style="font-size:1.35rem">Marks come from a valuation committee, a decentralized party. Each mark is a <code>GovernableAction</code> on BitSafe's own <code>GovernanceRules</code>, DARs used unmodified. A lender can be a k-of-n syndicate the same way.</p>
+      <ul class="list">
+        <li>1 of 3 confirmations: <b>refused</b> by BitSafe's rule <i>"Enough confirmations to execute action"</i></li>
+        <li>2 of 3: mark published, repo opens on it</li>
+        <li>Margin call on one pricer's own mark: <b>refused</b> ("mark from the wrong agent")</li>
+        <li>Oracle: one pricer per exchange; a proposal 8% off market refused</li>
+      </ul>
+    </div>
+    <div class="card dark">
+      <h3>DecMan LocalNet · 3 Canton 3.5.8 participants</h3>
+      <p style="margin-bottom:1.2rem">Committee onboarded through DecMan, hosted on all three nodes, threshold 2.</p>
+      <div class="grid g2" style="gap:1rem">
+        <div><span class="ok" style="background:var(--mint)">publishes</span><p style="margin-top:.6rem">Participant 3 stopped: members on nodes 1 and 2 publish UST10Y 97,500.</p></div>
+        <div><span class="notyet">cannot</span><p style="margin-top:.6rem">Participants 2 and 3 stopped: publish stops at the first confirmation.</p></div>
+      </div>
+      <ul class="ids" style="margin-top:1.2rem; color:var(--on-dark-muted)">
+        <li>update <span style="color:var(--on-dark)">12203359acdb…a4138</span> · one node down</li>
+        <li>update <span style="color:var(--on-dark)">1220a204dcd8…b08</span> · 2-of-3 mark</li>
+      </ul>
+    </div>
+  </div>
+  <p class="small" style="margin-top:1.4rem">Governance on DevNet: <span class="notyet">not yet</span> waiting on act-as rights for the committee's parties from NODERS (grant refused 403).</p>
+</section>
+
+<!-- 7 · CBTC ON DEVNET -->
+<section class="slide">
+  <div class="meta"><span>06 · Real CBTC on DevNet</span><span>7 / 14</span></div>
+  <h2>Real CBTC as collateral, <em>through the DA Utility registry</em></h2>
+  <div class="grid" style="grid-template-columns:1.25fr 1fr; align-items:start">
+    <div class="card tw">
+      <table>
+        <tr><th>Step on the NODERS DevNet participant</th><th>Update id</th></tr>
+        <tr><td>Faucet's 1.0 CBTC transfer offer accepted through the registry</td><td class="mono">122085841bcd…f6c5</td></tr>
+        <tr><td>CBTC allocated to lender A via the registry's <code>AllocationFactory</code></td><td class="mono">1220c89b7d65…d45c</td></tr>
+        <tr><td>Request: 50 USDC against 0.001 CBTC, 1 day</td><td class="mono">1220f040d4b6…ee2e</td></tr>
+        <tr><td>Sealed quote, principal escrowed</td><td class="mono">12205686d3f2…49f9</td></tr>
+        <tr><td>Award: USDC to borrower, CBTC allocation held</td><td class="mono">1220dde0a7ac…8746</td></tr>
+        <tr><td>Repurchase: allocation cancelled via the registry</td><td class="mono">1220db50b682…24dd</td></tr>
+      </table>
+    </div>
+    <div>
+      <p style="font-size:1.3rem">Choice context and disclosed contracts come from the registry's off-ledger API (<code>lib/registry.mjs</code>). Borrower holds 1 CBTC again after repurchase. 7 of 7 steps, 9 October.</p>
+      <p style="font-size:1.3rem">Cash leg here is desk USDC. Both legs as CIP-0056 allocations (USDCx quotes, CBTC collateral, repurchase as an <code>AllocationRequest</code>) run on a local participant against a registry implementing the Splice interfaces: 8 of 8.</p>
+      <p style="font-size:1.3rem">USDCx on DevNet: <span class="notyet">not yet</span> no DevNet USDCx registry or faucet documented.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 8 · WALLET -->
+<section class="slide">
+  <div class="meta"><span>07 · Wallet-signed desk commands</span><span>8 / 14</span></div>
+  <h2>The wallet's key <em>authorises the desk</em></h2>
+  <p style="max-width:74rem">Grofty signs only standard token operations on its own participant, so Talang does not route Daml commands through it. A desk role bound to a wallet acts only after the wallet signs a single-use challenge naming the exact command (CIP-0103 <code>signMessage</code>).</p>
+  <div class="steps" style="grid-template-columns:repeat(3,1fr); margin-top:1rem">
+    <div class="card step"><h3>Challenge</h3><p>A single-use nonce that names the exact desk command the role is about to submit.</p></div>
+    <div class="card step"><h3>Verify</h3><p><code>api/wallet-verify.mjs</code> checks nonce, signer, Ed25519 / P-256 signature, and that the key's fingerprint is the party's namespace. Then submits.</p></div>
+    <div class="card step"><h3>Receipt</h3><p>The borrower can verify which wallet key sealed a lender's quote; rival lenders see nothing. Venue fee payable in USDCx or CC on TestNet / MainNet.</p></div>
+  </div>
+  <p class="small" style="margin-top:1.8rem">Verified with a stub wallet holding a real Ed25519 key against the local ledger. With a live Grofty wallet: <span class="notyet">not yet</span></p>
+</section>
+
+<!-- 9 · MCP -->
+<section class="slide">
+  <div class="meta"><span>08 · AI desk agents (MCP)</span><span>9 / 14</span></div>
+  <h2>An agent at each desk, <em>bound by the same privacy</em></h2>
+  <p style="max-width:74rem">An MCP agent reads only its party's node. A lender's agent never sees a rival's rate; the regulator's sees reports and nothing upstream. Every action is re-checked by the contract.</p>
+  <div class="grid g3">
+    <div class="card"><span class="pill p-c">lenderA / B / C</span><p style="margin-top:1rem" class="mono">portfolio · open_requests · quote · call_margin · review_substitution · offer_roll · loss_history · privacy_check</p></div>
+    <div class="card"><span class="pill p-y">borrower</span><p style="margin-top:1rem" class="mono">quotes (ranked, with coverage) · award ("best" = cheapest covered) · book · accept_roll · privacy_check</p></div>
+    <div class="card"><span class="pill p-l">regulator</span><p style="margin-top:1rem" class="mono">lifecycle · best_execution · privacy_check</p></div>
+  </div>
+  <p class="small" style="margin-top:1.8rem"><code>npm run e2e:mcp</code>: 33 of 33 checks on a Canton participant, every desk end to end, privacy read from each node. Also in CI.</p>
+</section>
+
+<!-- 10 · BUSINESS MODEL -->
+<section class="slide">
+  <div class="meta"><span>09 · Business model</span><span>10 / 14</span></div>
+  <h2>A venue fee <em>that cannot be skipped</em></h2>
+  <div class="grid" style="grid-template-columns:1fr 1.2fr; align-items:center">
+    <div class="card dark">
+      <p class="num" style="font-size:6rem">10 bp</p>
+      <p>per annum of principal, ACT/360, collected inside the repurchase and on every roll.</p>
+      <p style="margin-top:1.4rem; color:var(--on-dark)">9.5M repo held 60 days → <b style="color:var(--yellow)">1,583.33</b> to the venue</p>
+    </div>
+    <div>
+      <ul class="list">
+        <li><b>Desk cash:</b> a split of the borrower's repurchase payment.</li>
+        <li><b>CIP-0056 asset:</b> a second leg of the repurchase <code>AllocationRequest</code>, under the operator's standing <code>VenueAgreement</code>. On a participant: 50,008.33 USDCx to the lender, 0.14 to the venue.</li>
+        <li><b>Who pays:</b> borrowers (funds, treasuries holding tokenized bonds, T-bills or CBTC) who want cash without advertising it.</li>
+        <li><b>Status:</b> <span class="ok">built</span> tested in <code>venueFeeOnRepurchase</code>, <code>tokenLifecycle</code>. No revenue yet.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 11 · EVIDENCE -->
+<section class="slide">
+  <div class="meta"><span>10 · Traction is evidence</span><span>11 / 14</span></div>
+  <h2>What ran, <em>and where</em></h2>
+  <div class="grid g4" style="margin-bottom:1.6rem">
+    <div class="card"><p class="num">22 / 22</p><p>Daml scripts: lifecycle, refusals, tokens, BitSafe</p></div>
+    <div class="card"><p class="num">33 / 33</p><p>MCP end-to-end checks, local sandbox and CI</p></div>
+    <div class="card"><p class="num">29 / 29</p><p>Playwright desk QA, every role and button</p></div>
+    <div class="card"><p class="num">45 / 45</p><p>Read-only proxy checks: no secret, no submit</p></div>
+  </div>
+  <div class="card tw">
+    <table>
+      <tr><th>Run</th><th>Where</th><th>Result</th></tr>
+      <tr><td><code>talang-repo</code> 1.0.0 vetted and seeded</td><td>NODERS DevNet <code>hackcanton-devnet-3</code></td><td>Hosted desk reads it live</td></tr>
+      <tr><td>CBTC rail</td><td>NODERS DevNet, DA Utility registry</td><td>7 / 7 steps, update ids recorded</td></tr>
+      <tr><td>BitSafe 2-of-3 marks · node offline</td><td>DecMan LocalNet, 3 participants</td><td>8 / 8 · 6 / 6 steps</td></tr>
+      <tr><td>CIP-0056 token rail · price oracle</td><td>Local Canton 3.4.11 participant</td><td>8 / 8 · 4 / 4 steps</td></tr>
+    </table>
+  </div>
+  <p class="small" style="margin-top:1rem">CI: GitHub Actions run 37890916049, commit e053a49. Evidence JSON in <code>docs/evidence/</code>. Users or pilots: none yet.</p>
+</section>
+
+<!-- 12 · WHY CANTON -->
+<section class="slide">
+  <div class="meta"><span>11 · Why Canton</span><span>12 / 14</span></div>
+  <h2>The product <em>is</em> the privacy model</h2>
+  <div class="card tw">
+    <table style="font-size:1.12rem">
+      <tr><th style="width:17%"></th><th>Public EVM chain</th><th>Privacy L2 / object chain</th><th>Canton</th></tr>
+      <tr><td>Who sees a lender's rate</td><td>Everyone: calldata and mempool</td><td>Hidden behind ZK, encryption or an enclave the desk builds and audits</td><td><b>The borrower who asked.</b> No other stakeholder, no other node receives it</td></tr>
+      <tr><td>Opening leg</td><td>Atomic, both amounts public</td><td>Atomic on its chain; other issuers' assets via a bridge</td><td><b>One Daml transaction</b> across both legs, incl. CIP-0056 assets from separate registries</td></tr>
+      <tr><td>Regulator view</td><td>Same public data, or an off-chain report</td><td>Viewing keys or a separate channel</td><td><b>Observer</b> on <code>RepoReport</code> and <code>BestExecution</code>; absent from quotes</td></tr>
+      <tr><td>k-of-n governance</td><td>Multisig; votes and prices public</td><td>Multisig or committee per chain</td><td><b>BitSafe <code>GovernanceRules</code></b> on a party hosted on several nodes; survives one of three down</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- 13 · ROADMAP -->
+<section class="slide">
+  <div class="meta"><span>12 · Roadmap</span><span>13 / 14</span></div>
+  <h2>From a shadow book <em>to live repos</em></h2>
+  <div class="grid g3">
+    <div class="card"><span class="pill p-l">2 weeks</span><h3 style="margin-top:1rem">Shadow book on DevNet</h3><p>One borrower, two lenders run their real collateral list and rates without moving value. Measure request-to-award time, quotes per request, calls the contract would issue.</p></div>
+    <div class="card"><span class="pill p-y">4 weeks</span><h3 style="margin-top:1rem">Small live repos on MainNet</h3><p>Collateral from one tokenized-bond or CBTC registry, cash in USDCx, both through CIP-0056. Ticket size capped.</p></div>
+    <div class="card"><span class="pill p-m">then</span><h3 style="margin-top:1rem">Independent marks, regulator node</h3><p>Committee run by independent price providers as a BitSafe decentralized party; an auditor runs an observer node.</p></div>
+  </div>
+  <div class="card dark" style="margin-top:1.6rem; padding:1.3rem 2rem">
+    <p style="margin:0; font-size:1.25rem"><span class="notyet">not yet</span> &nbsp; Governance committee on DevNet · USDCx on DevNet · live Grofty wallet on TestNet · any pilot user. Pilot success: award in under 10 minutes, two or more lenders quoting, zero rival quotes on any lender node.</p>
+  </div>
+</section>
+
+<!-- 14 · TEAM / ASK -->
+<section class="slide">
+  <div class="meta"><span>13 · Team and ask</span><span>14 / 14</span></div>
+  <h2>What would move this <em>to a pilot</em></h2>
+  <div class="grid" style="grid-template-columns:1fr 1.5fr; align-items:start">
+    <div class="card">
+      <h3>Pugar Huda Mantoro</h3>
+      <p>Builder. Prior work: Tirai, a confidential multi-dealer RFQ desk on Canton (2nd place, HackCanton Season 2). Talang reuses its escrow-on-quote and CIP-0056 settlement patterns; first Talang commit 2 October 2026.</p>
+      <p style="margin-top:1rem" class="mono">github.com/PugarHuda</p>
+    </div>
+    <div class="grid" style="gap:1rem">
+      <div class="card" style="padding:1.2rem 1.6rem"><p><span class="pill p-d">NODERS</span> &nbsp;act-as rights for the committee's parties, to run governance on DevNet</p></div>
+      <div class="card" style="padding:1.2rem 1.6rem"><p><span class="pill p-c">Pilot</span> &nbsp;one borrower and two lenders for a two-week shadow book</p></div>
+      <div class="card" style="padding:1.2rem 1.6rem"><p><span class="pill p-y">Registries</span> &nbsp;a USDCx registry on DevNet, a tokenized-bond or T-bill registry</p></div>
+      <div class="card" style="padding:1.2rem 1.6rem"><p><span class="pill p-l">Prices · wallet</span> &nbsp;a price provider to sit on the committee; a Grofty TestNet session</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>talang-desk.vercel.app · /desk</span><span>github.com/PugarHuda/talang</span></div>
+</section>
+
+<script>
+// One slide at a time: arrows, space, click, swipe; the hash keeps your place.
+(() => {
+  const slides = [...document.querySelectorAll('.slide')];
+  const rail = document.createElement('div'); rail.id = 'rail'; rail.innerHTML = '<i></i>';
+  const hint = document.createElement('div'); hint.id = 'hint';
+  document.body.append(rail, hint);
+  let i = 0;
+  const show = (n) => {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, k) => s.classList.toggle('on', k === i));
+    rail.firstChild.style.width = `${((i + 1) / slides.length) * 100}%`;
+    hint.textContent = `${i + 1} / ${slides.length}`;
+    history.replaceState(null, '', `#${i + 1}`);
+  };
+  addEventListener('keydown', (e) => {
+    if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); show(i + 1); }
+    else if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); show(i - 1); }
+    else if (e.key === 'f') document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+  });
+  addEventListener('click', (e) => { if (!e.target.closest('a')) show(i + (e.clientX < innerWidth * 0.22 ? -1 : 1)); });
+  let x0 = null;
+  addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+  addEventListener('touchend', (e) => { const dx = e.changedTouches[0].clientX - (x0 ?? 0); if (x0 !== null && Math.abs(dx) > 40) show(i + (dx < 0 ? 1 : -1)); x0 = null; }, { passive: true });
+  show((Number(location.hash.slice(1)) || 1) - 1);
+})();
+</script>
+</body>
+</html>

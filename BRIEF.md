@@ -85,11 +85,11 @@ marks, and wallets for the parties (CIP-0103).
 
 ## Evidence today
 
-- Contract: 19 Daml scripts covering the full lifecycle, default paths, every refusal,
+- Contract: 22 Daml scripts covering the full lifecycle, default paths, every refusal,
   best execution, the venue fee, rolls, both legs in CIP-0056 assets and BitSafe
   governance on BitSafe's own `GovernanceRules` (`test/daml/`).
 - On a running Canton 3.4.11 participant: one repo in every state seeded through the
-  JSON Ledger API, 19/19 MCP checks across lender, borrower and regulator desks,
+  JSON Ledger API, 33/33 MCP checks across lender, borrower and regulator desks,
   and the 2-of-3 committee flow with its update ids (`docs/evidence/`). CI repeats it.
 - Privacy read from each node: lenders see 0 rival quotes and 0 other lenders' loss
   notices; the regulator sees reports and best-execution records, 0 requests, 0 quotes.
