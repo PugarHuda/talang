@@ -1,6 +1,6 @@
 {
   "ledger": "DecMan LocalNet: 3 Canton 3.5.8 participants, committee hosted on all three (threshold 2)",
-  "ranAt": "2026-10-09T10:07:19.462Z",
+  "ranAt": "2026-10-09T10:32:58.386Z",
   "packages": [
     "talang-repo (1.0.0, or its 1.1.0 upgrade where vetted)",
     "governance-core-v1-0.1.0 (BitSafe, unmodified)",
@@ -27,15 +27,15 @@
     },
     {
       "step": "MarkProposal UST10Y 98,000 executed with 2 of 3: Mark signed by the committee",
-      "updateId": "1220a204dcd818f79d27b47ebc034a406ee63186f4433649ff59d367b1b0ce915b08",
-      "offset": 87,
-      "mark": "0081458ceee4eb122c21d669993cde2a36eee6f8141ac83664d24804ee0b466b94ca121220ba229e8c67f1af4fc060797eba72ef7e68dd3f6ca574a29b6894aaa70b189473"
+      "updateId": "1220db9dfd142ca195a552aca28380a0a60233a45d8b0f81abf9bdc7075bfb34c42b",
+      "offset": 226,
+      "mark": "0001df749cd642c79bbfd3551091f35e57f682ff70ea367fed259433797649ef9dca121220988bf1dc5214f21a705c9a57a45267eabdcd670b6639f8c48cb18e32452eba7f"
     },
     {
       "step": "repo opened on the committee mark (agent = the decentralized party)",
-      "updateId": "122084518c6c871d88c00d9c49b4f46fba1fe72c120139dc19bd9ccb318fc285a5ce",
-      "offset": 94,
-      "trade": "00fc6661f7befe73bb9cee863bcfb8d631edb8a80457b214575125c0760729bb8cca121220a86b45d14194a6e4bd702d2e5f3a9eec0c92a7986d5e812a7181ae2eca617ebb"
+      "updateId": "1220d84f99c5fae971955649e19c12530d16d0e3f7690bad03b57c80195819ce2244",
+      "offset": 253,
+      "trade": "001d828c21a2065d182c39b6c4f8ece5aba2e0f4f293513406a2f80b8ef25b7525ca1212202ad4d48ff435bb3b0873451af08f539b0cc603a238c434471625576a23e6ab23"
     },
     {
       "step": "margin call on one pricer's own mark at 50,000",
@@ -44,15 +44,15 @@
     },
     {
       "step": "governed markdown UST10Y 92,000 executed with 2 of 3",
-      "updateId": "1220aa013550c0868ef0c9f098e9ae7b604e476ecc43dd1e77a8376401d585b37852",
-      "offset": 111,
-      "mark": "00aa5327fce982bb82a8172b2509f479afc73ef05dec3bfca2252754a6f20f3790ca121220f7ab8d3e8bfeb029915d9ef8111ce2c2a22604c7b9f4ad8e85c9d270a2fca280"
+      "updateId": "1220d1c67fe8d5d4b8addb67fb11341836d41bf7550f4132f9a5e383bc3f6e758c54",
+      "offset": 249,
+      "mark": "006cf8d93ce29d6c9b95f996b67cbfbb9b632e784d1f06e5cd40866cd47ffcb8dfca1212202988e44edb25f883d21b8fa0ac6f48251233439fb42dcbf4b757732eef9800c1"
     },
     {
       "step": "margin call issued on the governed mark",
-      "updateId": "12201db54fef868a4511ceebec32b2c7b20f9523ff2cce611cfcac8f3bfff964ddbe",
-      "offset": 111,
-      "marginCall": "00948a9be70e9495b5b9c328820903174e152f0d071ba98dc52dd8df6e438fb650ca121220fd8944f7a5d9e48c26d99a6e2b234c2446b5241f2864abd79e9d1bb768395fec"
+      "updateId": "12204059ae3ff6574ba2fc3584c1d9dde010eaef0f697ad6657eb74e2d5947ab81b3",
+      "offset": 270,
+      "marginCall": "003a220ec9fc0350d6375abf3384987a39fbd57a08a2bb0715116c818be6d97d8fca121220820112db6468975c5d83cdb3c20fe7ac1db17bde4bdd092ef028cebcb51965b4"
     }
   ]
 }
