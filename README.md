@@ -55,7 +55,7 @@ The desk is at `/desk` (`?role=lenderB` opens it as a role); the landing page is
 
 ```
 daml build --all
-cd test && daml test        # 19 scripts: core, desk, CIP-0056 tokens, BitSafe governance
+cd test && daml test        # 22 scripts: core, desk, CIP-0056 tokens, BitSafe governance
 npm run test:proxy          # hosted read-only API, no network or credentials
 ```
 
@@ -67,9 +67,11 @@ Counts are what was observed, with where. "CI" is GitHub Actions run
 
 | Suite | Covers | Result | Where observed |
 |---|---|---|---|
-| `daml test` (`test/daml/`) | Core lifecycle, default paths and refusals (`TalangTest`); venue fee, best execution, rolls (`DeskTest`); CIP-0056 legs against `MockRegistry` (`TokenTest`); BitSafe valuation committee and lender syndicate on the real `GovernanceRules` (`GovernanceTest`) | 19 of 19 scripts ok (two are setup fixtures) | Locally on 9 October, and in CI |
+| `daml test` (`test/daml/`) | Core lifecycle, default paths and refusals (`TalangTest`); venue fee, best execution, rolls (`DeskTest`); CIP-0056 legs against `MockRegistry` (`TokenTest`); BitSafe valuation committee and lender syndicate on the real `GovernanceRules` (`GovernanceTest`); 1.1.0 rules: 2-hour minimum margin window, default keeps only what is owed and returns the excess (`marginWindowFloor`, `defaultReturnsExcess`, `defaultAcrossPledges`) | 22 of 22 scripts ok (two are setup fixtures) | Locally on 9 October, and in CI |
 | `npm run test:proxy` | `api/acs.mjs` and `api/config.mjs` with fetch stubbed: only POST acs and GET config served, bad roles rejected before the ledger is reached, every ledger call a read scoped to one desk party, no client secret or bearer token in any response, no other file in `api/` | 41 of 41 checks | Locally on 9 October |
-| `npm run e2e:mcp` | Every MCP desk end to end: tool lists per role, privacy read from each node, award, roll, margin call refused then issued | 19 of 19 checks | CI only; no file in `docs/evidence/` |
+| `npm run e2e:mcp` | Every MCP desk end to end: tool lists per role, privacy read from each node, award, roll offered and withdrawn, substitution declined, margin call refused under 2 hours then answered, claim and default refused early, cancel and withdraw unlock cash, repurchase, regulator exposure | 33 of 33 checks (31 of 31 with two lenders) | Local sandbox on 9 October, and in CI |
+| `npm run qa:desk` | Playwright through every role and every desk button, outcomes re-read from each node; refusals (short haircut, stale mark, early default, bad inputs, double click), privacy in page and API, read-only mode, server hardening, accessible names, 390 px layout | 29 of 29 checks | Local sandbox on 9 October |
+| `scripts/cbtc-rail.mjs` | Real CBTC on DevNet: the faucet's transfer offer accepted through the registry, CBTC allocated through the registry's `AllocationFactory` as repo collateral, award, repurchase cancelling the allocation | 7 of 7 steps | [NODERS DevNet](docs/evidence/cbtc-rail-devnet.json) |
 | `npm run governance` | BitSafe 2-of-3 marks: 1-of-3 refused, 2-of-3 executed, margin call on one pricer's own mark refused | 8 of 8 steps (2 expected refusals) | [local sandbox](docs/evidence/bitsafe-governed-marks-local-sandbox.json); [DecMan LocalNet](docs/evidence/bitsafe-governed-marks-localnet.json), 8 of 8 steps |
 | `scripts/localnet-offline.mjs` | Committee on three LocalNet participants: publishes with one node stopped, cannot with two | 6 of 6 steps (1 expected refusal) | [DecMan LocalNet](docs/evidence/bitsafe-node-offline-localnet.json) |
 | `npm run token-rail` | USDCx-funded sealed quotes, CBTC collateral as an allocation, repurchase read as an `AllocationRequest`, settlement | 8 of 8 steps | [local sandbox](docs/evidence/cip56-token-repo-local-sandbox.json), and in CI |
@@ -82,7 +84,7 @@ daml sandbox --json-api-port 7575 --dar .daml/dist/talang-repo-1.0.0.dar --wall-
 npm ci
 npm run local                               # allocate the desk's parties on the sandbox
 ENV_FILE=.env.local npm run seed            # one repo in every state
-ENV_FILE=.env.local npm run e2e:mcp         # every MCP desk, 19 checks, privacy read from each node
+ENV_FILE=.env.local npm run e2e:mcp         # every MCP desk, 33 checks, privacy read from each node
 ENV_FILE=.env.local npm run governance      # BitSafe 2-of-3 marks through GovernanceRules
 ENV_FILE=.env.local npm run token-rail      # USDCx quotes, CBTC collateral, repurchase as an AllocationRequest (needs `daml build --all`)
 ENV_FILE=.env.local npm run desk            # http://localhost:8090 (landing), /desk?role=lenderB
@@ -127,7 +129,7 @@ and the regulator's agent sees reports and nothing upstream.
 |---|---|
 | **NODERS DevNet / NaaS** | `talang-desk` 0.1.0 was uploaded to the HackCanton DevNet participant and driven through the desk on 3 October (commit `900da46`; package `237ad836995110225ea8cc6337f8af63d2ed3625d6ee8a5421644b154f78194b`, vetted on participant `hackcanton-devnet-3` since 3 October per the NODERS console); no update ids were recorded for that run. `talang-repo` 1.0.0 (package `24fdd6f484e99f2f5d3c2b84f6e7fdd706ee5eeffed214023347c38bcd3fc3bb`) was uploaded through the NODERS console on 9 October and is vetted on `hackcanton-devnet-3`; the seed ran there from a Vercel build (`scripts/devnet-ci.mjs`), so the hosted desk reads live DevNet repos, margin calls, substitutions, loss notices and best-execution records ([run log](docs/evidence/devnet-run.log)). On DevNet the app user may not upload packages or grant itself rights (both 403), so lender C and the governance committee's parties wait on NODERS granting act-as; the governance run there is **not yet**. |
 | **BitSafe Decentralization Manager** | Valuation committee and lender syndicate as `GovernableAction`s on BitSafe's own `GovernanceRules`. Threshold refusal and execution proven in Daml scripts and on a participant. Also run on a three-participant DecMan LocalNet: the committee is onboarded through DecMan and hosted on all three nodes; with one node stopped it still publishes, with two stopped it cannot ([docs/bitsafe.md](docs/bitsafe.md#decman-localnet-three-participants), [evidence](docs/evidence/bitsafe-node-offline-localnet.json)). |
-| **CIP-0056: USDCx, CBTC, Canton Coin** | Both legs implemented through the standard `Allocation` / `AllocationRequest` interfaces, tested against a registry implementing them, in Daml scripts and on a participant ([evidence](docs/evidence/cip56-token-repo-local-sandbox.json)). **Not yet run against a live registry**: that needs DevNet faucet or token-grant access. |
+| **CIP-0056: USDCx, CBTC, Canton Coin** | Both legs implemented through the standard `Allocation` / `AllocationRequest` interfaces, tested against a registry implementing them, in Daml scripts and on a participant ([evidence](docs/evidence/cip56-token-repo-local-sandbox.json)). **CBTC is run against the live registry on DevNet** ([evidence](docs/evidence/cbtc-rail-devnet.json)): the BitSafe faucet's transfer offer accepted through the DA Utility registry, CBTC allocated through its `AllocationFactory` (choice context and disclosed contracts from the registry's off-ledger API, `lib/registry.mjs`), held as collateral while the desk's USDC funds the loan, and the allocation cancelled through the registry at repurchase. USDCx: **not yet**, no DevNet USDCx registry or faucet is documented. |
 | **Grofty Wallet (CIP-0103)** | The desk connects any CIP-0103 wallet through the official `@canton-network/dapp-sdk` (`web/wallet.js`): commands for the wallet's own party are signed by the wallet via `prepareExecuteAndWait`, so even the read-only hosted copy can act without the server holding a key. **Not yet run with a live wallet**; the bounty asks for a MainNet run with a funded wallet. |
 
 ## Prior work disclosure

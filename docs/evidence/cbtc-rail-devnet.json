@@ -1,0 +1,66 @@
+{
+  "ledger": "NODERS HackCanton DevNet participant",
+  "ranAt": "2026-10-09T09:53:10.689Z",
+  "registry": "DA Utility registry, admin cbtc-network::12202a83c6f4082217c175e29bc53da5f2703ba2675778ab99217a5a881a949203ff, instrument CBTC",
+  "cash": "desk USDC (Talang Holding/Escrow)",
+  "steps": [
+    {
+      "step": "accepted CBTC transfer offer of 1.0000000000 from merchant",
+      "updateId": "122085841bcd61ed89557135716824fd92c83b56e9441a8b61facd6d7b59b852f6c5",
+      "offset": 2718521,
+      "instructionCid": "00f52b94198039f6913cd11d6f17e7d444784b2bd6fcba91c14c553ec4fed32e77ca1212206f641a2d680725282de1123cd29a7a409215dfb32db3e015be85d0fb84a82e37",
+      "amount": "1.0000000000",
+      "sender": "merchant::1220fa8543db6c66fe3a55b1f180c8dfc7f876265c76684fbc1d35d89e02c8aafe8e",
+      "disclosedContracts": [
+        "ed73d5b9ab717333f3dbd122de7be3156f8bf2614a67360c3dd61fc0135133fa:Utility.Registry.V0.Configuration.Instrument:InstrumentConfiguration",
+        "ed73d5b9ab717333f3dbd122de7be3156f8bf2614a67360c3dd61fc0135133fa:Utility.Registry.V0.Rule.Transfer:TransferRule"
+      ]
+    },
+    {
+      "step": "borrower holds 1 CBTC in 1 holdings (HoldingV1)",
+      "borrowerCBTC": 1,
+      "inputs": [
+        "0023a186a7c7b2d888369fbe4ff98ba3fa61431ba73cdd506cece3cd655ec81d3dca121220dcc4d4ff2338d1add3beef70c27780029bb52e42a384eba1f610863e0b77ba78"
+      ],
+      "holdingTemplate": "415a1ec96a9e2839453e9aa1c5c71b6511c008c79511cb6f873e0b7393fe3b92:Utility.Registry.Holding.V0.Holding:Holding"
+    },
+    {
+      "step": "CBTC allocated to lender A through the registry AllocationFactory",
+      "updateId": "1220c89b7d651b531e4e413d80bcba95852b530c18ca40d7390329d5fa6d5f6bd45c",
+      "offset": 2718525,
+      "factoryId": "00d58a5f061f086b3c4b405b57ca08f4cefcb7f3a27a26089be6388eb62ee619a8ca1112200991d565daa04ca691901bc04238a8655e2c068039130e4c00027eac2675d9f4",
+      "allocationCid": "00e92b47bec71bf98837d8425eff4286abd65e3df6bf0ab3f1923258602b6287e0ca12122000bde12e5503ef7b7a5dc27a279b9a13e833b819b42083f41297d9edd7a85049",
+      "allocationTemplate": "8c654487d9f5fb195fbcdd7b44cd8e365b1ea39c15ae62ce6c7a48343f1210dd:Utility.Registry.V0.Holding.Allocation:DvpLegAllocation",
+      "factoryOutput": "AllocationInstructionResult_Completed",
+      "disclosedContracts": [
+        "82798df018301852704f210b97adaabf76d3ecd37d889e1bf96b5f31a20eea34:Utility.Registry.App.V0.Service.AllocationFactory:AllocationFactory",
+        "ed73d5b9ab717333f3dbd122de7be3156f8bf2614a67360c3dd61fc0135133fa:Utility.Registry.V0.Configuration.Instrument:InstrumentConfiguration"
+      ]
+    },
+    {
+      "step": "RepoRFQ: 50 USDC against 0.001 CBTC, 1 day",
+      "updateId": "1220f040d4b664b24a9495ca8bd39a857fbe38503d788193e6f96f2edf1d3a27ee2e",
+      "offset": 2718538
+    },
+    {
+      "step": "sealed quote, principal escrowed in desk USDC",
+      "updateId": "12205686d3f20ad441391f0ebf6b2be7d826455c149802bca6ee1b445eb5e96849f9",
+      "offset": 2718552
+    },
+    {
+      "step": "award: USDC released to the borrower, CBTC allocation held as collateral",
+      "updateId": "1220dde0a7ac3cfccb9e3f672990ca022cd369675c7821968138c7095fef8c9f8746",
+      "offset": 2718571,
+      "trade": "00f670bb53cc28a22e5ece6f6e8d5455999974e805ac656b114097870bc38b9338ca12122042c29787f96a81fcf0ac3d80baab8561fb7f7d68ae44c6e5bd2580c4e3f12db2"
+    },
+    {
+      "step": "repurchase: USDC to the lender, CBTC allocation cancelled through the registry",
+      "updateId": "1220db50b6823e1d4c71d175a3f2cb8ca99fc6bdb452516341ebd353151aa30324dd",
+      "offset": 2718592,
+      "borrowerCBTCAfter": 1,
+      "disclosedContracts": [
+        "415a1ec96a9e2839453e9aa1c5c71b6511c008c79511cb6f873e0b7393fe3b92:Utility.Registry.Holding.V0.Holding:Holding"
+      ]
+    }
+  ]
+}

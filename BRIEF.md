@@ -100,7 +100,8 @@ marks, and wallets for the parties (CIP-0103).
 - The valuation committee onboarded through BitSafe DecMan and hosted on three
   participants: it publishes with one node down and cannot with two (`docs/evidence/`).
 - `talang-repo` 1.0.0 is vetted on the NODERS DevNet participant and seeded there; the hosted desk reads it.
-- Not yet: the governance committee on DevNet, a live USDCx or CBTC registry.
+- Real CBTC on DevNet: allocated through the DA Utility registry as repo collateral and released at repurchase (`docs/evidence/cbtc-rail-devnet.json`).
+- Not yet: the governance committee on DevNet, USDCx on DevNet.
 
 ## Validation log
 
