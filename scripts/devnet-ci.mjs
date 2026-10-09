@@ -9,7 +9,7 @@ import { mkdirSync, writeFileSync, copyFileSync, existsSync, readdirSync, readFi
 // The built DARs travel in devnet/ (the .daml/ build directories are not uploaded).
 mkdirSync('.daml/dist', { recursive: true });
 mkdirSync('test/.daml/dist', { recursive: true });
-copyFileSync('devnet/talang-repo-1.1.0.dar', '.daml/dist/talang-repo-1.1.0.dar');
+copyFileSync('devnet/talang-repo-1.2.0.dar', '.daml/dist/talang-repo-1.2.0.dar');
 copyFileSync('devnet/talang-test-0.1.0.dar', 'test/.daml/dist/talang-test-0.1.0.dar');
 
 const STEPS = [
@@ -22,6 +22,8 @@ const STEPS = [
   ['cbtc-rail', 'scripts/cbtc-rail.mjs'],
   // Any CIP-0056 legs by env, e.g. --build-env PRESET=cc-cash (scripts/token-repo.mjs, docs/token-legs.md).
   ['token-repo', 'scripts/token-repo.mjs'],
+  // Two builds, 2 h apart: --build-env PHASE=open, then PHASE=default (scripts/cbtc-default.mjs).
+  ['cbtc-default', 'scripts/cbtc-default.mjs'],
   ['tidy', 'scripts/devnet-tidy.mjs'],
 ];
 // DEVNET_STEPS=rights,cbtc-rail runs only those steps (the rest already ran on this node).
