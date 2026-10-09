@@ -16,11 +16,19 @@ async function call(path, json) {
   return JSON.parse(text);
 }
 
-const parties = {};
-for (const role of ROLES) {
-  const r = await call('/v2/parties', { partyIdHint: `talang-${role}`, identityProviderId: '' });
-  parties[role] = r.partyDetails.party;
+// The JSON API answers before the sandbox has joined its synchronizer; until it has,
+// party allocation is refused, so wait for it.
+async function allocate(hint) {
+  for (let i = 0; ; i++) {
+    try { return (await call('/v2/parties', { partyIdHint: hint, identityProviderId: '' })).partyDetails.party; }
+    catch (e) {
+      if (!/WITHOUT_CONNECTED_SYNCHRONIZER/.test(e.message) || i >= 60) throw e;
+      await new Promise((res) => setTimeout(res, 2000));
+    }
+  }
 }
+const parties = {};
+for (const role of ROLES) parties[role] = await allocate(`talang-${role}`);
 // A local user that may act and read as every desk party (the sandbox has no auth).
 const user = 'talang-local';
 await call('/v2/users', { user: { id: user, primaryParty: parties.borrower, isDeactivated: false, identityProviderId: '' },

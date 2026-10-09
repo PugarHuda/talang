@@ -11,8 +11,8 @@ jobs:
     name: Daml build + 19 scripts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: '17' }
       - name: Install Daml SDK 3.4.11
         run: |
@@ -27,10 +27,10 @@ jobs:
     name: Full stack on a Canton participant
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: '17' }
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with: { node-version: '20' }
       - name: Install Daml SDK 3.4.11
         run: |
@@ -42,8 +42,8 @@ jobs:
         run: |
           daml sandbox --no-legacy-assistant-warning --json-api-port 7575 \
             --dar .daml/dist/talang-repo-1.0.0.dar --wall-clock-time > sandbox.log 2>&1 &
-          for i in $(seq 1 90); do curl -sf localhost:7575/v2/version >/dev/null && break; sleep 2; done
-          curl -sf localhost:7575/v2/version
+          for i in $(seq 1 120); do grep -q "sandbox is ready" sandbox.log && break; sleep 2; done
+          grep "sandbox is ready" sandbox.log && curl -sf localhost:7575/v2/version
       - name: Parties, seed, every MCP desk end to end
         run: |
           node scripts/local.mjs
