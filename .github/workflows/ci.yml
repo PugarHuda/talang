@@ -41,7 +41,7 @@ jobs:
       - name: Start a Canton sandbox with the JSON Ledger API
         run: |
           daml sandbox --no-legacy-assistant-warning --json-api-port 7575 \
-            --dar .daml/dist/talang-repo-1.0.0.dar --wall-clock-time > sandbox.log 2>&1 &
+            --dar .daml/dist/talang-repo-1.1.0.dar --wall-clock-time > sandbox.log 2>&1 &
           for i in $(seq 1 120); do grep -q "sandbox is ready" sandbox.log && break; sleep 2; done
           grep "sandbox is ready" sandbox.log && curl -sf localhost:7575/v2/version
       - name: Parties, seed, every MCP desk end to end

@@ -80,7 +80,7 @@ Counts are what was observed, with where. "CI" is GitHub Actions run
 ## Run the whole stack locally, no credentials
 
 ```
-daml sandbox --json-api-port 7575 --dar .daml/dist/talang-repo-1.0.0.dar --wall-clock-time
+daml sandbox --json-api-port 7575 --dar .daml/dist/talang-repo-1.1.0.dar --wall-clock-time
 npm ci
 npm run local                               # allocate the desk's parties on the sandbox
 ENV_FILE=.env.local npm run seed            # one repo in every state

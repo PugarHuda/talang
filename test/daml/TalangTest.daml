@@ -3,7 +3,7 @@ module TalangTest where
 import DA.Assert ((===))
 import DA.List (head)
 import DA.Optional (isNone, isSome)
-import DA.Time (addRelTime, days)
+import DA.Time (addRelTime, days, hours)
 import Daml.Script
 
 import Talang
@@ -260,3 +260,58 @@ refusals = do
 
   -- The losing lender withdrew nothing: it got its cash back in the award.
   held p.lenderB "USDC" >>= (=== loanAmount)
+
+-- A margin call must leave the borrower at least two hours to answer.
+marginWindowFloor : Script ()
+marginWindowFloor = do
+  (p, t) <- opened
+  passTime (days 10)
+  now <- getTime
+  m <- mark p "UST10Y" 90000.0
+  submitMustFail p.lenderA do
+    exerciseCmd t CallMargin with markCid = m; respondBy = addRelTime now (hours 1)
+  _ <- submit p.lenderA do
+    exerciseCmd t CallMargin with markCid = m; respondBy = addRelTime now (hours 2)
+  pure ()
+
+-- Default keeps only what is owed. At 96,000 the 2% haircut leaves the pledge
+-- short, the call goes unanswered, and 13 days in the lender is owed
+-- 9,518,181.94: 99.1478 units at the call's mark. The other 0.8522 go home.
+defaultReturnsExcess : Script ()
+defaultReturnsExcess = do
+  (p, t) <- opened
+  passTime (days 10)
+  now <- getTime
+  m <- mark p "UST10Y" 96000.0
+  call <- submit p.lenderA do
+    exerciseCmd t CallMargin with markCid = m; respondBy = addRelTime now (days 2)
+  passTime (days 3)
+  _ <- submit p.lenderA do exerciseCmd call Default with contexts = []
+  held p.lenderA "UST10Y" >>= (=== 99.1478)
+  held p.borrower "UST10Y" >>= (=== 0.8522)
+  reports <- query @RepoReport p.regulator
+  [r.collateralQty | (_, r) <- reports, r.event == "DEFAULT"] === [99.1478]
+
+-- Two pledges (the original and posted margin): the lender takes the margin
+-- whole and only part of the original; the rest goes back to the borrower.
+defaultAcrossPledges : Script ()
+defaultAcrossPledges = do
+  (p, t) <- opened
+  passTime (days 10)
+  now <- getTime
+  m <- mark p "UST10Y" 95000.0
+  call <- submit p.lenderA do
+    exerciseCmd t CallMargin with markCid = m; respondBy = addRelTime now (days 1)
+  more <- bond p "UST10Y" 3.0
+  t2 <- submit p.borrower do exerciseCmd call PostMargin with holdingCid = more
+  passTime (days 5)
+  now2 <- getTime
+  m2 <- mark p "UST10Y" 94000.0
+  call2 <- submit p.lenderA do
+    exerciseCmd t2 CallMargin with markCid = m2; respondBy = addRelTime now2 (days 1)
+  passTime (days 2)
+  _ <- submit p.lenderA do exerciseCmd call2 Default with contexts = []
+  -- 17 days at 530 bp: 9,523,776.39 owed, 101.3168 units at 94,000. The 3 of
+  -- margin go whole, 98.3168 of the original 100 follow, 1.6832 come home.
+  held p.lenderA "UST10Y" >>= (=== 101.3168)
+  held p.borrower "UST10Y" >>= (=== 1.6832)

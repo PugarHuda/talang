@@ -225,6 +225,11 @@ markMaxAge = hours 24
 claimWindow : RelTime
 claimWindow = days 3
 
+-- The least time a margin call gives the borrower to answer. Without a floor a
+-- lender could call with a deadline a second away and seize the whole pledge.
+marginResponseMin : RelTime
+marginResponseMin = hours 2
+
 -- What the collateral lends against once the haircut is taken off.
 lendable : Decimal -> Decimal -> Decimal -> Decimal
 lendable haircut qty price = qty * price * (1.0 - haircut)
@@ -606,7 +611,8 @@ template RepoTrade
       controller lender
       do m <- freshMark agent collateralInstrument markCid
          now <- getTime
-         assertMsg "the borrower must get time to respond" (respondBy > now)
+         assertMsg "the borrower must get at least 2 hours to respond"
+           (respondBy >= addRelTime now marginResponseMin)
          let owed = terms.principal + interest terms.principal rateBps openedAt now
              needed = owed / (1.0 - haircut) / m.price
          assertMsg "collateral still covers what is owed"
@@ -712,6 +718,30 @@ template RepoTrade
       controller borrower, lender
       do now <- getTime
          seize this contexts now
+
+-- Units of collateral behind one lock.
+lockedQty : Locked -> Update Decimal
+lockedQty (Escrowed e) = do x <- fetch e; pure x.amount
+lockedQty (Allocated a) = do v <- view <$> fetch a; pure v.allocation.transferLeg.amount
+
+-- Pledged units to the lender until it holds `left`, the rest home to the
+-- borrower; returns the units the lender kept. A desk escrow is split at the
+-- line; an allocation is all or nothing, so the one that crosses it goes whole.
+waterfall : Contexts -> Party -> Party -> Decimal -> [Locked] -> Update Decimal
+waterfall _ _ _ _ [] = pure 0.0
+waterfall ctx lender borrower left (l :: rest)
+  | left <= 0.0 = do unwind ctx borrower l; waterfall ctx lender borrower left rest
+  | otherwise = do
+      q <- lockedQty l
+      case l of
+        Escrowed e | q > left -> do
+          h <- exercise e Release with recipient = lender
+          (_, back) <- exercise h Split with splitAmount = left
+          _ <- exercise back Transfer with newOwner = borrower
+          (left +) <$> waterfall ctx lender borrower 0.0 rest
+        _ -> do
+          deliver ctx lender l
+          (q +) <$> waterfall ctx lender borrower (left - q) rest
 
 -- Every pledged unit to the lender, and the default reported.
 seize : RepoTrade -> Contexts -> Time -> Update ()
@@ -852,13 +882,20 @@ template MarginCall
          assertMsg "margin below what was called" (qty >= unitsDue)
          exercise tradeCid TopUp with extra = Allocated allocCid; qty
 
-    -- Unanswered past the deadline: the lender keeps the collateral.
+    -- Unanswered past the deadline: the lender keeps collateral worth what it is
+    -- owed today, valued at the mark the call was made on, with no haircut, and
+    -- the rest goes back to the borrower (the GMRA close-out: the defaulter keeps
+    -- any excess). A token allocation cannot be split, so it goes whole.
     choice Default : ()
       with contexts : Contexts
       controller lender
       do now <- getTime
          assertMsg "the borrower still has time to respond" (now > respondBy)
-         exercise tradeCid Seize with contexts
+         t <- fetch tradeCid
+         archive tradeCid
+         let owedNow = t.terms.principal + interest t.terms.principal t.rateBps t.openedAt now
+         kept <- waterfall contexts lender borrower (ceil4 (owedNow / price)) t.collateral
+         report (t with collateralQty = kept) "DEFAULT" 0.0 0.0 now
 
 template Substitution
   with

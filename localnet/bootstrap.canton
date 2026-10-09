@@ -12,7 +12,7 @@ if (!sequencer1.health.initialized()) {
   bootstrap.synchronizer("global", Seq(sequencer1), Seq(mediator1), Seq(sequencer1, mediator1), PositiveInt.one, params)
 }
 
-val dars = Seq("../.daml/dist/talang-repo-1.0.0.dar", "../dars/governance-action-v1-0.1.0.dar", "../dars/governance-core-v1-0.1.0.dar")
+val dars = Seq("../.daml/dist/talang-repo-1.1.0.dar", "../dars/governance-action-v1-0.1.0.dar", "../dars/governance-core-v1-0.1.0.dar")
 participants.local.foreach { p =>
   if (!p.synchronizers.list_registered().exists(_._1.synchronizerAlias.unwrap == "global"))
     p.synchronizers.connect_local(sequencer1, "global")

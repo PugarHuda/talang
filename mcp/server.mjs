@@ -32,6 +32,22 @@ const pick = (list, id, what) => {
   return hits[0];
 };
 const short = (cid) => cid.slice(0, 16);
+// Arguments reach the ledger as Daml Decimals and Ints: refuse anything that is
+// not a finite number in range before it becomes "NaN" in a command.
+const num = (v, what, { min = -Infinity, max = Infinity, int = false } = {}) => {
+  const n = Number(v);
+  if (v === undefined || v === null || v === '' || !Number.isFinite(n) || (int && !Number.isInteger(n)) || n < min || n > max)
+    throw new Error(`${what} must be ${int ? 'a whole number' : 'a number'}${min > -Infinity ? ` >= ${min}` : ''}${max < Infinity ? ` <= ${max}` : ''}, got ${v}`);
+  return n;
+};
+// The smallest free holding of at least `qty`, split to exactly `qty` if larger.
+async function exactHolding(contracts, match, qty, what) {
+  const h = contracts.filter((c) => c.tpl === 'Holding' && c.arg.owner === ME && match(c.arg))
+    .sort((x, y) => N(x.arg.amount) - N(y.arg.amount)).find((x) => N(x.arg.amount) >= qty);
+  if (!h) throw new Error(`no free holding of at least ${qty} ${what}`);
+  return N(h.arg.amount) === qty ? h.cid
+    : created(await submit(ME, exercise('Holding', h.cid, 'Split', { splitAmount: String(qty) })), 'Holding');
+}
 const NOTHING = { type: 'object', properties: {} };
 
 const TOOLS = {
@@ -55,6 +71,14 @@ const TOOLS = {
       inputSchema: { type: 'object', required: ['repo', 'newRateBps', 'extraDays'], properties: {
         repo: { type: 'string' }, newRateBps: { type: 'number' }, extraDays: { type: 'integer' },
         hoursValid: { type: 'number', description: 'default 48' } } } },
+    { name: 'withdraw_quote', description: 'Withdraw a sealed quote that has not been taken: the locked principal comes back to this lender. Use it once a request is cancelled, or to stop quoting.',
+      inputSchema: { type: 'object', required: ['quote'], properties: { quote: { type: 'string', description: 'quote id or unique prefix (open_requests shows it)' } } } },
+    { name: 'withdraw_roll', description: 'Withdraw a roll offer the borrower has not accepted.',
+      inputSchema: { type: 'object', required: ['offer'], properties: { offer: { type: 'string' } } } },
+    { name: 'declare_default', description: 'On a margin call left unanswered past its deadline: keep collateral worth what is owed today at the call\'s mark (no haircut); the contract sends any excess back to the borrower. The ledger refuses it before the deadline.',
+      inputSchema: { type: 'object', required: ['marginCall'], properties: { marginCall: { type: 'string' } } } },
+    { name: 'claim_collateral', description: 'On a repo past maturity and not repurchased: take the pledged collateral. The ledger refuses it before maturity.',
+      inputSchema: { type: 'object', required: ['repo'], properties: { repo: { type: 'string' } } } },
     { name: 'loss_history', description: 'Requests this lender quoted and lost, with its rank among the quotes the borrower weighed. That is all a loser is ever told: no winning rate, no winner.',
       inputSchema: NOTHING },
     { name: 'privacy_check', description: 'Count what this lender\'s node can see that is not its own: rival quotes should be zero.',
@@ -68,6 +92,21 @@ const TOOLS = {
         request: { type: 'string' }, quote: { type: 'string', description: 'quote id prefix, or "best" for the cheapest covered quote' } } } },
     { name: 'book', description: 'Every open repo: lender, rate, what is owed today including the venue fee, coverage at the latest mark, margin calls to answer, roll offers to consider.',
       inputSchema: NOTHING },
+    { name: 'request_repo', description: 'Ask a panel of lenders for cash against collateral the borrower holds. No rate is named: the lenders compete on rate and haircut in sealed quotes only the borrower sees.',
+      inputSchema: { type: 'object', required: ['principal', 'collateralInstrument', 'collateralQty', 'termDays'], properties: {
+        principal: { type: 'number', description: 'cash wanted' }, cashInstrument: { type: 'string', description: 'default USDC' },
+        collateralInstrument: { type: 'string', description: 'e.g. UST5Y' }, collateralQty: { type: 'number' },
+        termDays: { type: 'integer' }, lenders: { type: 'array', items: { type: 'string' }, description: 'lender roles, default every lender in the parties file' },
+        hoursOpen: { type: 'number', description: 'quote deadline in hours; omit for none' } } } },
+    { name: 'cancel_request', description: 'Cancel an open request. Quotes already sealed stay locked until each lender withdraws them; the tool lists them.',
+      inputSchema: { type: 'object', required: ['request'], properties: { request: { type: 'string' } } } },
+    { name: 'post_margin', description: 'Answer a margin call: pledge exactly the units called, splitting a larger free holding if needed.',
+      inputSchema: { type: 'object', required: ['marginCall'], properties: { marginCall: { type: 'string' } } } },
+    { name: 'propose_substitution', description: 'Offer different collateral for a live repo. The offered units are locked now; the lender approves against a fresh mark, or declines and they come back. Shows whether it would cover at the latest mark.',
+      inputSchema: { type: 'object', required: ['repo', 'instrument', 'qty'], properties: {
+        repo: { type: 'string' }, instrument: { type: 'string' }, qty: { type: 'number' } } } },
+    { name: 'repurchase', description: 'Close a repo in desk cash: principal plus interest to the lender and the venue fee to the operator, every pledged unit home, in one transaction. Merges cash holdings if no single one is enough.',
+      inputSchema: { type: 'object', required: ['repo'], properties: { repo: { type: 'string' } } } },
     { name: 'accept_roll', description: 'Accept a lender\'s roll offer: pay the interest so far (and the venue fee) now, keep the cash, continue at the offered rate.',
       inputSchema: { type: 'object', required: ['offer'], properties: { offer: { type: 'string' } } } },
     { name: 'privacy_check', description: 'What this node holds: the borrower sees its own requests, quotes made to it and its repos, and nothing of the lenders\' other business.',
@@ -75,6 +114,8 @@ const TOOLS = {
   ],
   regulator: [
     { name: 'lifecycle', description: 'Every lifecycle event of every open or closed repo, in time order: open, margin calls, margin posted, substitutions, rolls, closes with the venue fee, defaults.',
+      inputSchema: NOTHING },
+    { name: 'exposure', description: 'Open exposure rebuilt from lifecycle reports alone: principal outstanding per lender, per borrower and per collateral instrument, each with its share of the total (concentration), and counts of margin calls, defaults and closes. No quote is used or visible.',
       inputSchema: NOTHING },
     { name: 'best_execution', description: 'For every award: how many sealed quotes the borrower weighed, where the one it took ranked on rate and the gap to the best rate in bp. No lender is named, no losing quote is shown.',
       inputSchema: NOTHING },
@@ -91,7 +132,7 @@ async function run(name, a = {}) {
   if (name === 'portfolio') {
     const calls = of('MarginCall'), subs = of('Substitution'), rolls = of('RollOffer');
     return of('RepoTrade').filter((t) => t.arg.lender === ME).map((t) => ({ repo: short(t.cid), borrower: roleOf(t.arg.borrower), ...assess(t, contracts), cid: undefined,
-      marginCall: calls.filter((c) => c.arg.tradeCid === t.cid).map((c) => ({ id: short(c.cid), unitsDue: N(c.arg.unitsDue), respondBy: c.arg.respondBy }))[0] ?? null,
+      marginCall: calls.filter((c) => c.arg.tradeCid === t.cid).map((c) => ({ id: short(c.cid), unitsDue: N(c.arg.unitsDue), respondBy: c.arg.respondBy, overdue: Date.now() > Date.parse(c.arg.respondBy) }))[0] ?? null,
       rollOffer: rolls.filter((r) => r.arg.tradeCid === t.cid).map((r) => ({ id: short(r.cid), newRateBps: N(r.arg.newRateBps), extraDays: N(r.arg.extraDays) }))[0] ?? null,
       substitution: subs.filter((s) => s.arg.tradeCid === t.cid).map((s) => {
         const m = latestMark(contracts, s.arg.newInstrument);
@@ -109,12 +150,13 @@ async function run(name, a = {}) {
         collateralValue: m ? N(t.collateralQty) * m.price : null, mark: m?.price ?? null,
         maxHaircutThatCovers: m ? 1 - N(t.principal) / (N(t.collateralQty) * m.price) : null, invitedLenders: r.arg.lenders.length,
         venueFeeBps: r.arg.venue ? N(r.arg.venue.feeBps) : 0,
-        myQuote: q ? { rateBps: N(q.arg.rateBps), haircut: N(q.arg.haircut) } : null };
+        myQuote: q ? { id: short(q.cid), rateBps: N(q.arg.rateBps), haircut: N(q.arg.haircut) } : null };
     });
   }
 
   if (name === 'quote') {
     const r = pick(of('RepoRFQ'), a.request, 'request'), t = r.arg.terms;
+    num(a.rateBps, 'rateBps', { min: 0.01, max: 10000 }); num(a.haircutPct, 'haircutPct', { min: 0, max: 49.99 });
     const cash = of('Holding').filter((h) => h.arg.owner === ME && h.arg.instrument === t.cashInstrument && h.arg.issuer === t.cashIssuer)
       .sort((x, y) => N(x.arg.amount) - N(y.arg.amount)).find((h) => N(h.arg.amount) >= N(t.principal));
     if (!cash) throw new Error(`no free ${t.cashInstrument} holding of at least ${N(t.principal)} to lock behind the quote`);
@@ -128,7 +170,8 @@ async function run(name, a = {}) {
   if (name === 'call_margin') {
     const t = pick(of('RepoTrade'), a.repo, 'repo'), m = latestMark(contracts, t.arg.collateralInstrument);
     if (!m) throw new Error('no mark for ' + t.arg.collateralInstrument);
-    const respondBy = new Date(Date.now() + (a.hoursToRespond ?? 24) * 36e5).toISOString();
+    // The contract (1.1.0) refuses a deadline under 2 hours; a minute of slack covers clock skew.
+    const respondBy = new Date(Date.now() + num(a.hoursToRespond ?? 24, 'hoursToRespond', { min: 2 }) * 36e5 + 6e4).toISOString();
     const tx = await submit(ME, exercise('RepoTrade', t.cid, 'CallMargin', { markCid: m.cid, respondBy }));
     return { called: true, marginCall: short(created(tx, 'MarginCall') ?? ''), respondBy, atMark: m.price };
   }
@@ -144,10 +187,40 @@ async function run(name, a = {}) {
 
   if (name === 'offer_roll') {
     const t = pick(of('RepoTrade'), a.repo, 'repo');
+    num(a.newRateBps, 'newRateBps', { min: 0.01, max: 10000 }); num(a.extraDays, 'extraDays', { min: 1, int: true });
     const expiresAt = new Date(Date.now() + (a.hoursValid ?? 48) * 36e5).toISOString();
     const tx = await submit(ME, create('RollOffer', {
       tradeCid: t.cid, borrower: t.arg.borrower, lender: ME, newRateBps: String(a.newRateBps), extraDays: String(a.extraDays), expiresAt }));
     return { offered: true, offer: short(created(tx, 'RollOffer') ?? ''), newRateBps: a.newRateBps, extraDays: a.extraDays, expiresAt };
+  }
+
+  if (name === 'withdraw_quote') {
+    const q = pick(of('RepoQuote').filter((x) => x.arg.lender === ME), a.quote, 'quote of yours');
+    await submit(ME, exercise('RepoQuote', q.cid, 'WithdrawQuote', { contexts: NO_CONTEXTS }));
+    return { withdrawn: short(q.cid), returned: `${N(q.arg.terms.principal)} ${q.arg.terms.cashInstrument}` };
+  }
+
+  if (name === 'withdraw_roll') {
+    const o = pick(of('RollOffer').filter((x) => x.arg.lender === ME), a.offer, 'roll offer of yours');
+    await submit(ME, exercise('RollOffer', o.cid, 'WithdrawRoll'));
+    return { withdrawn: short(o.cid) };
+  }
+
+  if (name === 'declare_default') {
+    const c = pick(of('MarginCall'), a.marginCall, 'margin call');
+    const t = of('RepoTrade').find((x) => x.cid === c.arg.tradeCid);
+    if (!t) throw new Error('the repo this call was on has changed since (margin posted, rolled or substituted): the call no longer applies');
+    await submit(ME, exercise('MarginCall', c.cid, 'Default', { contexts: NO_CONTEXTS }));
+    // Desk estimate of the split the contract just made (Talang.daml `waterfall`).
+    const due = owed(t.arg), keep = Math.ceil(due / N(c.arg.price) * 1e4) / 1e4, held = N(t.arg.collateralQty);
+    return { defaulted: short(t.cid), owedToday: due, callMark: N(c.arg.price), instrument: t.arg.collateralInstrument,
+      keptUnits: Math.min(keep, held), returnedToBorrower: Math.max(0, Math.round((held - keep) * 1e4) / 1e4) };
+  }
+
+  if (name === 'claim_collateral') {
+    const t = pick(of('RepoTrade').filter((x) => x.arg.lender === ME), a.repo, 'repo of yours');
+    await submit(ME, exercise('RepoTrade', t.cid, 'ClaimAfterMaturity', { contexts: NO_CONTEXTS }));
+    return { claimed: `${N(t.arg.collateralQty)} ${t.arg.collateralInstrument}`, maturity: t.arg.maturity };
   }
 
   if (name === 'loss_history') {
@@ -194,9 +267,68 @@ async function run(name, a = {}) {
       const fee = venueFee(t.arg);
       return { repo: short(t.cid), lender: roleOf(t.arg.lender), ...assess(t, contracts), cid: undefined, venueFee: fee,
         repurchaseToday: Math.round((owed(t.arg) + fee) * 100) / 100,
-        marginCall: calls.filter((c) => c.arg.tradeCid === t.cid).map((c) => ({ id: short(c.cid), unitsDue: N(c.arg.unitsDue), respondBy: c.arg.respondBy }))[0] ?? null,
+        marginCall: calls.filter((c) => c.arg.tradeCid === t.cid).map((c) => ({ id: short(c.cid), unitsDue: N(c.arg.unitsDue), respondBy: c.arg.respondBy, overdue: Date.now() > Date.parse(c.arg.respondBy) }))[0] ?? null,
         rollOffer: rolls.filter((r) => r.arg.tradeCid === t.cid).map((r) => ({ id: short(r.cid), newRateBps: N(r.arg.newRateBps), extraDays: N(r.arg.extraDays), expiresAt: r.arg.expiresAt }))[0] ?? null };
     });
+  }
+
+  if (name === 'request_repo') {
+    const principal = num(a.principal, 'principal', { min: 0.01 }), qty = num(a.collateralQty, 'collateralQty', { min: 0.0001 });
+    const termDays = num(a.termDays, 'termDays', { min: 1, max: 3650, int: true });
+    const roles = a.lenders?.length ? a.lenders : Object.keys(PARTIES).filter((r) => r.startsWith('lender'));
+    const lenders = roles.map((r) => { if (!r.startsWith('lender') || !PARTIES[r]) throw new Error(`unknown lender ${r}`); return PARTIES[r]; });
+    for (const r of ['cashIssuer', 'bondIssuer', 'agent', 'regulator']) if (!PARTIES[r]) throw new Error(`the parties file has no ${r}`);
+    const held = of('Holding').filter((h) => h.arg.owner === ME && h.arg.issuer === PARTIES.bondIssuer && h.arg.instrument === a.collateralInstrument)
+      .reduce((s, h) => s + N(h.arg.amount), 0);
+    if (held < qty) throw new Error(`the borrower holds ${held} ${a.collateralInstrument}, less than the ${qty} it would pledge`);
+    const deadline = a.hoursOpen != null ? new Date(Date.now() + num(a.hoursOpen, 'hoursOpen', { min: 0.1 }) * 36e5).toISOString() : null;
+    const tx = await submit(ME, create('RepoRFQ', { borrower: ME, regulator: PARTIES.regulator, agent: PARTIES.agent, lenders,
+      terms: { cashIssuer: PARTIES.cashIssuer, cashInstrument: a.cashInstrument ?? 'USDC', principal: String(principal),
+        collateralIssuer: PARTIES.bondIssuer, collateralInstrument: a.collateralInstrument, collateralQty: String(qty), termDays: String(termDays) },
+      deadline, venue: PARTIES.venue ? { operator: PARTIES.venue, feeBps: '10.0' } : null }));
+    return { request: short(created(tx, 'RepoRFQ') ?? ''), lenders: roles, principal, collateral: `${qty} ${a.collateralInstrument}`, termDays, deadline };
+  }
+
+  if (name === 'cancel_request') {
+    const r = pick(of('RepoRFQ'), a.request, 'request');
+    await submit(ME, exercise('RepoRFQ', r.cid, 'CancelRFQ'));
+    const sealed = of('RepoQuote').filter((q) => q.arg.rfqId === r.cid);
+    return { cancelled: short(r.cid), quotesStillLocked: sealed.map((q) => ({ quote: short(q.cid), lender: roleOf(q.arg.lender) })),
+      next: sealed.length ? 'each lender takes its cash back with withdraw_quote' : null };
+  }
+
+  if (name === 'post_margin') {
+    const c = pick(of('MarginCall'), a.marginCall, 'margin call');
+    if (!of('RepoTrade').some((x) => x.cid === c.arg.tradeCid)) throw new Error('the repo this call was on has changed since: the call no longer applies');
+    const due = N(c.arg.unitsDue);
+    const cid = await exactHolding(contracts, (h) => h.issuer === c.arg.issuer && h.instrument === c.arg.instrument, due, c.arg.instrument);
+    const tx = await submit(ME, exercise('MarginCall', c.cid, 'PostMargin', { holdingCid: cid }));
+    return { posted: `${due} ${c.arg.instrument}`, repo: short(created(tx, 'RepoTrade') ?? '') };
+  }
+
+  if (name === 'propose_substitution') {
+    const t = pick(of('RepoTrade'), a.repo, 'repo'), qty = num(a.qty, 'qty', { min: 0.0001 });
+    const cid = await exactHolding(contracts, (h) => h.instrument === a.instrument, qty, a.instrument);
+    const tx = await submit(ME, exercise('RepoTrade', t.cid, 'ProposeSubstitution', { holdingCid: cid }));
+    const m = latestMark(contracts, a.instrument);
+    return { substitution: short(created(tx, 'Substitution') ?? ''), offered: `${qty} ${a.instrument}`, mark: m?.price ?? null,
+      markFresh: m?.fresh ?? false, wouldCover: m ? lendable(N(t.arg.haircut), qty, m.price) / owed(t.arg) : null };
+  }
+
+  if (name === 'repurchase') {
+    const t = pick(of('RepoTrade'), a.repo, 'repo'), tm = t.arg.terms;
+    const fee = venueFee(t.arg), need = Math.round((owed(t.arg) + fee) * 100) / 100;
+    const cash = of('Holding').filter((h) => h.arg.owner === ME && h.arg.issuer === tm.cashIssuer && h.arg.instrument === tm.cashInstrument)
+      .sort((x, y) => N(y.arg.amount) - N(x.arg.amount));
+    if (cash.reduce((s, h) => s + N(h.arg.amount), 0) < need) throw new Error(`need ${need} ${tm.cashInstrument} to repurchase`);
+    let pot = cash[0].cid, have = N(cash[0].arg.amount);
+    for (const h of cash.slice(1)) {
+      if (have >= need) break;
+      pot = created(await submit(ME, exercise('Holding', pot, 'Merge', { other: h.cid })), 'Holding');
+      have += N(h.arg.amount);
+    }
+    await submit(ME, exercise('RepoTrade', t.cid, 'Repurchase', { cashCid: pot, contexts: NO_CONTEXTS }));
+    return { closed: short(t.cid), paid: need, venueFee: fee, collateralHome: `${N(t.arg.collateralQty)} ${t.arg.collateralInstrument}` };
   }
 
   if (name === 'accept_roll') {
@@ -205,7 +337,7 @@ async function run(name, a = {}) {
     if (!t) throw new Error('the repo this offer was for has changed; ask the lender for a new offer');
     const m = latestMark(contracts, t.arg.collateralInstrument);
     if (!m?.fresh) throw new Error(`no fresh mark for ${t.arg.collateralInstrument}`);
-    const due = owed(t.arg) - N(t.arg.terms.principal) + venueFee(t.arg);
+    const due = Math.round((owed(t.arg) - N(t.arg.terms.principal) + venueFee(t.arg)) * 100) / 100;
     const cash = of('Holding').filter((h) => h.arg.owner === ME && h.arg.instrument === t.arg.terms.cashInstrument
       && h.arg.issuer === t.arg.terms.cashIssuer).sort((x, y) => N(y.arg.amount) - N(x.arg.amount))[0];
     if (!cash || N(cash.arg.amount) < due) throw new Error(`need ${due} ${t.arg.terms.cashInstrument} in one holding to pay the interest`);
@@ -218,6 +350,33 @@ async function run(name, a = {}) {
     return of('RepoReport').sort((x, y) => x.arg.at.localeCompare(y.arg.at)).map((r) => ({ at: r.arg.at, event: r.arg.event,
       borrower: roleOf(r.arg.borrower), lender: roleOf(r.arg.lender), principal: N(r.arg.terms.principal), rateBps: N(r.arg.rateBps),
       collateral: `${N(r.arg.collateralQty)} ${r.arg.collateralInstrument}`, cashMoved: N(r.arg.cashMoved), venueFee: N(r.arg.feePaid) }));
+  }
+
+  if (name === 'exposure') {
+    // Reports carry no repo id, so a repo is keyed by (borrower, lender, original
+    // terms). Identical live twins share a key and a principal, so totals hold.
+    // ponytail: twins report the latest row's collateral; a repo id on RepoReport fixes that.
+    const reports = of('RepoReport').sort((x, y) => x.arg.at.localeCompare(y.arg.at)), repos = new Map();
+    for (const r of reports) {
+      const k = JSON.stringify([r.arg.borrower, r.arg.lender, r.arg.terms]);
+      const e = repos.get(k) ?? { live: 0, last: null };
+      if (r.arg.event === 'OPEN') e.live++;
+      if (r.arg.event === 'CLOSE' || r.arg.event === 'DEFAULT') e.live--;
+      e.last = r.arg; repos.set(k, e);
+    }
+    const open = [...repos.values()].filter((e) => e.live > 0);
+    const total = open.reduce((s, e) => s + e.live * N(e.last.terms.principal), 0);
+    const by = (f) => {
+      const m = {};
+      for (const e of open) m[f(e.last)] = (m[f(e.last)] ?? 0) + e.live * N(e.last.terms.principal);
+      return Object.entries(m).map(([name, principal]) => ({ name, principal, share: total ? Math.round(principal / total * 1000) / 1000 : 0 }))
+        .sort((x, y) => y.principal - x.principal);
+    };
+    const count = (ev) => reports.filter((r) => r.arg.event === ev).length;
+    return { openRepos: open.reduce((s, e) => s + e.live, 0), openPrincipal: total,
+      byLender: by((r) => roleOf(r.lender)), byBorrower: by((r) => roleOf(r.borrower)), byCollateral: by((r) => r.collateralInstrument),
+      events: { open: count('OPEN'), marginCall: count('MARGIN_CALL'), marginPosted: count('MARGIN_POSTED'), substitution: count('SUBSTITUTION'),
+        roll: count('ROLL'), close: count('CLOSE'), default: count('DEFAULT') } };
   }
 
   if (name === 'best_execution') {
@@ -247,12 +406,15 @@ const INSTRUCTIONS = {
   lender: `You are the repo desk agent for ${ROLE} on Talang, a sealed-bid repo desk on Canton. `
     + 'Start from portfolio. Call margin only on a repo whose coverage is below 1 at a FRESH mark, and say why in numbers. '
     + 'Approve a substitution only if wouldCover >= 1 at a fresh mark. When quoting, keep the haircut at or below '
-    + 'maxHaircutThatCovers or the borrower cannot take the quote. Ask the human before any write unless told to act.',
+    + 'maxHaircutThatCovers or the borrower cannot take the quote. Declare a default only on a call past its deadline, and say '
+    + 'that the contract returns any collateral above what is owed. Ask the human before any write unless told to act.',
   borrower: 'You are the treasury agent for the borrower on Talang. Start from quotes or book. Prefer the cheapest quote that '
     + 'covers; explain in numbers why a cheaper one cannot be taken. Before accepting a roll, compare the new rate with what '
-    + 'you pay now and say what is paid today. Ask the human before any write unless told to act.',
+    + 'you pay now and say what is paid today. Answer a margin call before its respondBy, or the lender may keep collateral '
+    + 'worth what is owed. Ask the human before any write unless told to act.',
   regulator: 'You are the supervisor\'s agent on Talang. You see lifecycle reports and best-execution records only. Flag '
-    + 'awards where the winner was not rank 1 and explain the spread; flag defaults and margin calls. Never speculate about losing lenders: '
+    + 'awards where the winner was not rank 1 and explain the spread; flag defaults and margin calls; use exposure for '
+    + 'concentration (any lender, borrower or collateral above half of open principal is worth a note). Never speculate about losing lenders: '
     + 'they are not visible to you by design.',
 }[KIND];
 

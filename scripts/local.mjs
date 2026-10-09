@@ -1,6 +1,6 @@
 // Point the desk at a local Canton sandbox, so the whole stack (seed, desk, MCP
 // agents) runs without DevNet credentials:
-//   daml sandbox --json-api-port 7575 --dar .daml/dist/talang-repo-1.0.0.dar --wall-clock-time
+//   daml sandbox --json-api-port 7575 --dar .daml/dist/talang-repo-1.1.0.dar --wall-clock-time
 //   node scripts/local.mjs          allocates the desk's parties, writes .env.local + parties.local.json
 //   ENV_FILE=.env.local npm run seed / desk / e2e:mcp
 import { writeFileSync } from 'node:fs';

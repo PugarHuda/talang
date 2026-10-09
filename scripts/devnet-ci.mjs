@@ -9,7 +9,7 @@ import { mkdirSync, writeFileSync, copyFileSync, existsSync, readdirSync, readFi
 // The built DARs travel in devnet/ (the .daml/ build directories are not uploaded).
 mkdirSync('.daml/dist', { recursive: true });
 mkdirSync('test/.daml/dist', { recursive: true });
-copyFileSync('devnet/talang-repo-1.0.0.dar', '.daml/dist/talang-repo-1.0.0.dar');
+copyFileSync('devnet/talang-repo-1.1.0.dar', '.daml/dist/talang-repo-1.1.0.dar');
 copyFileSync('devnet/talang-test-0.1.0.dar', 'test/.daml/dist/talang-test-0.1.0.dar');
 
 const STEPS = [
