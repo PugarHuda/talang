@@ -103,7 +103,7 @@ const rfq = created(await submit(p.borrower, create('RepoRFQ', { borrower: p.bor
 const cash = created(await submit(p.cashIssuer, create('Holding', { issuer: p.cashIssuer, owner: p.lenderA, instrument: 'USDC', amount: '9500000' })), 'Holding');
 const q = created(await submit(p.lenderA, exercise('RepoRFQ', rfq, 'SubmitQuote', { lender: p.lenderA, rateBps: '530', haircut: '0.02', cashCid: cash })), 'RepoQuote');
 const col = created(await submit(p.bondIssuer, create('Holding', { issuer: p.bondIssuer, owner: p.borrower, instrument: 'UST10Y', amount: '100' })), 'Holding');
-const openTx = await submit(p.borrower, exercise('RepoRFQ', rfq, 'Award', { winner: q, losers: [], collateralCid: col, markCid: mark, contexts: [] }));
+const openTx = await submit(p.borrower, exercise('RepoRFQ', rfq, 'AwardSealed', { winner: q, losers: [], collateralCid: col, markCid: mark, contexts: [] }));
 const trade = created(openTx, 'RepoTrade');
 step('repo opened on the committee mark (agent = the decentralized party)', openTx, { trade });
 

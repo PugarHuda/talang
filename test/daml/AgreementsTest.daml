@@ -1,0 +1,207 @@
+-- talang-repo 1.2.0: the minimum transfer amount on margin calls, the lender's
+-- haircut schedule, and close-out netting under one master agreement.
+module AgreementsTest where
+
+import DA.Assert ((===))
+import DA.Optional (isNone, isSome)
+import DA.TextMap qualified as TextMap
+import DA.Time (addRelTime, days)
+import Daml.Script
+
+import Talang
+import TalangAgreements
+import TalangTest
+
+-- A repo opened like `opened`, on any terms and collateral, with lender A.
+openOn : P -> Terms -> Decimal -> Script (ContractId RepoTrade)
+openOn p terms price = do
+  r <- submit p.borrower do
+    createCmd RepoRFQ with
+      borrower = p.borrower; regulator = p.regulator; agent = p.agent
+      lenders = [p.lenderA, p.lenderB]; terms; deadline = None; venue = None
+  q <- quote p r p.lenderA 530.0 0.02
+  col <- bond p terms.collateralInstrument terms.collateralQty
+  m <- mark p terms.collateralInstrument price
+  submit p.borrower do
+    exerciseCmd r AwardSealed with winner = q; losers = []; collateralCid = col; markCid = m; contexts = []
+
+-- 300,000 minimum transfer. Ten days in, 9,513,986.11 is owed. At 96,500 the
+-- pledge lends 9,457,000: 56,986.11 short, under the minimum, refused. At
+-- 93,000 it lends 9,114,000: 399,986.11 short, called.
+minTransferAmount : Script ()
+minTransferAmount = do
+  p <- setup
+  t <- openOn p ((stdTerms p) with minTransfer = Some 300000.0) 98000.0
+  passTime (days 10)
+  now <- getTime
+  small <- mark p "UST10Y" 96500.0
+  submitMustFail p.lenderA do
+    exerciseCmd t CallMargin with markCid = small; respondBy = addRelTime now (days 1)
+  big <- mark p "UST10Y" 93000.0
+  call <- submit p.lenderA do
+    exerciseCmd t CallMargin with markCid = big; respondBy = addRelTime now (days 1)
+  Some mc <- queryContractId p.borrower call
+  mc.owed === 9513986.11
+  -- Without a minimum (1.1.0 terms) the small shortfall may be called.
+  p2 <- setup
+  t2 <- openOn p2 (stdTerms p2) 98000.0
+  passTime (days 10)
+  now2 <- getTime
+  small2 <- mark p2 "UST10Y" 96500.0
+  _ <- submit p2.lenderA do
+    exerciseCmd t2 CallMargin with markCid = small2; respondBy = addRelTime now2 (days 1)
+  pure ()
+
+-- Lender A's policy: Treasuries at 2% or more, Bunds at 5% or more, nothing else.
+schedule : P -> Script (ContractId HaircutSchedule)
+schedule p = submit p.lenderA do
+  createCmd HaircutSchedule with
+    lender = p.lenderA; audience = [p.borrower]
+    floors = TextMap.fromList [("UST10Y", 0.02), ("BUND10", 0.05)]
+
+haircutSchedule : Script ()
+haircutSchedule = do
+  p <- setup
+  s <- schedule p
+  isSome <$> queryContractId p.borrower s >>= assert
+  isNone <$> queryContractId p.lenderB s >>= assert
+  -- A floor outside [0, 50%) is refused at publication.
+  submitMustFail p.lenderA do
+    createCmd HaircutSchedule with lender = p.lenderA; audience = []; floors = TextMap.fromList [("UST10Y", 0.6)]
+
+  r <- rfq p
+  c <- cash p p.lenderA loanAmount
+  -- 1% on Treasuries is below the lender's own 2% floor.
+  submitMustFail p.lenderA do
+    exerciseCmd s QuoteWithinSchedule with rfqCid = r; rateBps = 530.0; haircut = 0.01; cashCid = c
+  -- Only the lender that published the schedule can quote through it.
+  cB <- cash p p.lenderB loanAmount
+  submitMustFail p.lenderB do
+    exerciseCmd s QuoteWithinSchedule with rfqCid = r; rateBps = 530.0; haircut = 0.02; cashCid = cB
+  -- Collateral the schedule does not list is not eligible at any haircut.
+  rc <- submit p.borrower do
+    createCmd RepoRFQ with
+      borrower = p.borrower; regulator = p.regulator; agent = p.agent; lenders = [p.lenderA]
+      terms = (stdTerms p) with collateralInstrument = "CORP5Y"
+      deadline = None; venue = None
+  submitMustFail p.lenderA do
+    exerciseCmd s QuoteWithinSchedule with rfqCid = rc; rateBps = 530.0; haircut = 0.2; cashCid = c
+  -- At the floor the quote is sealed as usual.
+  q <- submit p.lenderA do
+    exerciseCmd s QuoteWithinSchedule with rfqCid = r; rateBps = 530.0; haircut = 0.02; cashCid = c
+  col <- bond p "UST10Y" 100.0
+  m <- mark p "UST10Y" 98000.0
+  t <- submit p.borrower do
+    exerciseCmd r AwardSealed with winner = q; losers = []; collateralCid = col; markCid = m; contexts = []
+
+  -- Bunds cover the repo at 85,000, but the repo's 2% haircut is under the
+  -- lender's 5% Bund floor, so approval through the schedule is refused.
+  bunds <- bond p "BUND10" 120.0
+  sub <- submit p.borrower do exerciseCmd t ProposeSubstitution with holdingCid = bunds
+  bm <- mark p "BUND10" 85000.0
+  submitMustFail p.lenderA do
+    exerciseCmd s ApproveWithinSchedule with substitutionCid = sub; markCid = bm; contexts = []
+  -- Ineligible substitute collateral is refused too.
+  gold <- bond p "GOLD" 5000.0
+  subG <- submit p.borrower do exerciseCmd t ProposeSubstitution with holdingCid = gold
+  gm <- mark p "GOLD" 2500.0
+  submitMustFail p.lenderA do
+    exerciseCmd s ApproveWithinSchedule with substitutionCid = subG; markCid = gm; contexts = []
+  submit p.lenderA do exerciseCmd subG Decline with contexts = []
+  -- The lender revises its policy; the same substitution now passes.
+  s2 <- submit p.lenderA do
+    exerciseCmd s ReviseSchedule with
+      newFloors = TextMap.fromList [("UST10Y", 0.02), ("BUND10", 0.02)]; newAudience = [p.borrower]
+  _ <- submit p.lenderA do
+    exerciseCmd s2 ApproveWithinSchedule with substitutionCid = sub; markCid = bm; contexts = []
+  held p.borrower "UST10Y" >>= (=== 100.0)
+  held p.borrower "GOLD" >>= (=== 5000.0)
+
+-- The borrower offers the master agreement; only the lender can sign it.
+signedMaster : P -> Script (ContractId MasterAgreement)
+signedMaster p = do
+  prop <- submit p.borrower do
+    createCmd MasterAgreementProposal with
+      borrower = p.borrower; lender = p.lenderA; regulator = p.regulator; form = "GMRA 2011"; proposer = p.borrower
+  submitMustFail p.borrower do exerciseCmd prop SignMaster
+  submit p.lenderA do exerciseCmd prop SignMaster
+
+-- Two repos with lender A: 100 UST10Y at 98,000 and 120 BUND10 at 85,000, each
+-- for 9,500,000 at 530 bp. Bunds fall to 78,000; the call on the Bund repo goes
+-- unanswered. Twelve days in, 9,516,783.33 is owed on each, 19,033,566.66 in
+-- all, against 19,160,000 of collateral at today's marks. Netted, the lender
+-- keeps the Treasuries and 118.3791 Bunds; 1.6209 Bunds go home. Per trade,
+-- the Bund default alone would take all 120 Bunds and still leave 157k short.
+closeOutNetting : Script ()
+closeOutNetting = do
+  p <- setup
+  ma <- signedMaster p
+  t1 <- openOn p (stdTerms p) 98000.0
+  t2 <- openOn p ((stdTerms p) with collateralInstrument = "BUND10"; collateralQty = 120.0) 85000.0
+  -- A repo with lender B is outside this agreement.
+  rB <- rfq p
+  qB <- quote p rB p.lenderB 540.0 0.02
+  colB <- bond p "UST10Y" 100.0
+  mB <- mark p "UST10Y" 98000.0
+  tB <- submit p.borrower do
+    exerciseCmd rB AwardSealed with winner = qB; losers = []; collateralCid = colB; markCid = mB; contexts = []
+
+  passTime (days 10)
+  now <- getTime
+  low <- mark p "BUND10" 78000.0
+  call <- submit p.lenderA do
+    exerciseCmd t2 CallMargin with markCid = low; respondBy = addRelTime now (days 1)
+  m1 <- mark p "UST10Y" 98000.0
+  -- No event of default yet: the call still has time, nothing has matured.
+  submitMustFail p.lenderA do
+    exerciseCmd ma CloseOut with tradeCids = [t1, t2]; markCids = [m1, low]; defaultedCall = Some call; contexts = []
+  submitMustFail p.lenderA do
+    exerciseCmd ma CloseOut with tradeCids = [t1, t2]; markCids = [m1, low]; defaultedCall = None; contexts = []
+
+  passTime (days 2)
+  u <- mark p "UST10Y" 98000.0
+  b <- mark p "BUND10" 78000.0
+  -- Lender B's repo cannot be pulled in; the borrower cannot close out; marks must pair up.
+  submitMustFail p.lenderA do
+    exerciseCmd ma CloseOut with tradeCids = [t1, t2, tB]; markCids = [u, b, u]; defaultedCall = Some call; contexts = []
+  submitMustFail p.borrower do
+    exerciseCmd ma CloseOut with tradeCids = [t1, t2]; markCids = [u, b]; defaultedCall = Some call; contexts = []
+  submitMustFail p.lenderA do
+    exerciseCmd ma CloseOut with tradeCids = [t1, t2]; markCids = [u]; defaultedCall = Some call; contexts = []
+
+  rep <- submit p.lenderA do
+    exerciseCmd ma CloseOut with tradeCids = [t1, t2]; markCids = [u, b]; defaultedCall = Some call; contexts = []
+  held p.lenderA "UST10Y" >>= (=== 100.0)
+  held p.lenderA "BUND10" >>= (=== 118.3791)
+  held p.borrower "BUND10" >>= (=== 1.6209)
+  held p.borrower "USDC" >>= (=== 3.0 * loanAmount)
+
+  -- One report to the regulator for the whole set; both repos, the call and
+  -- the agreement are gone; lender B's repo is untouched.
+  Some r <- queryContractId p.regulator rep
+  (r.trigger, r.reposNetted, r.owed, r.collateralValue) === ("MARGIN_CALL", 2, 19033566.66, 19160000.0)
+  (r.valueKept, r.valueReturned) === (19033569.8, 126430.2)
+  map snd <$> query @CloseOutReport p.regulator >>= (=== [r])
+  evs <- events p
+  assert ("DEFAULT" `notElem` evs)
+  isNone <$> queryContractId p.lenderA t1 >>= assert
+  isNone <$> queryContractId p.lenderA t2 >>= assert
+  isNone <$> queryContractId p.lenderA call >>= assert
+  isNone <$> queryContractId p.lenderA ma >>= assert
+  isSome <$> queryContractId p.lenderB tB >>= assert
+
+-- A repo past maturity is an event of default on its own. 91 days at 530 bp:
+-- 9,627,273.61 owed, 98.2375 units at 98,000; 1.7625 go home.
+closeOutAtMaturity : Script ()
+closeOutAtMaturity = do
+  p <- setup
+  ma <- signedMaster p
+  t <- openOn p (stdTerms p) 98000.0
+  passTime (days 91)
+  m <- mark p "UST10Y" 98000.0
+  rep <- submit p.lenderA do
+    exerciseCmd ma CloseOut with tradeCids = [t]; markCids = [m]; defaultedCall = None; contexts = []
+  held p.lenderA "UST10Y" >>= (=== 98.2375)
+  held p.borrower "UST10Y" >>= (=== 1.7625)
+  Some r <- queryContractId p.regulator rep
+  (r.trigger, r.owed) === ("MATURITY", 9627273.61)

@@ -15,7 +15,7 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { PARTIES, acs, submit, create, exercise, created, NO_CONTEXTS } from '../lib/ledger.mjs';
+import { PARTIES, AGREEMENTS, acs, submit, create, exercise, created, NO_CONTEXTS } from '../lib/ledger.mjs';
 import { assess, latestMark, lendable, owed, venueFee, N } from '../lib/repo.mjs';
 
 const ROLE = process.env.TALANG_ROLE ?? 'lenderA';
@@ -99,6 +99,19 @@ const TOOLS = {
       inputSchema: { type: 'object', required: ['repo'], properties: { repo: { type: 'string' } } } },
     { name: 'loss_history', description: 'Requests this lender quoted and lost, with its rank among the quotes the borrower weighed. That is all a loser is ever told: no winning rate, no winner.',
       inputSchema: NOTHING },
+    { name: 'master_agreements', description: 'Master agreements (GMRA-style, one per borrower-lender pair) this desk has signed or been offered, and the lenders\' published haircut schedules it can see.',
+      inputSchema: NOTHING },
+    { name: 'propose_master', description: 'Offer a master agreement to a counterparty (a lender role from the borrower, the borrower role from a lender). It binds once they sign it.',
+      inputSchema: { type: 'object', required: ['counterparty'], properties: { counterparty: { type: 'string', description: 'role, e.g. lenderA or borrower' },
+        form: { type: 'string', description: 'default GMRA 2011' } } } },
+    { name: 'sign_master', description: 'Sign a master agreement the counterparty offered. Under it the lender may close out every repo between the two at once on an event of default.',
+      inputSchema: { type: 'object', required: ['proposal'], properties: { proposal: { type: 'string' } } } },
+    { name: 'publish_haircut_schedule', description: 'Publish (or replace) this lender\'s minimum haircut per collateral instrument, in percent. Once published, quote and review_substitution go through it: the ledger refuses a haircut below the floor and collateral the schedule does not list.',
+      inputSchema: { type: 'object', required: ['floorsPct'], properties: {
+        floorsPct: { type: 'object', additionalProperties: { type: 'number' }, description: 'e.g. {"UST10Y": 2, "BUND10": 5}' },
+        borrowers: { type: 'array', items: { type: 'string' }, description: 'borrower roles that may see it, default borrower' } } } },
+    { name: 'close_out', description: 'Event of default under the master agreement with a borrower (a repo past maturity, or a margin call past its deadline): close out every repo with that borrower at once, valued at the latest fresh marks with no haircut. The lender keeps collateral worth the total owed; the rest goes back. One report to the regulator. The ledger refuses it without an event of default.',
+      inputSchema: { type: 'object', properties: { borrower: { type: 'string', description: 'borrower role, default borrower' } } } },
     { name: 'privacy_check', description: 'Count what this lender\'s node can see that is not its own: rival quotes should be zero.',
       inputSchema: NOTHING },
   ],
@@ -115,7 +128,8 @@ const TOOLS = {
         principal: { type: 'number', description: 'cash wanted' }, cashInstrument: { type: 'string', description: 'default USDC' },
         collateralInstrument: { type: 'string', description: 'e.g. UST5Y' }, collateralQty: { type: 'number' },
         termDays: { type: 'integer' }, lenders: { type: 'array', items: { type: 'string' }, description: 'lender roles, default every lender in the parties file' },
-        hoursOpen: { type: 'number', description: 'quote deadline in hours; omit for none' } } } },
+        hoursOpen: { type: 'number', description: 'quote deadline in hours; omit for none' },
+        minTransfer: { type: 'number', description: 'minimum transfer amount in cash: margin calls for a smaller shortfall are refused; omit for none' } } } },
     { name: 'cancel_request', description: 'Cancel an open request. Quotes already sealed stay locked until each lender withdraws them; the tool lists them.',
       inputSchema: { type: 'object', required: ['request'], properties: { request: { type: 'string' } } } },
     { name: 'post_margin', description: 'Answer a margin call: pledge exactly the units called, splitting a larger free holding if needed.',
@@ -127,6 +141,13 @@ const TOOLS = {
       inputSchema: { type: 'object', required: ['repo'], properties: { repo: { type: 'string' } } } },
     { name: 'accept_roll', description: 'Accept a lender\'s roll offer: pay the interest so far (and the venue fee) now, keep the cash, continue at the offered rate.',
       inputSchema: { type: 'object', required: ['offer'], properties: { offer: { type: 'string' } } } },
+    { name: 'master_agreements', description: 'Master agreements (GMRA-style, one per borrower-lender pair) this desk has signed or been offered, and the lenders\' published haircut schedules it can see.',
+      inputSchema: NOTHING },
+    { name: 'propose_master', description: 'Offer a master agreement to a counterparty (a lender role from the borrower, the borrower role from a lender). It binds once they sign it.',
+      inputSchema: { type: 'object', required: ['counterparty'], properties: { counterparty: { type: 'string', description: 'role, e.g. lenderA or borrower' },
+        form: { type: 'string', description: 'default GMRA 2011' } } } },
+    { name: 'sign_master', description: 'Sign a master agreement the counterparty offered. Under it the lender may close out every repo between the two at once on an event of default.',
+      inputSchema: { type: 'object', required: ['proposal'], properties: { proposal: { type: 'string' } } } },
     { name: 'privacy_check', description: 'What this node holds: the borrower sees its own requests, quotes made to it and its repos, and nothing of the lenders\' other business.',
       inputSchema: NOTHING },
   ],
@@ -137,6 +158,8 @@ const TOOLS = {
       inputSchema: NOTHING },
     { name: 'best_execution', description: 'For every award: how many sealed quotes the borrower weighed, where the one it took ranked on rate and the gap to the best rate in bp. No lender is named, no losing quote is shown.',
       inputSchema: NOTHING },
+    { name: 'close_outs', description: 'Every close-out under a master agreement: the trigger, how many repos were netted, total owed, collateral value at the marks, value kept by the lender and returned to the borrower. One row per close-out.',
+      inputSchema: NOTHING },
     { name: 'privacy_check', description: 'Count what the regulator\'s node holds beyond reports and best-execution records: requests and quotes should be zero.',
       inputSchema: NOTHING },
   ],
@@ -145,6 +168,69 @@ const TOOLS = {
 async function run(name, a = {}) {
   const contracts = (await acs(ME)).contracts.filter((c) => c.tpl !== 'Mark' || TRUSTED_AGENTS.includes(c.arg.agent));
   const of = (tpl) => contracts.filter((c) => c.tpl === tpl);
+  // talang-repo 1.2.0 contracts (schedules, master agreements, close-outs), read on demand.
+  const agreements = async () => (await acs(ME, undefined, AGREEMENTS)).contracts;
+  const role = (r, kind) => { if (typeof r !== 'string' || !r.startsWith(kind) || !PARTIES[r]) throw new Error(`unknown ${kind} ${r}`); return PARTIES[r]; };
+
+  // ---- both sides: master agreements and schedules ----
+  if (name === 'master_agreements') {
+    const ag = await agreements(), pct = (f) => Object.fromEntries(Object.entries(f).map(([k, v]) => [k, N(v) * 100]));
+    return { agreements: ag.filter((c) => c.tpl === 'MasterAgreement').map((c) => ({ id: short(c.cid), borrower: roleOf(c.arg.borrower), lender: roleOf(c.arg.lender), form: c.arg.form })),
+      proposals: ag.filter((c) => c.tpl === 'MasterAgreementProposal').map((c) => ({ id: short(c.cid), borrower: roleOf(c.arg.borrower), lender: roleOf(c.arg.lender),
+        form: c.arg.form, awaiting: c.arg.proposer === ME ? 'counterparty' : 'me' })),
+      haircutSchedules: ag.filter((c) => c.tpl === 'HaircutSchedule').map((c) => ({ id: short(c.cid), lender: roleOf(c.arg.lender), minHaircutPct: pct(c.arg.floors) })) };
+  }
+
+  if (name === 'propose_master') {
+    const other = role(a.counterparty, KIND === 'borrower' ? 'lender' : 'borrower');
+    const [borrower, lender] = KIND === 'borrower' ? [ME, other] : [other, ME];
+    const tx = await submit(ME, create('MasterAgreementProposal', { borrower, lender, regulator: PARTIES.regulator,
+      form: typeof a.form === 'string' && a.form && SAFE.test(a.form) ? a.form : 'GMRA 2011', proposer: ME }));
+    return { proposal: short(created(tx, 'MasterAgreementProposal') ?? ''), awaiting: a.counterparty };
+  }
+
+  if (name === 'sign_master') {
+    const pr = pick((await agreements()).filter((c) => c.tpl === 'MasterAgreementProposal' && c.arg.proposer !== ME), a.proposal, 'proposal to you');
+    const tx = await submit(ME, exercise('MasterAgreementProposal', pr.cid, 'SignMaster'));
+    return { signed: short(created(tx, 'MasterAgreement') ?? ''), borrower: roleOf(pr.arg.borrower), lender: roleOf(pr.arg.lender), form: pr.arg.form };
+  }
+
+  if (name === 'publish_haircut_schedule') {
+    const entries = Object.entries(a.floorsPct ?? {});
+    if (!entries.length) throw new Error('floorsPct needs at least one instrument');
+    const floors = Object.fromEntries(entries.map(([k, v]) => [instrument(k, 'instrument'), String(num(v, `floor for ${k}`, { min: 0, max: 49.99 }) / 100)]));
+    const audience = (a.borrowers?.length ? a.borrowers : ['borrower']).map((r) => role(r, 'borrower'));
+    const old = (await agreements()).find((c) => c.tpl === 'HaircutSchedule' && c.arg.lender === ME);
+    const tx = await submit(ME, old ? exercise('HaircutSchedule', old.cid, 'ReviseSchedule', { newFloors: floors, newAudience: audience })
+      : create('HaircutSchedule', { lender: ME, floors, audience }));
+    return { schedule: short(created(tx, 'HaircutSchedule') ?? ''), replaced: old ? short(old.cid) : null,
+      minHaircutPct: Object.fromEntries(entries.map(([k, v]) => [k, Number(v)])) };
+  }
+
+  if (name === 'close_out') {
+    const borrower = role(a.borrower ?? 'borrower', 'borrower');
+    const ma = (await agreements()).find((c) => c.tpl === 'MasterAgreement' && c.arg.lender === ME && c.arg.borrower === borrower);
+    if (!ma) throw new Error(`no master agreement signed with ${roleOf(borrower)}`);
+    const trades = of('RepoTrade').filter((t) => t.arg.lender === ME && t.arg.borrower === borrower && t.arg.regulator === ma.arg.regulator);
+    if (!trades.length) throw new Error(`no open repo with ${roleOf(borrower)}`);
+    const marks = trades.map((t) => {
+      const m = latestMark(contracts, t.arg.collateralInstrument);
+      if (!m?.fresh) throw new Error(`no fresh mark for ${t.arg.collateralInstrument}`);
+      return m;
+    });
+    const overdue = of('MarginCall').find((c) => trades.some((t) => t.cid === c.arg.tradeCid) && Date.now() > Date.parse(c.arg.respondBy));
+    const tx = await submit(ME, exercise('MasterAgreement', ma.cid, 'CloseOut', { tradeCids: trades.map((t) => t.cid),
+      markCids: marks.map((m) => m.cid), defaultedCall: overdue?.cid ?? null, contexts: NO_CONTEXTS }));
+    const r = (tx?.transaction?.events ?? []).map((e) => e.CreatedEvent).find((c) => c?.templateId?.endsWith(':CloseOutReport'))?.createArgument;
+    return { closedOut: trades.length, trigger: r?.trigger, owed: N(r?.owed), collateralValue: N(r?.collateralValue),
+      valueKept: N(r?.valueKept), valueReturned: N(r?.valueReturned) };
+  }
+
+  if (name === 'close_outs') {
+    return (await agreements()).filter((c) => c.tpl === 'CloseOutReport').map((c) => ({ at: c.arg.at, borrower: roleOf(c.arg.borrower), lender: roleOf(c.arg.lender),
+      form: c.arg.form, trigger: c.arg.trigger, reposNetted: N(c.arg.reposNetted), owed: N(c.arg.owed), collateralValue: N(c.arg.collateralValue),
+      valueKept: N(c.arg.valueKept), valueReturned: N(c.arg.valueReturned) }));
+  }
 
   // ---- lender ----
   if (name === 'portfolio') {
@@ -181,8 +267,11 @@ async function run(name, a = {}) {
     if (!cash) throw new Error(`no free ${t.cashInstrument} holding of at least ${N(t.principal)} to lock behind the quote`);
     const cashCid = N(cash.arg.amount) === N(t.principal) ? cash.cid
       : created(await submit(ME, exercise('Holding', cash.cid, 'Split', { splitAmount: t.principal })), 'Holding');
-    await submit(ME, exercise('RepoRFQ', r.cid, 'SubmitQuote',
-      { lender: ME, rateBps: String(a.rateBps), haircut: String(a.haircutPct / 100), cashCid }));
+    // A published haircut schedule is the lender's own policy: quote through it so the ledger checks the floor.
+    const sched = (await agreements()).find((c) => c.tpl === 'HaircutSchedule' && c.arg.lender === ME);
+    const args = { rateBps: String(a.rateBps), haircut: String(a.haircutPct / 100), cashCid };
+    await submit(ME, sched ? exercise('HaircutSchedule', sched.cid, 'QuoteWithinSchedule', { rfqCid: r.cid, ...args })
+      : exercise('RepoRFQ', r.cid, 'SubmitQuote', { lender: ME, ...args }));
     return { sealed: true, request: short(r.cid), rateBps: a.rateBps, haircutPct: a.haircutPct, locked: N(t.principal) };
   }
 
@@ -203,7 +292,9 @@ async function run(name, a = {}) {
     if (s.arg.newIssuer !== PARTIES.bondIssuer) throw new Error(`substitute issued by ${roleOf(s.arg.newIssuer)}, not the desk bond issuer: decline it`);
     const m = latestMark(contracts, s.arg.newInstrument);
     if (!m) throw new Error('no mark for ' + s.arg.newInstrument);
-    await submit(ME, exercise('Substitution', s.cid, 'Approve', { markCid: m.cid, contexts: NO_CONTEXTS }));
+    const sched = (await agreements()).find((c) => c.tpl === 'HaircutSchedule' && c.arg.lender === ME);
+    await submit(ME, sched ? exercise('HaircutSchedule', sched.cid, 'ApproveWithinSchedule', { substitutionCid: s.cid, markCid: m.cid, contexts: NO_CONTEXTS })
+      : exercise('Substitution', s.cid, 'Approve', { markCid: m.cid, contexts: NO_CONTEXTS }));
     return { approved: true, newCollateral: `${N(s.arg.newQty)} ${s.arg.newInstrument}`, atMark: m.price };
   }
 
@@ -277,7 +368,7 @@ async function run(name, a = {}) {
     const col = of('Holding').find((h) => h.arg.owner === ME && h.arg.instrument === t.collateralInstrument
       && h.arg.issuer === t.collateralIssuer && N(h.arg.amount) === N(t.collateralQty));
     if (!col) throw new Error(`no holding of exactly ${N(t.collateralQty)} ${t.collateralInstrument} to pledge`);
-    const tx = await submit(ME, exercise('RepoRFQ', r.cid, 'Award', { winner: win.cid, losers: qs.filter((q) => q.cid !== win.cid).map((q) => q.cid),
+    const tx = await submit(ME, exercise('RepoRFQ', r.cid, 'AwardSealed', { winner: win.cid, losers: qs.filter((q) => q.cid !== win.cid).map((q) => q.cid),
       collateralCid: col.cid, markCid: m.cid, contexts: NO_CONTEXTS }));
     return { opened: short(created(tx, 'RepoTrade') ?? ''), lender: roleOf(win.arg.lender), rateBps: N(win.arg.rateBps),
       haircut: N(win.arg.haircut), refunded: qs.length - 1 };
@@ -307,7 +398,8 @@ async function run(name, a = {}) {
     const deadline = a.hoursOpen != null ? new Date(Date.now() + num(a.hoursOpen, 'hoursOpen', { min: 0.1 }) * 36e5).toISOString() : null;
     const tx = await submit(ME, create('RepoRFQ', { borrower: ME, regulator: PARTIES.regulator, agent: PARTIES.agent, lenders,
       terms: { cashIssuer: PARTIES.cashIssuer, cashInstrument: a.cashInstrument ?? 'USDC', principal: String(principal),
-        collateralIssuer: PARTIES.bondIssuer, collateralInstrument: a.collateralInstrument, collateralQty: String(qty), termDays: String(termDays) },
+        collateralIssuer: PARTIES.bondIssuer, collateralInstrument: a.collateralInstrument, collateralQty: String(qty), termDays: String(termDays),
+        minTransfer: a.minTransfer != null ? String(num(a.minTransfer, 'minTransfer', { min: 0 })) : null },
       deadline, venue: PARTIES.venue ? { operator: PARTIES.venue, feeBps: '10.0' } : null }));
     return { request: short(created(tx, 'RepoRFQ') ?? ''), lenders: roles, principal, collateral: `${qty} ${a.collateralInstrument}`, termDays, deadline };
   }
@@ -404,7 +496,7 @@ async function run(name, a = {}) {
 
   if (name === 'best_execution') {
     return of('BestExecution').map((b) => ({ at: b.arg.at, quotesConsidered: N(b.arg.quotesConsidered), winnerRank: N(b.arg.winnerRank),
-      winningRateBps: N(b.arg.winningRateBps), winningHaircut: N(b.arg.winningHaircut), spreadToBestBps: N(b.arg.spreadToBestBps) }));
+      winningRateBps: N(b.arg.winningRateBps), winningHaircut: N(b.arg.winningHaircut), spreadToBestBps: N(b.arg.spreadToBestBps), spreadBucketBps: b.arg.spreadBucket ?? null }));
   }
 
   if (name === 'privacy_check') {

@@ -230,6 +230,17 @@ claimWindow = days 3
 marginResponseMin : RelTime
 marginResponseMin = hours 2
 
+-- 1.2.0: a margin call relies on a mark at most an hour old, so a lender cannot
+-- pick an older, lower mark when a newer one is out; a borrower holding a newer
+-- mark that shows cover refutes the call (RefuteMarginCall).
+marginMarkMaxAge : RelTime
+marginMarkMaxAge = hours 1
+
+-- 1.2.0: a default must follow the call's deadline within a day; after that the
+-- call's mark is too old to value the collateral on, and the lender calls again.
+defaultWindow : RelTime
+defaultWindow = days 1
+
 -- What the collateral lends against once the haircut is taken off.
 lendable : Decimal -> Decimal -> Decimal -> Decimal
 lendable haircut qty price = qty * price * (1.0 - haircut)
@@ -314,6 +325,10 @@ data Terms = Terms
     collateralInstrument : Text
     collateralQty : Decimal      -- units the borrower will pledge
     termDays : Int
+    -- 1.2.0: the minimum transfer amount (ICMA ERCC best practice), in cash. A
+    -- margin call whose shortfall is worth less than this is refused, so the
+    -- borrower is not called for small change. None: any shortfall may be called.
+    minTransfer : Optional Decimal
   deriving (Eq, Show)
 
 cashId : Terms -> InstrumentId
@@ -377,7 +392,11 @@ template RepoRFQ
     -- the borrower pays the rate it takes, and may weigh a lower haircut against
     -- a higher rate. Each loser learns its rank and nothing else; the regulator
     -- gets a best-execution record with no lender and no losing rate in it.
-    choice Award : ContractId RepoTrade
+    -- The choice is nonconsuming and archives the request at the end: every
+    -- invited lender observes the request, and a consuming choice would show
+    -- each of them the whole award (winner, rate, rivals' notices). This way a
+    -- lender sees only the archive, its own quote's fate and its own notice.
+    nonconsuming choice AwardSealed : ContractId RepoTrade
       with
         winner : ContractId RepoQuote
         losers : [ContractId RepoQuote]
@@ -388,11 +407,37 @@ template RepoRFQ
       do q <- fetch winner
          pledge <- exercise collateralCid Lock with
            counterparty = q.lender; purpose = "talang: pledged under an open repo"
-         award this self winner losers contexts (Escrowed pledge) markCid
+         t <- award this self winner losers contexts (Escrowed pledge) markCid
+         archive self
+         pure t
 
     -- The same award with collateral in a real CIP-0056 asset (CBTC, say): the
     -- borrower's registry holds it in an allocation to the lender, executable
     -- until the claim window after maturity closes. Open re-checks the leg.
+    nonconsuming choice AwardSealedWithTokenCollateral : ContractId RepoTrade
+      with
+        winner : ContractId RepoQuote
+        losers : [ContractId RepoQuote]
+        collateralAlloc : ContractId Allocation
+        markCid : ContractId Mark
+        contexts : Contexts
+      controller borrower
+      do t <- award this self winner losers contexts (Allocated collateralAlloc) markCid
+         archive self
+         pure t
+
+    -- 1.0.0/1.1.0 awards, consuming, so they divulged the award to every
+    -- invited lender. Kept for the upgrade, refused since 1.2.0.
+    choice Award : ContractId RepoTrade
+      with
+        winner : ContractId RepoQuote
+        losers : [ContractId RepoQuote]
+        collateralCid : ContractId Holding
+        markCid : ContractId Mark
+        contexts : Contexts
+      controller borrower
+      do abort "Award shows the whole award to every invited lender; use AwardSealed"
+
     choice AwardWithTokenCollateral : ContractId RepoTrade
       with
         winner : ContractId RepoQuote
@@ -401,7 +446,7 @@ template RepoRFQ
         markCid : ContractId Mark
         contexts : Contexts
       controller borrower
-      do award this self winner losers contexts (Allocated collateralAlloc) markCid
+      do abort "AwardWithTokenCollateral shows the whole award to every invited lender; use AwardSealedWithTokenCollateral"
 
     choice CancelRFQ : ()
       controller borrower
@@ -442,11 +487,29 @@ award rfq rfqId winner losers ctx pledge markCid = do
       borrower = rfq.borrower; lender = q.lender; rfqId; rank = rankOf cid; outOf = n; at = now
     exercise cid RejectQuote with contexts = ctx
   w <- fetch winner
+  let gap = w.rateBps - bestRate
   _ <- create BestExecution with
     borrower = rfq.borrower; regulator = rfq.regulator; quotesConsidered = n
     winnerRank = rankOf winner; winningRateBps = w.rateBps; winningHaircut = w.haircut
-    spreadToBestBps = w.rateBps - bestRate; at = now
+    spreadToBestBps = bucketFloor gap; at = now; spreadBucket = Some (bucketName gap)
   exercise winner Open with pledge; markCid; contexts = ctx
+
+-- The gap to the best rate is reported as a band, never the exact number:
+-- winning rate minus an exact gap would hand the regulator the best losing rate.
+-- spreadToBestBps carries the band's lower edge (0, 1, 6 or 26).
+bucketFloor : Decimal -> Decimal
+bucketFloor gap
+  | gap <= 0.0 = 0.0
+  | gap <= 5.0 = 1.0
+  | gap <= 25.0 = 6.0
+  | otherwise = 26.0
+
+bucketName : Decimal -> Text
+bucketName gap
+  | gap <= 0.0 = "0"
+  | gap <= 5.0 = "1-5"
+  | gap <= 25.0 = "6-25"
+  | otherwise = ">25"
 
 template RepoQuote
   with
@@ -517,7 +580,7 @@ template LossNotice
 
 -- What the regulator is told about price discovery: how many sealed quotes the
 -- borrower weighed, where the one it took ranked on rate, and the gap to the
--- best rate in bp. No lender is named and no losing quote is shown.
+-- best rate as a band (1.2.0). No lender is named and no losing quote is shown.
 template BestExecution
   with
     borrower : Party
@@ -528,6 +591,7 @@ template BestExecution
     winningHaircut : Decimal
     spreadToBestBps : Decimal
     at : Time
+    spreadBucket : Optional Text   -- 1.2.0: "0", "1-5", "6-25" or ">25" bp
   where
     signatory borrower
     observer regulator
@@ -598,6 +662,10 @@ template RepoTrade
         contexts : Contexts
       controller borrower, lender
       do now <- getTime
+         -- 1.2.0: SettleRepurchase closes inline and collects the venue fee;
+         -- called directly, this would skip it, so only a fee-free repo may.
+         assertMsg "a token close that owes the venue a fee goes through SettleRepurchase"
+           (venueFee venue terms.principal openedAt now == 0.0)
          forA_ collateral (unwind contexts borrower)
          report this "CLOSE" due fee now
 
@@ -617,12 +685,16 @@ template RepoTrade
              needed = owed / (1.0 - haircut) / m.price
          assertMsg "collateral still covers what is owed"
            (lendable haircut collateralQty m.price < owed)
+         assertMsg "a margin call needs a mark under an hour old"
+           (subTime now m.asOf <= marginMarkMaxAge)
+         forA_ terms.minTransfer \mta -> assertMsg "shortfall below the minimum transfer amount"
+           (owed - lendable haircut collateralQty m.price >= mta)
          let unitsDue = ceil4 (needed - collateralQty)
          report this "MARGIN_CALL" 0.0 0.0 now
          create MarginCall with
            tradeCid = self; borrower; lender; regulator
            issuer = collateralIssuer; instrument = collateralInstrument
-           unitsDue; price = m.price; owed; respondBy; maturity
+           unitsDue; price = m.price; owed; respondBy; maturity; markAsOf = Some m.asOf
 
     -- The borrower offers different collateral, desk-issued or a token
     -- allocation. It is locked now, and the swap happens only if the lender
@@ -795,7 +867,10 @@ template RepurchaseNotice
                exercise va CollectFee with allocCid = fa; amount = fee; extraArgs = contextFor contexts fa
              _ -> abort "the venue fee leg is missing"
            _ -> pure ()
-         exercise tradeCid CloseWithTokens with due; fee; contexts
+         t <- fetch tradeCid
+         archive tradeCid
+         forA_ t.collateral (unwind contexts borrower)
+         report t "CLOSE" due fee now
 
     interface instance AllocationRequest for RepurchaseNotice where
       view = AllocationRequestView with
@@ -859,8 +934,23 @@ template MarginCall
     owed : Decimal
     respondBy : Time
     maturity : Time
+    markAsOf : Optional Time   -- 1.2.0: when the call's mark was struck
   where
     signatory borrower, lender
+
+    -- A newer mark from the same agent that shows the pledge covers what is
+    -- owed today cancels the call.
+    choice RefuteMarginCall : ()
+      with markCid : ContractId Mark
+      controller borrower
+      do now <- getTime
+         assertMsg "the call has expired" (now <= respondBy)
+         t <- fetch tradeCid
+         m <- freshMark t.agent instrument markCid
+         assertMsg "the mark is not newer than the call's" (optional True (< m.asOf) markAsOf)
+         let owedNow = t.terms.principal + interest t.terms.principal t.rateBps t.openedAt now
+         assertMsg "the newer mark still leaves the pledge short"
+           (lendable t.haircut t.collateralQty m.price >= owedNow)
 
     choice PostMargin : ContractId RepoTrade
       with holdingCid : ContractId Holding
@@ -891,6 +981,8 @@ template MarginCall
       controller lender
       do now <- getTime
          assertMsg "the borrower still has time to respond" (now > respondBy)
+         assertMsg "the call is more than a day past its deadline: call again on a fresh mark"
+           (now <= addRelTime respondBy defaultWindow)
          t <- fetch tradeCid
          archive tradeCid
          let owedNow = t.terms.principal + interest t.terms.principal t.rateBps t.openedAt now
@@ -915,6 +1007,10 @@ template Substitution
         contexts : Contexts
       controller lender
       do t <- fetch tradeCid
+         -- A mark prices an instrument name, not an issuer: a substitute from
+         -- another issuer (the borrower's own IOU, say) would borrow the real
+         -- bond's price. 1.2.0 accepts substitutes from the repo's issuer only.
+         assertMsg "substitute from another issuer than the repo's collateral" (newIssuer == t.collateralIssuer)
          m <- freshMark t.agent newInstrument markCid
          now <- getTime
          let owed = t.terms.principal + interest t.terms.principal t.rateBps t.openedAt now
@@ -925,6 +1021,12 @@ template Substitution
     choice Decline : ()
       with contexts : Contexts
       controller lender
+      do unwind contexts borrower newCollateral
+
+    -- 1.2.0: the borrower takes back an offer the lender has not answered.
+    choice WithdrawSubstitution : ()
+      with contexts : Contexts
+      controller borrower
       do unwind contexts borrower newCollateral
 
 -- ---------------------------------------------------------------------------

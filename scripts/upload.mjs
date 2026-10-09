@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { api, LEDGER } from '../lib/ledger.mjs';
 
-const DARS = ['.daml/dist/talang-repo-1.1.0.dar', 'dars/governance-action-v1-0.1.0.dar', 'dars/governance-core-v1-0.1.0.dar'];
+const DARS = ['.daml/dist/talang-repo-1.2.0.dar', 'dars/governance-action-v1-0.1.0.dar', 'dars/governance-core-v1-0.1.0.dar'];
 for (const dar of DARS) {
   const r = await api('/v2/packages', { method: 'POST', bytes: readFileSync(dar) });
   if (!r.ok) { console.error(`✗ ${dar}: ${r.status} ${JSON.stringify(r.data).slice(0, 300)}`); process.exit(1); }

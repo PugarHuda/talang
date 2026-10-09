@@ -68,7 +68,7 @@ async function openRepo(instrument, qty, principal, termDays, quotes, winner) {
   const qs = [];
   for (const [lender, rate, haircut] of quotes) qs.push(await quote(rfq, lender, principal, rate, haircut));
   const col = await mint(p.bondIssuer, p.borrower, instrument, qty);
-  const tx = await submit(p.borrower, exercise('RepoRFQ', rfq, 'Award', {
+  const tx = await submit(p.borrower, exercise('RepoRFQ', rfq, 'AwardSealed', {
     winner: qs[winner], losers: qs.filter((_, i) => i !== winner), collateralCid: col,
     markCid: await latestMark(instrument), contexts: NO_CONTEXTS }));
   return created(tx, 'RepoTrade');

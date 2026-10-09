@@ -78,7 +78,7 @@ const rivalSees = (await acs(p.lenderB)).contracts.filter((c) => c.tpl === 'Repo
 step(`lender B's node holds ${rivalSees} rival quotes`, null, { rivalQuotesOnLenderB: rivalSees });
 
 const pledge = await allocateLeg(cbtc, 'CBTC', await mint(cbtc, 'CBTC', p.borrower, 1), p.borrower, p.lenderA, 1, inDays(40));
-const awardTx = await submit(p.borrower, exercise('RepoRFQ', rfq, 'AwardWithTokenCollateral',
+const awardTx = await submit(p.borrower, exercise('RepoRFQ', rfq, 'AwardSealedWithTokenCollateral',
   { winner: quotes[0], losers: [quotes[1]], collateralAlloc: pledge, markCid: mark, contexts: [] }));
 const trade = created(awardTx, 'RepoTrade');
 step('award: USDCx allocation executed to the borrower, B\'s cancelled back to B, CBTC held for A', awardTx, {

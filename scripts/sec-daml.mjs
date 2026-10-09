@@ -40,7 +40,7 @@ const before = await offset();
 const r1 = await rfq();
 const qa = await quote(r1, p.lenderA, 400), qb = await quote(r1, p.lenderB, 450);
 const col1 = await mint(p.bondIssuer, p.borrower, I, 20);
-const tx = await submit(p.borrower, exercise('RepoRFQ', r1, 'Award', { winner: qa, losers: [qb], collateralCid: col1, markCid: m1, contexts: NO_CONTEXTS }));
+const tx = await submit(p.borrower, exercise('RepoRFQ', r1, 'AwardSealed', { winner: qa, losers: [qb], collateralCid: col1, markCid: m1, contexts: NO_CONTEXTS }));
 const trade = created(tx, 'RepoTrade');
 const evB = await seen(p.lenderB, before, await offset());
 const leakTrade = evB.map((e) => e.CreatedEvent).find((c) => c?.templateId?.endsWith(':RepoTrade'));
@@ -56,7 +56,7 @@ verdict('borrower skips the venue fee by creating the RFQ with venue = null', t1
 const r2 = await rfq();
 const cheap = await quote(r2, p.lenderA, 300), dear = await quote(r2, p.lenderB, 500);
 const col2 = await mint(p.bondIssuer, p.borrower, I, 20);
-const tx2 = await submit(p.borrower, exercise('RepoRFQ', r2, 'Award', { winner: dear, losers: [], collateralCid: col2, markCid: m1, contexts: NO_CONTEXTS }));
+const tx2 = await submit(p.borrower, exercise('RepoRFQ', r2, 'AwardSealed', { winner: dear, losers: [], collateralCid: col2, markCid: m1, contexts: NO_CONTEXTS }));
 const be = tx2.transaction.events.map((e) => e.CreatedEvent).find((c) => c?.templateId?.endsWith(':BestExecution'))?.createArgument;
 verdict('borrower hides a cheaper quote from best-execution', be?.winnerRank === '1' || be?.winnerRank === 1, `BestExecution rank ${be?.winnerRank}/${be?.quotesConsidered}, real rank 2/2`);
 await submit(p.lenderA, exercise('RepoQuote', cheap, 'WithdrawQuote', { contexts: NO_CONTEXTS }));

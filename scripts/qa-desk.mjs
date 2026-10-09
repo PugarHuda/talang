@@ -310,7 +310,7 @@ await check('default: after the response window the lender declares default and 
   const q = createdCid(await submit('lenderA', exercise('RepoRFQ', rfq, 'SubmitQuote', { lender: P.lenderA, rateBps: '500', haircut: '0.02', cashCid: cash })), 'RepoQuote');
   const col = await mint('bondIssuer', 'borrower', IC, 10000);
   const m1 = createdCid(await markApi(IC, 100), 'Mark');
-  const t = createdCid(await submit('borrower', exercise('RepoRFQ', rfq, 'Award', { winner: q, losers: [], collateralCid: col, markCid: m1, contexts: [] })), 'RepoTrade');
+  const t = createdCid(await submit('borrower', exercise('RepoRFQ', rfq, 'AwardSealed', { winner: q, losers: [], collateralCid: col, markCid: m1, contexts: [] })), 'RepoTrade');
   const m2 = createdCid(await markApi(IC, 80), 'Mark');
   await submit('lenderA', exercise('RepoTrade', t, 'CallMargin', { markCid: m2, respondBy: new Date(Date.now() + 4000).toISOString() }));
   await sleep(5000);

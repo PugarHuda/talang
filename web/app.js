@@ -379,7 +379,7 @@ const ACTIONS = {
     const m = mark(t.collateralInstrument);
     if (!m?.fresh) throw new Error('no fresh mark for ' + t.collateralInstrument + ': ask the agent to publish one');
     const col = await exact(t.collateralInstrument, t.collateralIssuer, t.collateralQty);
-    await act(exercise('RepoRFQ', rfq.cid, 'Award', { winner: b.dataset.cid, losers, collateralCid: col, markCid: m.cid, contexts: NO_CONTEXTS }));
+    await act(exercise('RepoRFQ', rfq.cid, 'AwardSealed', { winner: b.dataset.cid, losers, collateralCid: col, markCid: m.cid, contexts: NO_CONTEXTS }));
     return 'Repo opened: cash received, bonds pledged, other quotes refunded with their rank only';
   },
   async cancel(b) { await act(exercise('RepoRFQ', b.dataset.cid, 'CancelRFQ')); return 'Request cancelled'; },
@@ -525,8 +525,14 @@ async function start() {
     try {
       const party = await wallet.connect();
       const role = Object.entries(CFG.parties).find(([, v]) => v === party)?.[0];
+      // A wallet from another network (Grofty on TestNet) can still drive a role bound to it.
+      const bound = Object.entries(CFG.walletRoles ?? {}).find(([, v]) => v === party)?.[0];
       $('#wallet').textContent = role ? `Wallet · ${NAMES[role] ?? role}` : `Wallet · ${party.split('::')[0].slice(0, 18)}`;
       $('#wallet').title = party;
+      if (!role && bound && CFG.parties[bound]) {
+        ROLE = bound; $('#role').value = bound; $('#role').dispatchEvent(new Event('change'));
+        return toast(`Wallet connected: it drives ${NAMES[bound] ?? bound}, each command needs its signature`);
+      }
       if (!role) return toast(`Wallet connected as ${party.slice(0, 40)}…: its participant does not host Talang's contracts; the wallet panel says what it can do on this desk`, true);
       ROLE = role; $('#role').value = role; $('#role').dispatchEvent(new Event('change'));
       toast(`Signing as ${NAMES[role] ?? role} with your wallet`);

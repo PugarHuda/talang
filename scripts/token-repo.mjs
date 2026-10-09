@@ -221,12 +221,12 @@ try {
   let awardTx;
   if (COLL) {
     collAlloc = await allocate(COLL, p.borrower, p.lenderA, QTY, at((TERM_DAYS + 4) * D), 'collateral');
-    awardTx = await submit(p.borrower, exercise('RepoRFQ', rfq, 'AwardWithTokenCollateral',
+    awardTx = await submit(p.borrower, exercise('RepoRFQ', rfq, 'AwardSealedWithTokenCollateral',
       { winner: created(quoteTx, 'RepoQuote'), losers: [], collateralAlloc: collAlloc, markCid: mark, contexts: awardCtx.contexts }),
     [], { disclosedContracts: awardCtx.disclosedContracts });
   } else {
     const coll = created(await submit(p.bondIssuer, create('Holding', { issuer: p.bondIssuer, owner: p.borrower, instrument: 'UST', amount: QTY })), 'Holding');
-    awardTx = await submit(p.borrower, exercise('RepoRFQ', rfq, 'Award',
+    awardTx = await submit(p.borrower, exercise('RepoRFQ', rfq, 'AwardSealed',
       { winner: created(quoteTx, 'RepoQuote'), losers: [], collateralCid: coll, markCid: mark, contexts: awardCtx.contexts }),
     [], { disclosedContracts: awardCtx.disclosedContracts });
   }

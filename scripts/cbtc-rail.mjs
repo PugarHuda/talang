@@ -125,7 +125,7 @@ try {
   const cash = created(await submit(p.cashIssuer, create('Holding', { issuer: p.cashIssuer, owner: p.lenderA, instrument: 'USDC', amount: PRINCIPAL })), 'Holding');
   const quoteTx = await submit(p.lenderA, exercise('RepoRFQ', rfq, 'SubmitQuote', { lender: p.lenderA, rateBps: RATE, haircut: HAIRCUT, cashCid: cash }));
   step('sealed quote, principal escrowed in desk USDC', quoteTx);
-  const awardTx = await submit(p.borrower, exercise('RepoRFQ', rfq, 'AwardWithTokenCollateral',
+  const awardTx = await submit(p.borrower, exercise('RepoRFQ', rfq, 'AwardSealedWithTokenCollateral',
     { winner: created(quoteTx, 'RepoQuote'), losers: [], collateralAlloc: alloc.cid, markCid: mark, contexts: [] }));
   const trade = created(awardTx, 'RepoTrade');
   step('award: USDC released to the borrower, CBTC allocation held as collateral', awardTx, { trade });

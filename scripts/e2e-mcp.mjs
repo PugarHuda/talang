@@ -4,7 +4,7 @@
 // Works with two lenders; lender C's agent and checks run only if the parties file has lenderC.
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { PARTIES as p, submit, create } from '../lib/ledger.mjs';
+import { PARTIES as p, AGREEMENTS, acs, submit, create, exercise } from '../lib/ledger.mjs';
 
 let failed = 0, passed = 0;
 const check = (ok, label) => { console.log(`${ok ? '✓' : '✗'} ${label}`); ok ? passed++ : failed++; };
@@ -188,6 +188,52 @@ if (awarded) {
     `regulator exposure on ${inst} back to ${on(exp1)} after one open and one close; ${exp1.openPrincipal} open in all`);
 }
 
+
+// ---- 1.2.0: minimum transfer amount, haircut schedule, master agreement and close-out ----
+check(['publish_haircut_schedule', 'master_agreements', 'propose_master', 'sign_master', 'close_out'].every((t) => A.tools.includes(t))
+  && ['master_agreements', 'propose_master', 'sign_master'].every((t) => BOR.tools.includes(t)) && REG.tools.includes('close_outs'),
+  '1.2.0 tools: lender schedule, master agreement on both sides, close-out, regulator close-outs');
+
+// Lender B's schedule: UST2Y at 3% or more. A 2% quote is refused by the ledger, 3% is sealed.
+const sch = await B.call('publish_haircut_schedule', { floorsPct: { UST2Y: 3 } });
+const seenSch = (await BOR.call('master_agreements')).data?.haircutSchedules.find((x) => x.id === sch.data?.schedule);
+check(sch.data?.schedule && seenSch?.minHaircutPct.UST2Y === 3, `lender B published a haircut schedule; the borrower sees UST2Y >= ${seenSch?.minHaircutPct.UST2Y}% (${sch.error ?? sch.data.schedule})`);
+await submit(p.bondIssuer, create('Holding', { issuer: p.bondIssuer, owner: p.borrower, instrument: 'UST2Y', amount: '10' }));
+const req2 = await BOR.call('request_repo', { principal: 500000, collateralInstrument: 'UST2Y', collateralQty: 10, termDays: 7, lenders: ['lenderB'], minTransfer: 25000 });
+if (req2.data) {
+  await submit(p.cashIssuer, create('Holding', { issuer: p.cashIssuer, owner: p.lenderB, instrument: 'USDC', amount: '500000' }));
+  const lo = await B.call('quote', { request: req2.data.request, rateBps: 500, haircutPct: 2 });
+  check(/below the lender's schedule/.test(lo.error ?? ''), `a 2% quote under lender B's 3% floor is refused by the ledger (${lo.error?.slice(0, 80) ?? 'accepted'})`);
+  const ok = await B.call('quote', { request: req2.data.request, rateBps: 500, haircutPct: 3 });
+  const rq = (await B.call('open_requests')).data.find((r) => r.request === req2.data.request);
+  check(ok.data?.sealed && rq?.myQuote?.haircut === 0.03, `a 3% quote through the schedule is sealed (${ok.error ?? 'ok'})`);
+  const cancel = await BOR.call('cancel_request', { request: req2.data.request });
+  if (cancel.data?.quotesStillLocked[0]) await B.call('withdraw_quote', { quote: cancel.data.quotesStillLocked[0].quote });
+} else check(false, `request with a minimum transfer amount: ${req2.error}`);
+// Leave lender B without a schedule, so the next run starts the same way.
+if (sch.data) {
+  for (const c of (await acs(p.lenderB, undefined, AGREEMENTS)).contracts.filter((x) => x.tpl === 'HaircutSchedule' && x.arg.lender === p.lenderB))
+    await submit(p.lenderB, exercise('HaircutSchedule', c.cid, 'Archive'));
+}
+
+// Master agreement between the borrower and lender A, offered by the borrower, signed by A.
+let ma = (await A.call('master_agreements')).data.agreements.find((x) => x.borrower === 'borrower' && x.lender === 'lenderA');
+if (!ma) {
+  const pr = await BOR.call('propose_master', { counterparty: 'lenderA' });
+  const self = await BOR.call('sign_master', { proposal: pr.data?.proposal ?? 'x' });
+  const sg = await A.call('sign_master', { proposal: pr.data?.proposal ?? 'x' });
+  check(pr.data?.proposal && self.error && sg.data?.signed, `master agreement offered by the borrower, signed by lender A (${sg.error ?? `${sg.data.form}, ${sg.data.signed}`}); the proposer cannot sign its own`);
+  ma = (await A.call('master_agreements')).data.agreements.find((x) => x.id === sg.data?.signed);
+}
+check(!!ma && (await BOR.call('master_agreements')).data.agreements.some((x) => x.id === ma.id), `both sides see master agreement ${ma?.id} (${ma?.form})`);
+// No repo with A is past maturity and no call is past its deadline: the ledger refuses a close-out.
+const portfolioA = (await A.call('portfolio')).data.filter((t) => t.borrower === 'borrower');
+if (ma && portfolioA.length && !portfolioA.some((t) => t.matured || t.marginCall?.overdue || !t.markFresh)) {
+  const co = await A.call('close_out', { borrower: 'borrower' });
+  check(/no event of default/.test(co.error ?? ''), `close-out without an event of default refused by the ledger (${portfolioA.length} repos with A)`);
+} else skip("close-out refusal: a repo with lender A is in default already, lacks a fresh mark, or none is open");
+const cos = await REG.call('close_outs');
+check(Array.isArray(cos.data), `regulator close-out reports readable: ${cos.data?.length ?? cos.error}`);
 for (const ag of [A, B, C, BOR, REG].filter(Boolean)) await ag.c.close();
 console.log(failed ? `\n${failed} of ${passed + failed} checks failed` : `\nall ${passed} checks passed`);
 process.exit(failed ? 1 : 0);

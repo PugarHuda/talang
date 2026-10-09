@@ -77,7 +77,7 @@ valuationCommittee = do
   qA <- quote p r p.lenderA 530.0 0.02
   col <- bond p "UST10Y" 100.0
   t <- submit p.borrower do
-    exerciseCmd r Award with winner = qA; losers = []; collateralCid = col; markCid = m; contexts = []
+    exerciseCmd r AwardSealed with winner = qA; losers = []; collateralCid = col; markCid = m; contexts = []
 
   -- A single pricer's own mark, however low, cannot drive a margin call.
   passTime (days 5)
@@ -127,7 +127,7 @@ lenderSyndicate = do
   col <- bond p "UST10Y" 100.0
   m <- markFor p [p.borrower, syndicate] "UST10Y" 98000.0
   t <- submit p.borrower do
-    exerciseCmd r Award with winner = qid; losers = []; collateralCid = col; markCid = m; contexts = []
+    exerciseCmd r AwardSealed with winner = qid; losers = []; collateralCid = col; markCid = m; contexts = []
 
   passTime (days 30)
   now <- getTime

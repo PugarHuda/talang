@@ -1,0 +1,197 @@
+-- Talang 1.2.0: what a repo desk agrees before and around trading, added as an
+-- upgrade of talang-repo 1.1.0 (new templates only, in their own module, so no
+-- 1.1.0 template changes shape).
+--
+--   HaircutSchedule   a lender's minimum haircut per collateral instrument;
+--                     quotes and substitution approvals go through it.
+--   MasterAgreement   one per borrower-lender pair (GMRA-style); on an event of
+--                     default, CloseOut nets every repo between them at once.
+--
+-- The minimum transfer amount on margin calls lives on Terms (Talang.daml).
+module TalangAgreements where
+
+import DA.Action (foldlA)
+import DA.List (dedup)
+import DA.TextMap qualified as TextMap
+
+import Splice.Api.Token.AllocationV1 (Allocation)
+
+import Talang
+
+-- ---------------------------------------------------------------------------
+-- 1.2.0: the lender's haircut schedule
+-- ---------------------------------------------------------------------------
+
+-- A lender's own haircut policy by collateral instrument, a GC basket in
+-- miniature (e.g. govvies 2%, corporates 5%, BTC 25%), published to the
+-- borrowers it quotes. Quoting and approving substitutions through it, the
+-- ledger refuses a haircut below the floor and collateral the schedule does not
+-- list, so a fat-fingered or talked-down haircut never reaches a borrower.
+-- ponytail: 1.1.0's plain SubmitQuote and Approve stay callable (an upgrade may
+-- not remove them); a lender with a schedule routes its desk through these
+-- choices. Forcing every quote through it needs a lookup by lender (a key).
+template HaircutSchedule
+  with
+    lender : Party
+    floors : TextMap.TextMap Decimal   -- instrument -> minimum haircut
+    audience : [Party]
+  where
+    signatory lender
+    observer audience
+    ensure all (\h -> h >= 0.0 && h < 0.5) (map snd (TextMap.toList floors))
+
+    choice ReviseSchedule : ContractId HaircutSchedule
+      with
+        newFloors : TextMap.TextMap Decimal
+        newAudience : [Party]
+      controller lender
+      do create this with floors = newFloors; audience = newAudience
+
+    nonconsuming choice QuoteWithinSchedule : ContractId RepoQuote
+      with
+        rfqCid : ContractId RepoRFQ
+        rateBps : Decimal
+        haircut : Decimal
+        cashCid : ContractId Holding
+      controller lender
+      do rfq <- fetch rfqCid
+         withinSchedule floors rfq.terms.collateralInstrument haircut
+         exercise rfqCid SubmitQuote with lender; rateBps; haircut; cashCid
+
+    nonconsuming choice TokenQuoteWithinSchedule : ContractId RepoQuote
+      with
+        rfqCid : ContractId RepoRFQ
+        rateBps : Decimal
+        haircut : Decimal
+        allocCid : ContractId Allocation
+      controller lender
+      do rfq <- fetch rfqCid
+         withinSchedule floors rfq.terms.collateralInstrument haircut
+         exercise rfqCid SubmitTokenQuote with lender; rateBps; haircut; allocCid
+
+    -- The repo keeps its haircut under substitution, so the new collateral must
+    -- be eligible at that haircut.
+    nonconsuming choice ApproveWithinSchedule : ContractId RepoTrade
+      with
+        substitutionCid : ContractId Substitution
+        markCid : ContractId Mark
+        contexts : Contexts
+      controller lender
+      do s <- fetch substitutionCid
+         assertMsg "substitution offered to another lender" (s.lender == lender)
+         t <- fetch s.tradeCid
+         withinSchedule floors s.newInstrument t.haircut
+         exercise substitutionCid Approve with markCid; contexts
+
+withinSchedule : TextMap.TextMap Decimal -> Text -> Decimal -> Update ()
+withinSchedule floors instrument haircut = case TextMap.lookup instrument floors of
+  None -> abort ("collateral not eligible under the lender's schedule: " <> instrument)
+  Some minimum -> assertMsg "haircut below the lender's schedule" (haircut >= minimum)
+
+-- ---------------------------------------------------------------------------
+-- 1.2.0: master agreement and close-out netting
+-- ---------------------------------------------------------------------------
+
+-- One side offers a master agreement (GMRA-style) to the other; it binds once
+-- the other side signs.
+template MasterAgreementProposal
+  with
+    borrower : Party
+    lender : Party
+    regulator : Party
+    form : Text          -- e.g. "GMRA 2011"
+    proposer : Party
+  where
+    signatory proposer
+    observer borrower, lender
+    ensure borrower /= lender && (proposer == borrower || proposer == lender)
+
+    choice SignMaster : ContractId MasterAgreement
+      controller (if proposer == borrower then lender else borrower)
+      do create MasterAgreement with borrower; lender; regulator; form
+
+    choice WithdrawMasterProposal : ()
+      controller proposer
+      do pure ()
+
+-- The master agreement between one borrower and one lender, signed by both.
+-- On an event of default the lender closes out every repo between them at once
+-- and nets them to a single sum (GMRA close-out): the lender keeps collateral
+-- worth what all the repos owe today, at fresh marks with no haircut, and the
+-- borrower gets the rest back, so excess on one repo covers a shortfall on another.
+-- ponytail: one agreement per pair is the parties' practice, not a ledger rule
+-- (that needs a key), and the lender names the repos; a repo left out stays open
+-- and can still be closed on its own.
+template MasterAgreement
+  with
+    borrower : Party
+    lender : Party
+    regulator : Party
+    form : Text
+  where
+    signatory borrower, lender
+
+    -- An event of default is a repo past maturity, or a margin call on one of
+    -- the repos left unanswered past its deadline. The agreement ends with it.
+    choice CloseOut : ContractId CloseOutReport
+      with
+        tradeCids : [ContractId RepoTrade]
+        markCids : [ContractId Mark]           -- one per trade, same order
+        defaultedCall : Optional (ContractId MarginCall)
+        contexts : Contexts
+      controller lender
+      do assertMsg "nothing to close out" (not (null tradeCids))
+         assertMsg "duplicate trade ids" (length (dedup tradeCids) == length tradeCids)
+         assertMsg "one mark per trade" (length markCids == length tradeCids)
+         now <- getTime
+         ts <- forA tradeCids \cid -> do
+           t <- fetch cid
+           assertMsg "repo under another agreement" (t.borrower == borrower && t.lender == lender)
+           assertMsg "repo reported to another regulator" (t.regulator == regulator)
+           pure t
+         called <- case defaultedCall of
+           None -> pure False
+           Some c -> do
+             mc <- fetch c
+             assertMsg "margin call on a repo not being closed out" (mc.tradeCid `elem` tradeCids)
+             assertMsg "the borrower still has time to respond" (now > mc.respondBy)
+             archive c
+             pure True
+         let matured = any (\t -> now > t.maturity) ts
+         assertMsg "no event of default: no repo past maturity and no margin call past its deadline"
+           (called || matured)
+         priced <- forA (zip (zip tradeCids ts) markCids) \((cid, t), mk) -> do
+           m <- freshMark t.agent t.collateralInstrument mk
+           archive cid
+           pure (t, m.price, t.terms.principal + interest t.terms.principal t.rateBps t.openedAt now)
+         let owedTotal = sum [o | (_, _, o) <- priced]
+             value = sum [t.collateralQty * px | (t, px, _) <- priced]
+         -- Each repo's pledge runs through the default waterfall, asked only for
+         -- what is still owed across all of them; the rest goes home.
+         kept <- foldlA (\keptSoFar (t, px, _) -> do
+                   let left = max 0.0 (owedTotal - keptSoFar)
+                   units <- waterfall contexts lender borrower (ceil4 (left / px)) t.collateral
+                   pure (keptSoFar + units * px)) 0.0 priced
+         create CloseOutReport with
+           regulator; borrower; lender; form
+           trigger = if called then "MARGIN_CALL" else "MATURITY"
+           reposNetted = length priced; owed = owedTotal; collateralValue = value
+           valueKept = kept; valueReturned = value - kept; at = now
+
+-- What the regulator is told of a close-out: one row for the whole netting set.
+template CloseOutReport
+  with
+    regulator : Party
+    borrower : Party
+    lender : Party
+    form : Text
+    trigger : Text
+    reposNetted : Int
+    owed : Decimal
+    collateralValue : Decimal
+    valueKept : Decimal
+    valueReturned : Decimal
+    at : Time
+  where
+    signatory borrower, lender
+    observer regulator

@@ -24,7 +24,7 @@ venueFeeOnRepurchase = do
   col <- bond p "UST10Y" 100.0
   m <- mark p "UST10Y" 98000.0
   t <- submit p.borrower do
-    exerciseCmd r Award with winner = qA; losers = []; collateralCid = col; markCid = m; contexts = []
+    exerciseCmd r AwardSealed with winner = qA; losers = []; collateralCid = col; markCid = m; contexts = []
   passTime (days 60)
   loan <- heldCid p.borrower "USDC"
   -- Principal and interest alone are not enough once the fee is due.
@@ -58,15 +58,16 @@ bestExecution = do
   m2 <- markFor p [p.borrower, p.lenderA, p.lenderB, lenderC] "UST10Y" 98000.0
   -- B's 4% haircut lends 9,408,000 against 9,500,000: it cannot be taken.
   submitMustFail p.borrower do
-    exerciseCmd r Award with winner = qB; losers = [qA, qC]; collateralCid = col; markCid = m2; contexts = []
+    exerciseCmd r AwardSealed with winner = qB; losers = [qA, qC]; collateralCid = col; markCid = m2; contexts = []
   _ <- submit p.borrower do
-    exerciseCmd r Award with winner = qC; losers = [qA, qB]; collateralCid = col; markCid = m2; contexts = []
+    exerciseCmd r AwardSealed with winner = qC; losers = [qA, qB]; collateralCid = col; markCid = m2; contexts = []
 
   [be] <- map snd <$> query @BestExecution p.regulator
   be.quotesConsidered === 3
   be.winnerRank === 2
   be.winningRateBps === 530.0
-  be.spreadToBestBps === 10.0
+  be.spreadToBestBps === 6.0
+  be.spreadBucket === Some "6-25"
 
   -- Each loser sees exactly one notice: its own rank, no rate, no winner.
   [nA] <- map snd <$> query @LossNotice p.lenderA

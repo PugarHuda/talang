@@ -46,7 +46,7 @@ loan = 50000.0
 termsT : T -> Terms
 termsT t = Terms with
   cashIssuer = t.usdcx; cashInstrument = "USDCx"; principal = loan
-  collateralIssuer = t.cbtc; collateralInstrument = "CBTC"; collateralQty = 1.0; termDays = 30
+  collateralIssuer = t.cbtc; collateralInstrument = "CBTC"; collateralQty = 1.0; termDays = 30; minTransfer = None
 
 mint : Party -> Text -> Party -> Decimal -> Script (ContractId MockHolding)
 mint registry tag owner amount = submit registry do
@@ -115,7 +115,7 @@ tokenOpened = do
   pledge <- allocate t.cbtc btc t.borrower t.lenderA t.borrower "CBTC" 1.0 (addRelTime now (days 40))
   m <- markT t 62000.0
   trade <- submit t.borrower do
-    exerciseCmd rfq AwardWithTokenCollateral with
+    exerciseCmd rfq AwardSealedWithTokenCollateral with
       winner = qA; losers = [qB]; collateralAlloc = pledge; markCid = m; contexts = []
   pure (t, trade)
 
@@ -257,12 +257,12 @@ tokenRefusals = do
   wrong <- allocate t.cbtc btc t.borrower t.lenderB t.borrower "CBTC" 1.0 (addRelTime now (days 40))
   m <- markT t 62000.0
   submitMustFail t.borrower do
-    exerciseCmd rfq AwardWithTokenCollateral with
+    exerciseCmd rfq AwardSealedWithTokenCollateral with
       winner = q; losers = []; collateralAlloc = wrong; markCid = m; contexts = []
   -- A pledge that lapses at maturity, before the claim window, is refused.
   btc2 <- mint t.cbtc "CBTC" t.borrower 1.0
   lapsing <- allocate t.cbtc btc2 t.borrower t.lenderA t.borrower "CBTC" 1.0 (addRelTime now (days 30))
   submitMustFail t.borrower do
-    exerciseCmd rfq AwardWithTokenCollateral with
+    exerciseCmd rfq AwardSealedWithTokenCollateral with
       winner = q; losers = []; collateralAlloc = lapsing; markCid = m; contexts = []
   (isSome <$> queryContractId t.lenderA q) >>= assert

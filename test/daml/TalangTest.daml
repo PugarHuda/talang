@@ -58,7 +58,7 @@ stdTerms : P -> Terms
 stdTerms p = Terms with
   cashIssuer = p.cashIssuer; cashInstrument = "USDC"; principal = loanAmount
   collateralIssuer = p.bondIssuer; collateralInstrument = "UST10Y"
-  collateralQty = 100.0; termDays = 90
+  collateralQty = 100.0; termDays = 90; minTransfer = None
 
 rfq : P -> Script (ContractId RepoRFQ)
 rfq p = submit p.borrower do
@@ -102,7 +102,7 @@ opened = do
   col <- bond p "UST10Y" 100.0
   m <- mark p "UST10Y" 98000.0
   t <- submit p.borrower do
-    exerciseCmd r Award with winner = qA; losers = [qB]; collateralCid = col; markCid = m; contexts = []
+    exerciseCmd r AwardSealed with winner = qA; losers = [qB]; collateralCid = col; markCid = m; contexts = []
   pure (p, t)
 
 -- The whole life of a repo, and what each party can see along the way.
@@ -122,7 +122,7 @@ lifecycle = do
   col <- bond p "UST10Y" 100.0
   m <- mark p "UST10Y" 98000.0
   t <- submit p.borrower do
-    exerciseCmd r Award with winner = qA; losers = [qB]; collateralCid = col; markCid = m; contexts = []
+    exerciseCmd r AwardSealed with winner = qA; losers = [qB]; collateralCid = col; markCid = m; contexts = []
 
   -- Opening leg: cash to the borrower, the loser's cash back, the bonds pledged.
   held p.borrower "USDC" >>= (=== loanAmount)
@@ -240,20 +240,20 @@ refusals = do
       agent = p.borrower; instrument = "UST10Y"; price = 200000.0; asOf = now
       audience = [p.lenderA, p.lenderB]
   submitMustFail p.borrower do
-    exerciseCmd r Award with winner = qA; losers = []; collateralCid = col; markCid = fake; contexts = []
+    exerciseCmd r AwardSealed with winner = qA; losers = []; collateralCid = col; markCid = fake; contexts = []
 
   -- At 97,000, a 4% haircut lends 9,312,000: not enough for 9,500,000.
   m <- mark p "UST10Y" 97000.0
   submitMustFail p.borrower do
-    exerciseCmd r Award with winner = qB; losers = [qA]; collateralCid = col; markCid = m; contexts = []
+    exerciseCmd r AwardSealed with winner = qB; losers = [qA]; collateralCid = col; markCid = m; contexts = []
 
   -- Naming the same quote twice is refused.
   submitMustFail p.borrower do
-    exerciseCmd r Award with winner = qA; losers = [qA]; collateralCid = col; markCid = m; contexts = []
+    exerciseCmd r AwardSealed with winner = qA; losers = [qA]; collateralCid = col; markCid = m; contexts = []
 
   -- The pledge cannot be pulled back by the borrower alone.
   t <- submit p.borrower do
-    exerciseCmd r Award with winner = qA; losers = [qB]; collateralCid = col; markCid = m; contexts = []
+    exerciseCmd r AwardSealed with winner = qA; losers = [qB]; collateralCid = col; markCid = m; contexts = []
   Some trade <- queryContractId p.borrower t
   submitMustFail p.borrower do
     exerciseCmd (escrowOf (head trade.collateral)) Release with recipient = p.borrower

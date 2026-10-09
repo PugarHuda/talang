@@ -1,0 +1,99 @@
+-- talang-repo 1.2.0 fixes from the security review: awards that do not divulge
+-- to rival lenders, substitutes from the repo's issuer only, a borrower's own
+-- withdraw of a substitution, recent marks for margin calls, a bounded default
+-- window, the venue fee on token closes, and the best-execution gap as a band.
+module SecurityTest where
+
+import DA.Assert ((===))
+import DA.Optional (isNone)
+import DA.Time (addRelTime, days, hours, minutes)
+import Daml.Script
+
+import Talang
+import TalangTest
+
+-- The consuming 1.1.0 award is refused; the sealed award archives the request.
+sealedAward : Script ()
+sealedAward = do
+  p <- setup
+  r <- rfq p
+  qA <- quote p r p.lenderA 530.0 0.02
+  qB <- quote p r p.lenderB 545.0 0.03
+  col <- bond p "UST10Y" 100.0
+  m <- mark p "UST10Y" 98000.0
+  submitMustFail p.borrower do
+    exerciseCmd r Award with winner = qA; losers = [qB]; collateralCid = col; markCid = m; contexts = []
+  t <- submit p.borrower do
+    exerciseCmd r AwardSealed with winner = qA; losers = [qB]; collateralCid = col; markCid = m; contexts = []
+  isNone <$> queryContractId p.borrower r >>= assert
+  -- The loser holds its notice and its cash, nothing of the winner's trade.
+  isNone <$> queryContractId p.lenderB t >>= assert
+  [n] <- map snd <$> query @LossNotice p.lenderB
+  n.rank === 2
+  held p.lenderB "USDC" >>= (=== loanAmount)
+
+-- A substitute in the right instrument name but from the borrower's own issuance
+-- is refused; the borrower can withdraw an unanswered offer.
+substitutionIssuer : Script ()
+substitutionIssuer = do
+  (p, t) <- opened
+  iou <- submit p.borrower do
+    createCmd Holding with issuer = p.borrower; owner = p.borrower; instrument = "UST10Y"; amount = 200.0
+  sub <- submit p.borrower do exerciseCmd t ProposeSubstitution with holdingCid = iou
+  m <- mark p "UST10Y" 98000.0
+  submitMustFail p.lenderA do exerciseCmd sub Approve with markCid = m; contexts = []
+  submitMustFail p.lenderA do exerciseCmd sub WithdrawSubstitution with contexts = []
+  submit p.borrower do exerciseCmd sub WithdrawSubstitution with contexts = []
+  held p.borrower "UST10Y" >>= (=== 200.0)
+
+-- A call needs a mark under an hour old; a newer mark that shows cover refutes it.
+marginMarks : Script ()
+marginMarks = do
+  (p, t) <- opened
+  passTime (days 10)
+  low <- mark p "UST10Y" 90000.0
+  passTime (minutes 61)
+  now <- getTime
+  submitMustFail p.lenderA do
+    exerciseCmd t CallMargin with markCid = low; respondBy = addRelTime now (days 1)
+  low2 <- mark p "UST10Y" 90000.0
+  call <- submit p.lenderA do
+    exerciseCmd t CallMargin with markCid = low2; respondBy = addRelTime now (days 1)
+  -- The same price, newer, does not refute; a recovered price does.
+  passTime (minutes 5)
+  same <- mark p "UST10Y" 90000.0
+  submitMustFail p.borrower do exerciseCmd call RefuteMarginCall with markCid = same
+  up <- mark p "UST10Y" 98000.0
+  submit p.borrower do exerciseCmd call RefuteMarginCall with markCid = up
+  isNone <$> queryContractId p.lenderA call >>= assert
+
+-- Default more than a day after the deadline is refused: call again.
+defaultWindowBound : Script ()
+defaultWindowBound = do
+  (p, t) <- opened
+  passTime (days 10)
+  now <- getTime
+  m <- mark p "UST10Y" 90000.0
+  call <- submit p.lenderA do
+    exerciseCmd t CallMargin with markCid = m; respondBy = addRelTime now (hours 2)
+  passTime (days 1 + hours 3)
+  submitMustFail p.lenderA do exerciseCmd call Default with contexts = []
+
+-- A repo that owes the venue a fee cannot be closed with CloseWithTokens directly.
+venueFeeOnTokenClose : Script ()
+venueFeeOnTokenClose = do
+  p <- setup
+  operator <- allocateParty "VenueOperator"
+  r <- submit p.borrower do
+    createCmd RepoRFQ with
+      borrower = p.borrower; regulator = p.regulator; agent = p.agent
+      lenders = [p.lenderA]; terms = stdTerms p; deadline = None
+      venue = Some Venue with operator; feeBps = 10.0
+  q <- quote p r p.lenderA 530.0 0.02
+  col <- bond p "UST10Y" 100.0
+  m <- mark p "UST10Y" 98000.0
+  t <- submit p.borrower do
+    exerciseCmd r AwardSealed with winner = q; losers = []; collateralCid = col; markCid = m; contexts = []
+  passTime (days 30)
+  submitMultiMustFail [p.borrower, p.lenderA] [] do
+    exerciseCmd t CloseWithTokens with due = loanAmount; fee = 0.0; contexts = []
