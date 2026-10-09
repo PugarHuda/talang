@@ -1,0 +1,64 @@
+{
+  "ledger": "NODERS HackCanton DevNet participant",
+  "registry": "DA Utility registry, admin cbtc-network::12202a83c6f4082217c175e29bc53da5f2703ba2675778ab99217a5a881a949203ff, instrument CBTC",
+  "cash": "desk USDC (Talang Holding/Escrow)",
+  "marker": {
+    "principal": "51.25",
+    "termDays": 2
+  },
+  "scenario": "stress mark 52000 USDC per CBTC published by the agent party to trigger the call; a scenario, not a market price",
+  "ranAt": "2026-10-09T11:44:23.593Z",
+  "trade": "00c43f03a5f90a018d8612dd93a864d10de025e8b2f1750d1a3095394047163e0eca1212202ef07f5df403c8fbaaf0b95b85151cd3a302ad4f8eab83167d17ef1fae8a00f0",
+  "marginCall": "00f517c617f6252256c31c977099d03c185333c665932a56be2de65a9fa3bbbc25ca1212208d785645f8de11ba2f7612a91c91e10a570c947d33ffda8ccf7b0cda2aa19420",
+  "allocationCid": "0022ce4ebaa61dc3789ac56f5229865df71db0d2998a72b405674fe8b6c6d0badfca1212201d0cde86d8d09d00badf3418fd227dbbd9e582c3c8154988a166c0eff3958afe",
+  "respondBy": "2026-10-09T13:46:19.947Z",
+  "steps": [
+    {
+      "phase": "open",
+      "step": "borrower holds 1 CBTC (HoldingV1)",
+      "borrowerCBTC": 1
+    },
+    {
+      "phase": "open",
+      "step": "0.001 CBTC allocated borrower -> lender A through the registry AllocationFactory",
+      "updateId": "122039eb2e82de2abadce24b11937e119d7e4c4b0e11ca4702c800bf2a525696bc26",
+      "offset": 2730742,
+      "allocationCid": "0022ce4ebaa61dc3789ac56f5229865df71db0d2998a72b405674fe8b6c6d0badfca1212201d0cde86d8d09d00badf3418fd227dbbd9e582c3c8154988a166c0eff3958afe",
+      "allocationTemplate": "8c654487d9f5fb195fbcdd7b44cd8e365b1ea39c15ae62ce6c7a48343f1210dd:Utility.Registry.V0.Holding.Allocation:DvpLegAllocation",
+      "factoryId": "00d58a5f061f086b3c4b405b57ca08f4cefcb7f3a27a26089be6388eb62ee619a8ca1112200991d565daa04ca691901bc04238a8655e2c068039130e4c00027eac2675d9f4"
+    },
+    {
+      "phase": "open",
+      "step": "RepoRFQ: 51.25 USDC against 0.001 CBTC, 2 days (marker terms)",
+      "updateId": "12207236096a645a92373d487a5c50a29d33be70740acbb15dd0d2e4cda1f2c1ebaa",
+      "offset": 2730750
+    },
+    {
+      "phase": "open",
+      "step": "sealed quote, principal escrowed in desk USDC",
+      "updateId": "12207b140f95ae3d04c6729ab09e0290e74e49d480d5ba53bba9af8fb10131bbe3e5",
+      "offset": 2730761
+    },
+    {
+      "phase": "open",
+      "step": "award at mark 62000: USDC to the borrower, CBTC allocation held as collateral",
+      "updateId": "12207b081477228a5e7ba278783391e4704f59d0b408de4247e9fa33f53bb658ba71",
+      "offset": 2730773,
+      "trade": "00c43f03a5f90a018d8612dd93a864d10de025e8b2f1750d1a3095394047163e0eca1212202ef07f5df403c8fbaaf0b95b85151cd3a302ad4f8eab83167d17ef1fae8a00f0"
+    },
+    {
+      "phase": "open",
+      "step": "STRESS SCENARIO mark: 52000 USDC per CBTC (not a market price), published by the agent",
+      "updateId": "12204009fdac322e26b555de8f5f50062a2c48181d5ff075d06027f4d8247a1b4949",
+      "offset": 2730788
+    },
+    {
+      "phase": "open",
+      "step": "margin call by lender A, borrower to respond by 2026-10-09T13:46:19.947Z; run PHASE=default after that",
+      "updateId": "122024100b24d0946403bfad887b62e95d3ea54221759935dbaf880ebe5fb63b36bd",
+      "offset": 2730812,
+      "marginCall": "00f517c617f6252256c31c977099d03c185333c665932a56be2de65a9fa3bbbc25ca1212208d785645f8de11ba2f7612a91c91e10a570c947d33ffda8ccf7b0cda2aa19420",
+      "respondBy": "2026-10-09T13:46:19.947Z"
+    }
+  ]
+}
