@@ -9,7 +9,7 @@ import { PARTIES, acs, submit } from './lib/ledger.mjs';
 
 const WEB = join(dirname(fileURLToPath(import.meta.url)), 'web');
 const PORT = Number(process.env.PORT ?? 8090);
-const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml' };
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png' };
 
 const body = (req) => new Promise((res) => { let s = ''; req.on('data', (d) => (s += d)); req.on('end', () => res(s ? JSON.parse(s) : {})); });
 const send = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); };
@@ -27,7 +27,8 @@ createServer(async (req, res) => {
       if (!PARTIES[role]) return send(res, 400, { error: 'unknown role' });
       return send(res, 200, await submit(PARTIES[role], command));
     }
-    const path = req.url === '/' ? '/index.html' : req.url.split('?')[0];
+    const bare = req.url.split('?')[0];
+    const path = bare === '/' ? '/index.html' : bare === '/desk' ? '/desk.html' : bare;
     const file = await readFile(join(WEB, path.replace(/\.\./g, '')));
     res.writeHead(200, { 'content-type': TYPES[extname(path)] ?? 'application/octet-stream' });
     res.end(file);

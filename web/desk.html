@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Talang · sealed repo desk</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@200..700&family=Geist+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%23120d24%22/%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%227%22 fill=%22%237b4dff%22/%3E%3C/svg%3E" />
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/" aria-label="Talang home">
+      <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true"><path d="M16 3 28 10v12L16 29 4 22V10z" fill="#120d24"/><path d="M16 3 28 10 16 17 4 10z" fill="#3a2b66"/><path d="M16 17v12L4 22V10z" fill="#1d1538"/><circle cx="16" cy="17" r="3.2" fill="#8b5cff"/></svg>
+      <span>talang</span><small>desk</small>
+    </a>
+    <nav class="roles" id="roles" aria-label="Acting as"></nav>
+    <label class="role-select">
+      <span class="sr">Acting as</span>
+      <select id="role">
+        <option value="borrower">Borrower · fund</option>
+        <option value="lenderA">Lender A · bank</option>
+        <option value="lenderB">Lender B · bank</option>
+        <option value="lenderC">Lender C · bank</option>
+        <option value="regulator">Regulator</option>
+        <option value="agent">Valuation agent</option>
+        <option value="venue">Venue operator</option>
+      </select>
+    </label>
+    <button id="wallet" class="ghost wallet" type="button" title="Sign with a CIP-0103 wallet such as Grofty">Connect wallet</button>
+    <div id="status" class="status">connecting…</div>
+  </header>
+
+  <main>
+    <section class="who" aria-label="Acting role">
+      <div>
+        <p class="kicker">Acting as</p>
+        <h1 id="role-name">Borrower</h1>
+        <div id="party" class="party"></div>
+      </div>
+      <p class="note">Each role reads only its own node's view of the ledger. Nothing is hidden by the page: what a role cannot see never reached it.</p>
+    </section>
+    <div id="readonly" class="banner" hidden>Read-only public view of live DevNet data. Run the desk locally to act.</div>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    <div id="view" aria-live="off">
+      <div class="skel"></div><div class="skel"></div><div class="skel short"></div>
+    </div>
+  </main>
+  <footer class="foot"><a href="/">← talang</a><a href="https://github.com/PugarHuda/talang">GitHub ↗</a></footer>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

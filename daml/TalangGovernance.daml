@@ -1,0 +1,135 @@
+-- Talang under BitSafe's Decentralization Manager.
+--
+-- Two parties in a repo should not be one key on one node: the price source and
+-- the lender. Both can be decentralized parties, hosted across several nodes,
+-- that act only when a threshold of their members confirms. Each action here is
+-- a GovernableAction (BitSafe governance-action-v1): a member proposes it, other
+-- members confirm through GovernanceRules, and GovernanceRules executes it with
+-- the decentralized party's authority. Below threshold the ledger refuses and
+-- nothing moves.
+--
+--   Valuation committee  every Mark is published by the committee party, so the
+--                        repo's agent, and every margin call, substitution and
+--                        roll that relies on a mark, needs k-of-n pricers.
+--   Lender syndicate     a lender that is itself a decentralized party: quoting,
+--                        calling margin, defaulting a borrower or offering a roll
+--                        needs k-of-n of the syndicate's members.
+module TalangGovernance where
+
+import DA.Action (void)
+
+import Governance.Action
+
+import Splice.Api.Token.AllocationV1 (Allocation)
+
+import Talang
+
+-- ---------------------------------------------------------------------------
+-- Valuation committee
+-- ---------------------------------------------------------------------------
+
+-- A member's proposed mark. Executed by GovernanceRules once enough members
+-- confirm; the Mark it creates is signed by the committee party alone, which is
+-- what RepoTrade's `agent` checks.
+template MarkProposal
+  with
+    committee : Party
+    proposer : Party
+    instrument : Text
+    price : Decimal
+    asOf : Time
+    audience : [Party]
+    source : Text           -- where the member took the price from, for the audit trail
+  where
+    signatory proposer
+    observer committee
+    ensure price > 0.0 && instrument /= ""
+
+    interface instance GovernableAction for MarkProposal where
+      view = GovernableActionView with
+        governanceParty = committee
+        proposer
+        actionLabel = "talang:PublishMark"
+        description = instrument <> " @ " <> show price <> " from " <> source
+      executeImpl = void $ create Mark with agent = committee; instrument; price; asOf; audience
+
+-- ---------------------------------------------------------------------------
+-- Lender syndicate
+-- ---------------------------------------------------------------------------
+
+-- Everything a lender does on Talang, as data a syndicate can vote on.
+data LenderMove
+  = QuoteMove with
+      rfqCid : ContractId RepoRFQ
+      rateBps : Decimal
+      haircut : Decimal
+      cashCid : ContractId Holding
+  | TokenQuoteMove with
+      rfqCid : ContractId RepoRFQ
+      rateBps : Decimal
+      haircut : Decimal
+      allocCid : ContractId Allocation
+  | MarginCallMove with
+      tradeCid : ContractId RepoTrade
+      markCid : ContractId Mark
+      respondBy : Time
+  | ApproveSubstitutionMove with
+      substitutionCid : ContractId Substitution
+      markCid : ContractId Mark
+  | DeclineSubstitutionMove with
+      substitutionCid : ContractId Substitution
+  | DefaultMove with
+      marginCallCid : ContractId MarginCall
+  | ClaimMove with
+      tradeCid : ContractId RepoTrade
+  | RollOfferMove with
+      tradeCid : ContractId RepoTrade
+      borrower : Party
+      newRateBps : Decimal
+      extraDays : Int
+      expiresAt : Time
+  deriving (Eq, Show)
+
+moveLabel : LenderMove -> Text
+moveLabel = \case
+  QuoteMove {} -> "talang:Quote"
+  TokenQuoteMove {} -> "talang:TokenQuote"
+  MarginCallMove {} -> "talang:CallMargin"
+  ApproveSubstitutionMove {} -> "talang:ApproveSubstitution"
+  DeclineSubstitutionMove {} -> "talang:DeclineSubstitution"
+  DefaultMove {} -> "talang:Default"
+  ClaimMove {} -> "talang:ClaimAfterMaturity"
+  RollOfferMove {} -> "talang:OfferRoll"
+
+-- A syndicate member's proposed move. Registry contexts for token legs are
+-- left out on purpose: a governed move settles only desk escrows and registries
+-- that need no off-ledger context, and a token default goes through the
+-- syndicate's ordinary submission after the vote (see README).
+template SyndicateProposal
+  with
+    syndicate : Party
+    proposer : Party
+    move : LenderMove
+    memo : Text
+  where
+    signatory proposer
+    observer syndicate
+
+    interface instance GovernableAction for SyndicateProposal where
+      view = GovernableActionView with
+        governanceParty = syndicate
+        proposer
+        actionLabel = moveLabel move
+        description = memo
+      executeImpl = case move of
+        QuoteMove {..} -> void $ exercise rfqCid SubmitQuote with
+          lender = syndicate; rateBps; haircut; cashCid
+        TokenQuoteMove {..} -> void $ exercise rfqCid SubmitTokenQuote with
+          lender = syndicate; rateBps; haircut; allocCid
+        MarginCallMove {..} -> void $ exercise tradeCid CallMargin with markCid; respondBy
+        ApproveSubstitutionMove {..} -> void $ exercise substitutionCid Approve with markCid; contexts = []
+        DeclineSubstitutionMove {..} -> exercise substitutionCid Decline with contexts = []
+        DefaultMove {..} -> exercise marginCallCid Default with contexts = []
+        ClaimMove {..} -> exercise tradeCid ClaimAfterMaturity with contexts = []
+        RollOfferMove {..} -> void $ create RollOffer with
+          tradeCid; borrower; lender = syndicate; newRateBps; extraDays; expiresAt

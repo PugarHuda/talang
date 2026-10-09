@@ -1,0 +1,268 @@
+-- A repo where both legs are real Canton Token Standard assets, driven through
+-- the standard Allocation interfaces exactly as a live registry drives them:
+-- USDCx as cash, CBTC as collateral, each from its own registry.
+module TokenTest where
+
+import DA.Assert ((===))
+import DA.Optional (isNone, isSome)
+import DA.TextMap qualified as TextMap
+import DA.Time (addRelTime, days)
+import Daml.Script
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1 (InstrumentId(..))
+import Splice.Api.Token.AllocationV1
+import Splice.Api.Token.AllocationRequestV1
+
+import Talang
+import MockRegistry
+
+data T = T
+  with
+    borrower : Party
+    lenderA : Party
+    lenderB : Party
+    regulator : Party
+    agent : Party
+    usdcx : Party         -- cash registry
+    cbtc : Party          -- collateral registry
+    operator : Party      -- the venue
+
+setupT : Script T
+setupT = do
+  borrower <- allocateParty "Borrower"
+  lenderA <- allocateParty "LenderA"
+  lenderB <- allocateParty "LenderB"
+  regulator <- allocateParty "Regulator"
+  agent <- allocateParty "Agent"
+  usdcx <- allocateParty "USDCxRegistry"
+  cbtc <- allocateParty "CBTCRegistry"
+  operator <- allocateParty "Venue"
+  pure T with ..
+
+loan : Decimal
+loan = 50000.0
+
+termsT : T -> Terms
+termsT t = Terms with
+  cashIssuer = t.usdcx; cashInstrument = "USDCx"; principal = loan
+  collateralIssuer = t.cbtc; collateralInstrument = "CBTC"; collateralQty = 1.0; termDays = 30
+
+mint : Party -> Text -> Party -> Decimal -> Script (ContractId MockHolding)
+mint registry tag owner amount = submit registry do
+  createCmd MockHolding with registry; owner; instrumentTag = tag; amount
+
+-- What a wallet does when asked to fund a leg: lock it in a registry allocation.
+allocate : Party -> ContractId MockHolding -> Party -> Party -> Party -> Text -> Decimal -> Time -> Script (ContractId Allocation)
+allocate registry holding sender receiver executor tag amount settleBefore = do
+  now <- getTime
+  a <- submit sender do
+    exerciseCmd holding MockAllocate with
+      spec = AllocationSpecification with
+        settlement = SettlementInfo with
+          executor
+          settlementRef = Reference with id = "talang"; cid = None
+          requestedAt = now; allocateBefore = settleBefore; settleBefore
+          meta = emptyMetadata
+        transferLegId = "leg"
+        transferLeg = TransferLeg with
+          sender; receiver; amount
+          instrumentId = InstrumentId with admin = registry; id = tag
+          meta = emptyMetadata
+  pure (toInterfaceContractId a)
+
+-- Units of a registry asset a party owns outright.
+owns : Party -> Party -> Text -> Script Decimal
+owns registry party tag = do
+  hs <- query @MockHolding party
+  pure (sum [h.amount | (_, h) <- hs, h.owner == party, h.registry == registry, h.instrumentTag == tag])
+
+markT : T -> Decimal -> Script (ContractId Mark)
+markT t price = do
+  now <- getTime
+  submit t.agent do
+    createCmd Mark with
+      agent = t.agent; instrument = "CBTC"; price; asOf = now
+      audience = [t.borrower, t.lenderA, t.lenderB]
+
+-- Two lenders quote in USDCx, the borrower takes A at 600 bp against 1 CBTC.
+tokenOpened : Script (T, ContractId RepoTrade)
+tokenOpened = do
+  t <- setupT
+  now <- getTime
+  let deadline = addRelTime now (days 1)
+  rfq <- submit t.borrower do
+    createCmd RepoRFQ with
+      borrower = t.borrower; regulator = t.regulator; agent = t.agent
+      lenders = [t.lenderA, t.lenderB]; terms = termsT t; deadline = Some deadline
+      venue = Some Venue with operator = t.operator; feeBps = 10.0
+
+  cashA <- mint t.usdcx "USDCx" t.lenderA loan
+  cashB <- mint t.usdcx "USDCx" t.lenderB loan
+  allocA <- allocate t.usdcx cashA t.lenderA t.borrower t.borrower "USDCx" loan deadline
+  allocB <- allocate t.usdcx cashB t.lenderB t.borrower t.borrower "USDCx" loan deadline
+  qA <- submit t.lenderA do
+    exerciseCmd rfq SubmitTokenQuote with lender = t.lenderA; rateBps = 600.0; haircut = 0.10; allocCid = allocA
+  qB <- submit t.lenderB do
+    exerciseCmd rfq SubmitTokenQuote with lender = t.lenderB; rateBps = 620.0; haircut = 0.08; allocCid = allocB
+
+  -- Sealed on the token rail too: B sees neither A's quote nor A's allocation.
+  (isNone <$> queryContractId t.lenderB qA) >>= assert
+  (isNone <$> queryInterfaceContractId t.lenderB allocA) >>= assert
+  (isNone <$> queryContractId t.regulator qA) >>= assert
+
+  btc <- mint t.cbtc "CBTC" t.borrower 1.0
+  pledge <- allocate t.cbtc btc t.borrower t.lenderA t.borrower "CBTC" 1.0 (addRelTime now (days 40))
+  m <- markT t 62000.0
+  trade <- submit t.borrower do
+    exerciseCmd rfq AwardWithTokenCollateral with
+      winner = qA; losers = [qB]; collateralAlloc = pledge; markCid = m; contexts = []
+  pure (t, trade)
+
+tokenLifecycle : Script ()
+tokenLifecycle = do
+  (t, trade) <- tokenOpened
+  -- Opening leg: USDCx to the borrower, B's USDCx back, the CBTC held for A.
+  owns t.usdcx t.borrower "USDCx" >>= (=== loan)
+  owns t.usdcx t.lenderB "USDCx" >>= (=== loan)
+  owns t.usdcx t.lenderA "USDCx" >>= (=== 0.0)
+  owns t.cbtc t.borrower "CBTC" >>= (=== 0.0)
+  owns t.cbtc t.lenderA "CBTC" >>= (=== 0.0)
+
+  -- 15 days at 600 bp: 125.00 to the lender and 2.08 to the venue.
+  passTime (days 15)
+  now <- getTime
+  notice <- submit t.borrower do
+    exerciseCmd trade NoticeRepurchase with settleBefore = addRelTime now (days 1)
+
+  -- Any CIP-0056 wallet reads the notice as a standard allocation request.
+  Some req <- queryInterfaceContractId t.borrower (toInterfaceContractId @AllocationRequest notice)
+  req.settlement.executor === t.borrower
+  map (\l -> (l.receiver, l.amount)) (map snd (TextMap.toList req.transferLegs))
+    === [(t.lenderA, 50125.0), (t.operator, 2.08)]
+
+  payPI <- mint t.usdcx "USDCx" t.borrower 50125.0
+  payFee <- mint t.usdcx "USDCx" t.borrower 2.08
+  allocPI <- allocate t.usdcx payPI t.borrower t.lenderA t.borrower "USDCx" 50125.0 (addRelTime now (days 1))
+  allocFee <- allocate t.usdcx payFee t.borrower t.operator t.borrower "USDCx" 2.08 (addRelTime now (days 1))
+  va <- submit t.operator do
+    createCmd VenueAgreement with operator = t.operator; borrower = t.borrower; feeBps = 10.0
+
+  -- The fee leg cannot be skipped.
+  submitMustFail t.borrower do
+    exerciseCmd notice SettleRepurchase with
+      lenderAlloc = allocPI; feeAlloc = None; venueAgreement = None; contexts = []
+  submit t.borrower do
+    exerciseCmd notice SettleRepurchase with
+      lenderAlloc = allocPI; feeAlloc = Some allocFee; venueAgreement = Some va; contexts = []
+
+  owns t.usdcx t.lenderA "USDCx" >>= (=== 50125.0)
+  owns t.usdcx t.operator "USDCx" >>= (=== 2.08)
+  owns t.cbtc t.borrower "CBTC" >>= (=== 1.0)
+  reports <- query @RepoReport t.regulator
+  [(r.event, r.cashMoved, r.feePaid) | (_, r) <- reports, r.event == "CLOSE"] === [("CLOSE", 50125.0, 2.08)]
+
+-- A notice names the amount for one day. Settling it later is refused, so the
+-- lender is never paid a day's interest short.
+staleNotice : Script ()
+staleNotice = do
+  (t, trade) <- tokenOpened
+  passTime (days 5)
+  now <- getTime
+  notice <- submit t.borrower do
+    exerciseCmd trade NoticeRepurchase with settleBefore = addRelTime now (days 5)
+  Some n <- queryContractId t.borrower notice
+  pay <- mint t.usdcx "USDCx" t.borrower n.due
+  alloc <- allocate t.usdcx pay t.borrower t.lenderA t.borrower "USDCx" n.due (addRelTime now (days 5))
+  passTime (days 2)
+  submitMustFail t.borrower do
+    exerciseCmd notice SettleRepurchase with
+      lenderAlloc = alloc; feeAlloc = None; venueAgreement = None; contexts = []
+
+-- CBTC falls, the lender calls, the borrower posts more CBTC through its registry.
+tokenMargin : Script ()
+tokenMargin = do
+  (t, trade) <- tokenOpened
+  passTime (days 3)
+  now <- getTime
+  m <- markT t 54000.0
+  call <- submit t.lenderA do
+    exerciseCmd trade CallMargin with markCid = m; respondBy = addRelTime now (days 1)
+  Some mc <- queryContractId t.borrower call
+  -- 50,025 owed / 0.9 / 54,000 = 1.02932 units: 0.0294 more, rounded up so posting it covers.
+  mc.unitsDue === 0.0294
+  more <- mint t.cbtc "CBTC" t.borrower 0.0294
+  short <- mint t.cbtc "CBTC" t.borrower 0.02
+  tooLittle <- allocate t.cbtc short t.borrower t.lenderA t.borrower "CBTC" 0.02 (addRelTime now (days 60))
+  submitMustFail t.borrower do exerciseCmd call PostTokenMargin with allocCid = tooLittle
+  -- An allocation that would lapse before the claim window is refused too.
+  early <- allocate t.cbtc more t.borrower t.lenderA t.borrower "CBTC" 0.0294 (addRelTime now (days 5))
+  submitMustFail t.borrower do exerciseCmd call PostTokenMargin with allocCid = early
+  more2 <- mint t.cbtc "CBTC" t.borrower 0.0294
+  good <- allocate t.cbtc more2 t.borrower t.lenderA t.borrower "CBTC" 0.0294 (addRelTime now (days 60))
+  t2 <- submit t.borrower do exerciseCmd call PostTokenMargin with allocCid = good
+  Some topped <- queryContractId t.borrower t2
+  topped.collateralQty === 1.0294
+  length topped.collateral === 2
+
+-- Not repurchased by maturity: the CBTC allocation executes to the lender.
+tokenDefault : Script ()
+tokenDefault = do
+  (t, trade) <- tokenOpened
+  passTime (days 29)
+  submitMustFail t.lenderA do exerciseCmd trade ClaimAfterMaturity with contexts = []
+  passTime (days 2)
+  submit t.lenderA do exerciseCmd trade ClaimAfterMaturity with contexts = []
+  owns t.cbtc t.lenderA "CBTC" >>= (=== 1.0)
+  owns t.cbtc t.borrower "CBTC" >>= (=== 0.0)
+
+-- Forged or mismatched allocations never fund a quote or a pledge.
+tokenRefusals : Script ()
+tokenRefusals = do
+  t <- setupT
+  now <- getTime
+  let deadline = addRelTime now (days 1)
+  rfq <- submit t.borrower do
+    createCmd RepoRFQ with
+      borrower = t.borrower; regulator = t.regulator; agent = t.agent
+      lenders = [t.lenderA]; terms = termsT t; deadline = Some deadline; venue = None
+  -- Short of the loan.
+  c1 <- mint t.usdcx "USDCx" t.lenderA 40000.0
+  a1 <- allocate t.usdcx c1 t.lenderA t.borrower t.borrower "USDCx" 40000.0 deadline
+  submitMustFail t.lenderA do
+    exerciseCmd rfq SubmitTokenQuote with lender = t.lenderA; rateBps = 600.0; haircut = 0.1; allocCid = a1
+  -- Executed by the lender instead of the borrower.
+  c2 <- mint t.usdcx "USDCx" t.lenderA loan
+  a2 <- allocate t.usdcx c2 t.lenderA t.borrower t.lenderA "USDCx" loan deadline
+  submitMustFail t.lenderA do
+    exerciseCmd rfq SubmitTokenQuote with lender = t.lenderA; rateBps = 600.0; haircut = 0.1; allocCid = a2
+  -- Another registry's token under the same name.
+  fake <- allocateParty "FakeRegistry"
+  c3 <- mint fake "USDCx" t.lenderA loan
+  a3 <- allocate fake c3 t.lenderA t.borrower t.borrower "USDCx" loan deadline
+  submitMustFail t.lenderA do
+    exerciseCmd rfq SubmitTokenQuote with lender = t.lenderA; rateBps = 600.0; haircut = 0.1; allocCid = a3
+  -- Lapses before the RFQ deadline.
+  c4 <- mint t.usdcx "USDCx" t.lenderA loan
+  a4 <- allocate t.usdcx c4 t.lenderA t.borrower t.borrower "USDCx" loan (addRelTime now (days 0))
+  submitMustFail t.lenderA do
+    exerciseCmd rfq SubmitTokenQuote with lender = t.lenderA; rateBps = 600.0; haircut = 0.1; allocCid = a4
+
+  -- A good quote, then collateral pledged to the wrong lender is refused.
+  c5 <- mint t.usdcx "USDCx" t.lenderA loan
+  a5 <- allocate t.usdcx c5 t.lenderA t.borrower t.borrower "USDCx" loan deadline
+  q <- submit t.lenderA do
+    exerciseCmd rfq SubmitTokenQuote with lender = t.lenderA; rateBps = 600.0; haircut = 0.1; allocCid = a5
+  btc <- mint t.cbtc "CBTC" t.borrower 1.0
+  wrong <- allocate t.cbtc btc t.borrower t.lenderB t.borrower "CBTC" 1.0 (addRelTime now (days 40))
+  m <- markT t 62000.0
+  submitMustFail t.borrower do
+    exerciseCmd rfq AwardWithTokenCollateral with
+      winner = q; losers = []; collateralAlloc = wrong; markCid = m; contexts = []
+  -- A pledge that lapses at maturity, before the claim window, is refused.
+  btc2 <- mint t.cbtc "CBTC" t.borrower 1.0
+  lapsing <- allocate t.cbtc btc2 t.borrower t.lenderA t.borrower "CBTC" 1.0 (addRelTime now (days 30))
+  submitMustFail t.borrower do
+    exerciseCmd rfq AwardWithTokenCollateral with
+      winner = q; losers = []; collateralAlloc = lapsing; markCid = m; contexts = []
+  (isSome <$> queryContractId t.lenderA q) >>= assert

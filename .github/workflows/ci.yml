@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  daml:
+    name: Daml build + 19 scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - name: Install Daml SDK 3.4.11
+        run: |
+          curl -sSL https://get.daml.com/ | sh -s 3.4.11
+          echo "$HOME/.daml/bin" >> "$GITHUB_PATH"
+      - run: daml build --all --no-legacy-assistant-warning
+      - name: daml test (core, desk, CIP-0056 tokens, BitSafe governance)
+        working-directory: test
+        run: daml test --no-legacy-assistant-warning
+
+  ledger:
+    name: Full stack on a Canton participant
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: Install Daml SDK 3.4.11
+        run: |
+          curl -sSL https://get.daml.com/ | sh -s 3.4.11
+          echo "$HOME/.daml/bin" >> "$GITHUB_PATH"
+      - run: daml build --no-legacy-assistant-warning
+      - run: npm ci
+      - name: Start a Canton sandbox with the JSON Ledger API
+        run: |
+          daml sandbox --no-legacy-assistant-warning --json-api-port 7575 \
+            --dar .daml/dist/talang-repo-1.0.0.dar --wall-clock-time > sandbox.log 2>&1 &
+          for i in $(seq 1 90); do curl -sf localhost:7575/v2/version >/dev/null && break; sleep 2; done
+          curl -sf localhost:7575/v2/version
+      - name: Parties, seed, every MCP desk end to end
+        run: |
+          node scripts/local.mjs
+          ENV_FILE=.env.local node scripts/seed.mjs
+          ENV_FILE=.env.local node scripts/e2e-mcp.mjs
+      - name: BitSafe 2-of-3 governed marks through governance-core-v1
+        run: ENV_FILE=.env.local node scripts/governance.mjs
+      - name: CIP-0056 repo, USDCx cash and CBTC collateral as allocations
+        run: |
+          daml build --all --no-legacy-assistant-warning
+          ENV_FILE=.env.local node scripts/token-rail.mjs
+      - name: Syntax-check the desk, the hosted proxy and the scripts
+        run: for f in server.mjs web/app.js api/*.mjs lib/*.mjs mcp/server.mjs scripts/*.mjs; do node --check "$f"; done
+      - if: failure()
+        run: tail -100 sandbox.log

@@ -1,0 +1,142 @@
+-- Talang under BitSafe's Decentralization Manager, against the real
+-- governance-core-v1 GovernanceRules: a 2-of-3 valuation committee publishes
+-- every mark, and a 2-of-3 lender syndicate quotes and calls margin. Below the
+-- threshold the ledger refuses; at it, the decentralized party acts.
+module GovernanceTest where
+
+import DA.Action (void)
+import DA.Assert ((===))
+import DA.Set qualified as Set
+import DA.Time (addRelTime, days, hours)
+import Daml.Script
+
+import Governance.Action
+import Governance.Rules
+import Governance.Confirmation (GovernanceConfirmation)
+import Governance.ExecutionResult (GovernanceExecutionResult(..))
+
+import Talang
+import TalangGovernance
+import TalangTest
+
+rulesFor : Party -> [Party] -> Script (ContractId GovernanceRules)
+rulesFor gov members = submit gov do
+  createCmd GovernanceRules with
+    governanceParty = gov; members = Set.fromList members; threshold = 2
+    actionConfirmationTimeout = hours 1; additionalProposers = None
+
+-- Each named member confirms the proposal; returns their confirmations.
+confirm : Party -> ContractId GovernanceRules -> ContractId GovernableAction -> [Party] -> Script [ContractId GovernanceConfirmation]
+confirm gov rules action members = forA members \m ->
+  (.confirmationCid) <$> submit (actAs m <> readAs gov) do
+    exerciseCmd rules GovernanceRules_ConfirmAction with confirmer = m; actionProposalCid = action
+
+execute : Party -> ContractId GovernanceRules -> ContractId GovernableAction -> Party -> [ContractId GovernanceConfirmation] -> Commands ()
+execute gov rules action executor confirmations = void $
+  exerciseCmd rules GovernanceRules_ExecuteConfirmedAction with
+    executor; actionProposalCid = action; confirmations
+
+-- A mark proposed by one pricer and published once a second confirms.
+governedMark : Party -> ContractId GovernanceRules -> Party -> Party -> [Party] -> Text -> Decimal -> Script (ContractId Mark)
+governedMark committee rules proposer second audience instrument price = do
+  now <- getTime
+  prop <- submit proposer do
+    createCmd MarkProposal with
+      committee; proposer; instrument; price; asOf = now; audience; source = "pricing feed"
+  let action = toInterfaceContractId @GovernableAction prop
+  cs <- confirm committee rules action [proposer, second]
+  submit (actAs proposer <> readAs committee) do execute committee rules action proposer cs
+  marks <- query @Mark committee
+  case [cid | (cid, m) <- marks, m.instrument == instrument, m.price == price, m.asOf == now] of
+    cid :: _ -> pure cid
+    [] -> fail "governed mark not published"
+
+valuationCommittee : Script ()
+valuationCommittee = do
+  p0 <- setup
+  committee <- allocateParty "ValuationCommittee"
+  [pricerA, pricerB, pricerC] <- forA ["PricerA", "PricerB", "PricerC"] allocateParty
+  rules <- rulesFor committee [pricerA, pricerB, pricerC]
+  let p = p0 with agent = committee
+      audience = [p.borrower, p.lenderA, p.lenderB]
+
+  -- One confirmation is not enough: the ledger refuses and no mark exists.
+  now <- getTime
+  lone <- submit pricerA do
+    createCmd MarkProposal with
+      committee; proposer = pricerA; instrument = "UST10Y"; price = 98000.0; asOf = now
+      audience; source = "pricing feed"
+  let loneAction = toInterfaceContractId @GovernableAction lone
+  [c1] <- confirm committee rules loneAction [pricerA]
+  submitMustFail (actAs pricerA <> readAs committee) do execute committee rules loneAction pricerA [c1]
+  query @Mark committee >>= (=== []) . map snd
+
+  -- Two of three: the committee party publishes and the repo opens on it.
+  m <- governedMark committee rules pricerB pricerC audience "UST10Y" 98000.0
+  r <- rfq p
+  qA <- quote p r p.lenderA 530.0 0.02
+  col <- bond p "UST10Y" 100.0
+  t <- submit p.borrower do
+    exerciseCmd r Award with winner = qA; losers = []; collateralCid = col; markCid = m; contexts = []
+
+  -- A single pricer's own mark, however low, cannot drive a margin call.
+  passTime (days 5)
+  now <- getTime
+  rogue <- submit pricerA do
+    createCmd Mark with agent = pricerA; instrument = "UST10Y"; price = 50000.0; asOf = now; audience
+  submitMustFail p.lenderA do
+    exerciseCmd t CallMargin with markCid = rogue; respondBy = addRelTime now (days 1)
+
+  -- A governed markdown can.
+  low <- governedMark committee rules pricerA pricerC audience "UST10Y" 92000.0
+  _ <- submit p.lenderA do
+    exerciseCmd t CallMargin with markCid = low; respondBy = addRelTime now (days 1)
+  -- The audit trail: each governed mark left an execution record naming its confirmers.
+  results <- map snd <$> query @GovernanceExecutionResult committee
+  length results === 2
+  map (.actionLabel) results === ["talang:PublishMark", "talang:PublishMark"]
+
+-- A lender that is a 2-of-3 syndicate. It quotes, and later calls margin, only
+-- once two of its members confirm; one member alone moves nothing.
+lenderSyndicate : Script ()
+lenderSyndicate = do
+  p0 <- setup
+  syndicate <- allocateParty "LenderSyndicate"
+  [bankA, bankB, bankC] <- forA ["BankA", "BankB", "BankC"] allocateParty
+  rules <- rulesFor syndicate [bankA, bankB, bankC]
+  let p = p0 with lenderA = syndicate
+  r <- rfq p
+  funds <- cash p syndicate loanAmount
+
+  let propose move memo = do
+        prop <- submit bankA do
+          createCmd SyndicateProposal with syndicate; proposer = bankA; move; memo
+        pure (toInterfaceContractId @GovernableAction prop)
+
+  q1 <- propose (QuoteMove with rfqCid = r; rateBps = 530.0; haircut = 0.02; cashCid = funds) "quote 530 / 2%"
+  [c1] <- confirm syndicate rules q1 [bankA]
+  submitMustFail (actAs bankA <> readAs syndicate) do execute syndicate rules q1 bankA [c1]
+  cs <- confirm syndicate rules q1 [bankA, bankB]
+  submit (actAs bankA <> readAs syndicate) do execute syndicate rules q1 bankA cs
+
+  [(qid, qt)] <- query @RepoQuote p.borrower
+  qt.lender === syndicate
+  -- The rival lender still sees nothing of the syndicate's quote.
+  query @RepoQuote p.lenderB >>= (=== []) . map snd
+
+  col <- bond p "UST10Y" 100.0
+  m <- markFor p [p.borrower, syndicate] "UST10Y" 98000.0
+  t <- submit p.borrower do
+    exerciseCmd r Award with winner = qid; losers = []; collateralCid = col; markCid = m; contexts = []
+
+  passTime (days 30)
+  now <- getTime
+  low <- markFor p [p.borrower, syndicate] "UST10Y" 95000.0
+  call <- propose (MarginCallMove with tradeCid = t; markCid = low; respondBy = addRelTime now (days 1)) "UST10Y marked to 95,000"
+  [c2] <- confirm syndicate rules call [bankC]
+  submitMustFail (actAs bankC <> readAs syndicate) do execute syndicate rules call bankC [c2]
+  cs2 <- confirm syndicate rules call [bankB, bankC]
+  submit (actAs bankC <> readAs syndicate) do execute syndicate rules call bankC cs2
+  [mc] <- map snd <$> query @MarginCall p.borrower
+  mc.lender === syndicate
+  mc.unitsDue === 2.4915

@@ -48,6 +48,12 @@ mark p instrument price = do
       agent = p.agent; instrument; price; asOf = now
       audience = [p.borrower, p.lenderA, p.lenderB]
 
+markFor : P -> [Party] -> Text -> Decimal -> Script (ContractId Mark)
+markFor p audience instrument price = do
+  now <- getTime
+  submit p.agent do
+    createCmd Mark with agent = p.agent; instrument; price; asOf = now; audience
+
 stdTerms : P -> Terms
 stdTerms p = Terms with
   cashIssuer = p.cashIssuer; cashInstrument = "USDC"; principal = loanAmount
@@ -58,7 +64,7 @@ rfq : P -> Script (ContractId RepoRFQ)
 rfq p = submit p.borrower do
   createCmd RepoRFQ with
     borrower = p.borrower; regulator = p.regulator; agent = p.agent
-    lenders = [p.lenderA, p.lenderB]; terms = stdTerms p; deadline = None
+    lenders = [p.lenderA, p.lenderB]; terms = stdTerms p; deadline = None; venue = None
 
 quote : P -> ContractId RepoRFQ -> Party -> Decimal -> Decimal -> Script (ContractId RepoQuote)
 quote p r lender rateBps haircut = do
@@ -78,6 +84,10 @@ heldCid party instrument = do
     cid :: _ -> pure cid
     [] -> fail ("no " <> instrument <> " for " <> show party)
 
+escrowOf : Locked -> ContractId Escrow
+escrowOf (Escrowed e) = e
+escrowOf _ = error "not a desk escrow"
+
 events : P -> Script [Text]
 events p = map (\(_, r) -> r.event) <$> query @RepoReport p.regulator
 
@@ -92,7 +102,7 @@ opened = do
   col <- bond p "UST10Y" 100.0
   m <- mark p "UST10Y" 98000.0
   t <- submit p.borrower do
-    exerciseCmd r Award with winner = qA; losers = [qB]; collateralCid = col; markCid = m
+    exerciseCmd r Award with winner = qA; losers = [qB]; collateralCid = col; markCid = m; contexts = []
   pure (p, t)
 
 -- The whole life of a repo, and what each party can see along the way.
@@ -112,7 +122,7 @@ lifecycle = do
   col <- bond p "UST10Y" 100.0
   m <- mark p "UST10Y" 98000.0
   t <- submit p.borrower do
-    exerciseCmd r Award with winner = qA; losers = [qB]; collateralCid = col; markCid = m
+    exerciseCmd r Award with winner = qA; losers = [qB]; collateralCid = col; markCid = m; contexts = []
 
   -- Opening leg: cash to the borrower, the loser's cash back, the bonds pledged.
   held p.borrower "USDC" >>= (=== loanAmount)
@@ -151,19 +161,19 @@ lifecycle = do
   bunds <- bond p "BUND10" 120.0
   sub <- submit p.borrower do exerciseCmd t2 ProposeSubstitution with holdingCid = bunds
   low <- mark p "BUND10" 80000.0
-  submitMustFail p.lenderA do exerciseCmd sub Approve with markCid = low
+  submitMustFail p.lenderA do exerciseCmd sub Approve with markCid = low; contexts = []
   bm <- mark p "BUND10" 85000.0
-  t3 <- submit p.lenderA do exerciseCmd sub Approve with markCid = bm
+  t3 <- submit p.lenderA do exerciseCmd sub Approve with markCid = bm; contexts = []
   held p.borrower "UST10Y" >>= (=== 102.4915)
   held p.borrower "BUND10" >>= (=== 0.0)
 
   -- 60 days in all at 530 bp: 83,916.67 of interest, paid with change back.
   passTime (days 30)
   loan <- heldCid p.borrower "USDC"
-  submitMustFail p.borrower do exerciseCmd t3 Repurchase with cashCid = loan
+  submitMustFail p.borrower do exerciseCmd t3 Repurchase with cashCid = loan; contexts = []
   topUp <- cash p p.borrower 100000.0
   pot <- submit p.borrower do exerciseCmd loan Merge with other = topUp
-  _ <- submit p.borrower do exerciseCmd t3 Repurchase with cashCid = pot
+  _ <- submit p.borrower do exerciseCmd t3 Repurchase with cashCid = pot; contexts = []
   held p.lenderA "USDC" >>= (=== 9583916.67)
   held p.borrower "USDC" >>= (=== 16083.33)
   held p.borrower "BUND10" >>= (=== 120.0)
@@ -186,9 +196,9 @@ defaultOnUnmetCall = do
   m <- mark p "UST10Y" 90000.0
   call <- submit p.lenderA do
     exerciseCmd t CallMargin with markCid = m; respondBy = addRelTime now (days 2)
-  submitMustFail p.lenderA do exerciseCmd call Default
+  submitMustFail p.lenderA do exerciseCmd call Default with contexts = []
   passTime (days 3)
-  _ <- submit p.lenderA do exerciseCmd call Default
+  _ <- submit p.lenderA do exerciseCmd call Default with contexts = []
   held p.lenderA "UST10Y" >>= (=== 100.0)
   held p.borrower "USDC" >>= (=== loanAmount)
   evs <- events p
@@ -199,9 +209,9 @@ claimAfterMaturity : Script ()
 claimAfterMaturity = do
   (p, t) <- opened
   passTime (days 89)
-  submitMustFail p.lenderA do exerciseCmd t ClaimAfterMaturity
+  submitMustFail p.lenderA do exerciseCmd t ClaimAfterMaturity with contexts = []
   passTime (days 2)
-  _ <- submit p.lenderA do exerciseCmd t ClaimAfterMaturity
+  _ <- submit p.lenderA do exerciseCmd t ClaimAfterMaturity with contexts = []
   held p.lenderA "UST10Y" >>= (=== 100.0)
 
 -- Everything the desk must refuse.
@@ -230,23 +240,23 @@ refusals = do
       agent = p.borrower; instrument = "UST10Y"; price = 200000.0; asOf = now
       audience = [p.lenderA, p.lenderB]
   submitMustFail p.borrower do
-    exerciseCmd r Award with winner = qA; losers = []; collateralCid = col; markCid = fake
+    exerciseCmd r Award with winner = qA; losers = []; collateralCid = col; markCid = fake; contexts = []
 
   -- At 97,000, a 4% haircut lends 9,312,000: not enough for 9,500,000.
   m <- mark p "UST10Y" 97000.0
   submitMustFail p.borrower do
-    exerciseCmd r Award with winner = qB; losers = [qA]; collateralCid = col; markCid = m
+    exerciseCmd r Award with winner = qB; losers = [qA]; collateralCid = col; markCid = m; contexts = []
 
   -- Naming the same quote twice is refused.
   submitMustFail p.borrower do
-    exerciseCmd r Award with winner = qA; losers = [qA]; collateralCid = col; markCid = m
+    exerciseCmd r Award with winner = qA; losers = [qA]; collateralCid = col; markCid = m; contexts = []
 
   -- The pledge cannot be pulled back by the borrower alone.
   t <- submit p.borrower do
-    exerciseCmd r Award with winner = qA; losers = [qB]; collateralCid = col; markCid = m
+    exerciseCmd r Award with winner = qA; losers = [qB]; collateralCid = col; markCid = m; contexts = []
   Some trade <- queryContractId p.borrower t
   submitMustFail p.borrower do
-    exerciseCmd (head trade.collateral) Release with recipient = p.borrower
+    exerciseCmd (escrowOf (head trade.collateral)) Release with recipient = p.borrower
 
   -- The losing lender withdrew nothing: it got its cash back in the award.
   held p.lenderB "USDC" >>= (=== loanAmount)

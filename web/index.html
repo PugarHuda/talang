@@ -3,34 +3,279 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Talang · sealed repo desk</title>
-  <link rel="stylesheet" href="/style.css" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 rx=%223%22 fill=%22%230e1116%22/%3E%3Ccircle cx=%2211.5%22 cy=%2211.5%22 r=%222%22 fill=%22%234fc3e0%22/%3E%3C/svg%3E" />
+  <title>Talang · repo quotes behind glass</title>
+  <meta name="description" content="A sealed-bid repo desk on Canton. Each lender's rate reaches the borrower and nobody else; the repo then lives on the ledger until it is repurchased." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@200..700&family=Geist+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="/landing.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%23120d24%22/%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%227%22 fill=%22%237b4dff%22/%3E%3C/svg%3E" />
+  <script type="importmap">
+    { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    } }
+  </script>
 </head>
 <body>
-  <aside class="rail">
-    <div class="brand">talang<span>.</span></div>
-    <p class="tag">Sealed-bid repo on Canton</p>
-    <label class="who">Acting as
-      <select id="role">
-        <option value="borrower">Borrower · fund</option>
-        <option value="lenderA">Lender A · bank</option>
-        <option value="lenderB">Lender B · bank</option>
-        <option value="lenderC">Lender C · bank</option>
-        <option value="regulator">Regulator</option>
-        <option value="agent">Valuation agent</option>
-      </select>
-    </label>
-    <div id="party" class="party"></div>
-    <div id="status" class="status">connecting…</div>
-    <p class="note">Each role reads only its own node's view of the ledger. Nothing is hidden by the page: what a role cannot see never reached it.</p>
-    <a class="link" href="https://github.com/PugarHuda/talang">GitHub ↗</a>
-  </aside>
-  <main>
-    <div id="readonly" class="banner" hidden>Read-only public view of live DevNet data. Run the desk locally to act.</div>
-    <div id="toast" class="toast" hidden></div>
-    <div id="view"></div>
+<a class="skip" href="#main">Skip to content</a>
+
+<div class="frame">
+  <header class="nav">
+    <a class="brand" href="/" aria-label="Talang home">
+      <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><path d="M16 3 28 10v12L16 29 4 22V10z" fill="#120d24"/><path d="M16 3 28 10 16 17 4 10z" fill="#3a2b66"/><path d="M16 17v12L4 22V10z" fill="#1d1538"/><circle cx="16" cy="17" r="3.2" fill="#8b5cff"/></svg>
+      <span>talang</span>
+    </a>
+    <nav class="pills" aria-label="Sections">
+      <a href="#top" aria-current="page">Home</a>
+      <a href="#lifecycle">Lifecycle</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#tokens">Tokens</a>
+      <a href="#agents">AI desks</a>
+    </nav>
+    <a class="btn btn-glass btn-sm" href="/desk">Launch desk</a>
+  </header>
+
+  <main id="main">
+  <section class="hero" id="top" aria-labelledby="hero-title">
+    <div class="hero-copy">
+      <p class="eyebrow"><span class="dot" aria-hidden="true"></span>Sealed-bid repo on Canton</p>
+      <h1 id="hero-title">Repo quotes,<br />behind glass</h1>
+      <p class="lede">A borrower asks a panel of lenders for cash against collateral. Each rate reaches the borrower and nobody else, and the repo then lives on the ledger until it is repurchased.</p>
+      <div class="ctas">
+        <a class="btn btn-dark" href="/desk">Launch desk <span aria-hidden="true">→</span></a>
+        <a class="btn btn-glass" href="https://github.com/PugarHuda/talang"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 .5a11.5 11.5 0 0 0-3.6 22.4c.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0C17.3 4.8 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.2c0 .3.2.7.8.6A11.5 11.5 0 0 0 12 .5z"/></svg>View the code</a>
+      </div>
+    </div>
+
+    <div class="visual" aria-label="A sealed quote held inside a glass cube. The borrower sees it, Lender B sees nothing of rivals, the regulator sees reports only.">
+      <canvas id="gl" aria-hidden="true"></canvas>
+      <svg class="fallback" viewBox="0 0 400 400" aria-hidden="true">
+        <defs>
+          <radialGradient id="fb-blob" cx="38%" cy="32%" r="70%"><stop offset="0" stop-color="#b79bff"/><stop offset=".45" stop-color="#6a2cf0"/><stop offset="1" stop-color="#2a0e8a"/></radialGradient>
+          <linearGradient id="fb-top" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".75"/><stop offset="1" stop-color="#e6dcff" stop-opacity=".3"/></linearGradient>
+          <linearGradient id="fb-side" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#d9ccff" stop-opacity=".15"/></linearGradient>
+        </defs>
+        <g fill="url(#fb-blob)">
+          <circle cx="200" cy="215" r="78"/>
+          <circle cx="200" cy="120" r="26"/><circle cx="200" cy="310" r="26"/><circle cx="108" cy="215" r="26"/><circle cx="292" cy="215" r="26"/>
+          <circle cx="135" cy="150" r="24"/><circle cx="265" cy="150" r="24"/><circle cx="135" cy="280" r="24"/><circle cx="265" cy="280" r="24"/>
+        </g>
+        <path d="M200 40 345 120v170L200 370 55 290V120z" fill="url(#fb-side)" stroke="#fff" stroke-opacity=".9" stroke-width="2"/>
+        <path d="M200 40 345 120 200 200 55 120z" fill="url(#fb-top)" stroke="#fff" stroke-width="2"/>
+        <path d="M200 200v170" stroke="#fff" stroke-opacity=".8" stroke-width="2"/>
+      </svg>
+
+      <div class="chip toolbar" aria-hidden="true">
+        <span class="tb-plus">+</span><i></i>
+        <span>Quote</span><span>Award</span><span>Margin</span><span>Roll</span><span>Repurchase</span>
+        <i></i><span class="tb-ok">sealed</span><span class="tb-play">▶</span>
+      </div>
+
+      <div class="chip tag tag-yellow t-borrower"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 1l5 14 2-6 6-2z"/></svg><span><b>Borrower</b> sees every quote</span></div>
+      <div class="chip tag tag-lilac t-regulator"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 1l5 14 2-6 6-2z"/></svg><span><b>Regulator</b> sees reports only</span></div>
+      <div class="chip tag tag-coral t-lender"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 1l5 14 2-6 6-2z"/></svg><span><b>Lender B</b> sees nothing of rivals</span></div>
+
+      <div class="chip quote-card" aria-hidden="true">
+        <div class="qc-head">Sealed quote <span>×</span></div>
+        <div class="qc-sel">Lender A → Borrower <span>⌄</span></div>
+        <dl>
+          <div><dt>Rate</dt><dd>525 bp</dd></div>
+          <div><dt>Haircut</dt><dd>2.0%</dd></div>
+          <div><dt>Locked</dt><dd>4.8M USDC</dd></div>
+        </dl>
+        <div class="qc-vis"><span>Observers</span><b>none</b></div>
+      </div>
+
+      <figure class="chip code">
+        <figcaption><span>daml/Talang.daml</span><span>L446</span></figcaption>
+<pre id="daml"><code><span class="k">template</span> <span class="t">RepoQuote</span>
+  <span class="k">with</span>
+    borrower : <span class="t">Party</span>
+    lender   : <span class="t">Party</span>
+    rateBps  : <span class="t">Decimal</span>
+    haircut  : <span class="t">Decimal</span>
+    <span class="c">...</span>
+  <span class="k">where</span>
+    <span class="k">signatory</span> lender, borrower
+    <span class="c">-- no observer: rivals and the</span>
+    <span class="c">-- regulator never receive it</span></code></pre>
+        <div class="code-actions">
+          <button type="button" id="copy"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="5" width="9" height="9" rx="2"/><path d="M11 5V3a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h2"/></svg><span>Copy code</span></button>
+          <span class="code-note">0 observers</span>
+        </div>
+      </figure>
+
+      <span class="chip badge b1" aria-hidden="true">CIP-0056</span>
+      <span class="chip badge b2" aria-hidden="true">MCP</span>
+    </div>
+
+    <div class="hero-foot">
+      <a class="social" href="https://github.com/PugarHuda/talang" aria-label="Talang on GitHub"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 .5a11.5 11.5 0 0 0-3.6 22.4c.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0C17.3 4.8 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.2c0 .3.2.7.8.6A11.5 11.5 0 0 0 12 .5z"/></svg></a>
+      <span class="foot-note">HackCanton Season 3 · Financial Applications</span>
+      <a class="scroll" href="#lifecycle">Scroll for more<span class="mouse" aria-hidden="true"></span></a>
+    </div>
+  </section>
   </main>
-  <script type="module" src="/app.js"></script>
+</div>
+
+<div class="page">
+  <section class="stats" aria-label="Measured on a Canton 3.4.11 participant">
+    <div><b>0</b><span>rival quotes visible on any lender node, checked every run</span></div>
+    <div><b>0</b><span>requests, quotes or loss notices visible to the regulator</span></div>
+    <div><b>19 / 19</b><span>Daml scripts and MCP end-to-end checks passing</span></div>
+    <div><b>6</b><span>repo states seeded through the Ledger API</span></div>
+  </section>
+
+  <section id="lifecycle" class="sec" aria-labelledby="lc-h">
+    <p class="kicker">01 · Lifecycle</p>
+    <h2 id="lc-h">How a repo lives</h2>
+    <p class="sub">Every step is a Daml choice the contract re-checks. Nothing settles on trust.</p>
+    <ol class="steps">
+      <li class="glass"><span class="n">01</span><h3>Request</h3><p class="who">Borrower</p><p>Only the invited lenders see it, and it carries no rate.</p></li>
+      <li class="glass"><span class="n">02</span><h3>Sealed quotes</h3><p class="who">Each lender</p><p>Full principal locked behind the quote. Rivals and the regulator never receive it.</p></li>
+      <li class="glass"><span class="n">03</span><h3>Award</h3><p class="who">Borrower</p><p>Atomic opening leg: collateral pledged, cash delivered, losers refunded unrevealed.</p></li>
+      <li class="glass"><span class="n">04</span><h3>Margin · Substitution · Roll</h3><p class="who">Lender and borrower</p><p>Calls priced from a fresh mark and refused while covered. Swaps and rolls re-check coverage.</p></li>
+      <li class="glass"><span class="n">05</span><h3>Repurchase or Default</h3><p class="who">Borrower · Lender</p><p>Principal plus ACT/360 interest home, fee to the venue. An unanswered call or past maturity hands the pledge to the lender.</p></li>
+    </ol>
+  </section>
+
+  <section id="privacy" class="sec split" aria-labelledby="pv-h">
+    <div>
+      <p class="kicker">02 · Privacy proof</p>
+      <h2 id="pv-h">What each node sees</h2>
+      <p class="sub">Nothing is hidden by the page. What a role cannot see never reached its node: the contract's signatories and observers decide who receives each fact.</p>
+      <p class="callout"><b>0</b> rival quotes on any lender node, read back from every node on every run.</p>
+    </div>
+    <div class="glass matrix-wrap">
+      <table class="matrix">
+        <caption class="sr">Who receives each contract</caption>
+        <thead><tr><th scope="col">Contract</th><th scope="col">Borrower</th><th scope="col">Lender B</th><th scope="col">Regulator</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Request</th><td><i class="y">✓</i></td><td><i class="y">✓</i><small>if invited</small></td><td><i class="n">—</i></td></tr>
+          <tr><th scope="row">Lender B's own quote</th><td><i class="y">✓</i></td><td><i class="y">✓</i></td><td><i class="n">—</i></td></tr>
+          <tr><th scope="row">Lender A's quote</th><td><i class="y">✓</i></td><td><i class="n">—</i><small>never arrives</small></td><td><i class="n">—</i></td></tr>
+          <tr><th scope="row">Loss notice</th><td><i class="y">✓</i></td><td><i class="p">rank</i><small>only</small></td><td><i class="n">—</i></td></tr>
+          <tr><th scope="row">Best execution</th><td><i class="y">✓</i></td><td><i class="n">—</i></td><td><i class="y">✓</i><small>no names</small></td></tr>
+          <tr><th scope="row">Lifecycle reports</th><td><i class="y">✓</i></td><td><i class="y">✓</i><small>its repos</small></td><td><i class="y">✓</i><small>every event</small></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="bx-h">
+    <p class="kicker">03 · Best execution</p>
+    <h2 id="bx-h">Prove the price without leaking it</h2>
+    <p class="sub">When the cheapest rate's haircut does not cover, the borrower takes rank 2, and can still show the regulator how price discovery went.</p>
+    <div class="duo">
+      <article class="dark-card">
+        <p class="dc-k">To the regulator</p>
+        <dl class="kv">
+          <div><dt>Quotes weighed</dt><dd>3</dd></div>
+          <div><dt>Winner's rank on rate</dt><dd>2</dd></div>
+          <div><dt>Gap to best rate</dt><dd>10 bp</dd></div>
+          <div><dt>Lenders named</dt><dd class="muted">none</dd></div>
+        </dl>
+      </article>
+      <article class="dark-card lilac">
+        <p class="dc-k">To each losing lender</p>
+        <p class="big">Rank 3 of 3</p>
+        <p class="dc-s">No winning rate. No winner. That is all a loser is told.</p>
+      </article>
+    </div>
+  </section>
+
+  <section id="pricing" class="sec split rev" aria-labelledby="bs-h">
+    <div class="glass committee" aria-hidden="true">
+      <div class="pricers">
+        <span class="pr ok">Pricer 1<b>✓</b></span>
+        <span class="pr ok">Pricer 2<b>✓</b></span>
+        <span class="pr">Pricer 3<b>…</b></span>
+      </div>
+      <div class="thr"><span>2 of 3</span></div>
+      <div class="markout"><small>Mark · GILT10</small><b>96,000</b><span class="pill-ok">published</span></div>
+      <p class="refused">1 of 3 → refused by GovernanceRules</p>
+    </div>
+    <div>
+      <p class="kicker">04 · BitSafe Decentralization Manager</p>
+      <h2 id="bs-h">Marks no single party can move</h2>
+      <p class="sub">Margin is computed from a mark that k of n independent pricers must confirm. A lender can be a syndicate that quotes, calls margin, defaults and offers rolls only after a threshold of its members confirms.</p>
+      <ul class="facts">
+        <li>Uses BitSafe's released <code>governance-action-v1</code> and <code>governance-core-v1</code> DARs unchanged.</li>
+        <li>Threshold refusal and execution proven in Daml scripts and on a Canton participant.</li>
+        <li class="muted">The three-participant DecMan LocalNet run is written up, not yet run.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="tokens" class="sec split" aria-labelledby="tk-h">
+    <div>
+      <p class="kicker">05 · Canton Token Standard</p>
+      <h2 id="tk-h">Real assets on both legs</h2>
+      <p class="sub">Cash such as USDCx and collateral such as CBTC as CIP-0056 allocations. Repurchase unwinds them, default executes them, margin and substitution add or swap them.</p>
+      <ul class="facts">
+        <li>Repurchase appears in any CIP-0056 wallet as a standard allocation request.</li>
+        <li>Built and tested on the <code>Allocation</code> / <code>AllocationRequest</code> interfaces, against a registry implementing them.</li>
+        <li class="muted">Not yet run against a live registry.</li>
+      </ul>
+    </div>
+    <div class="wallet glass" aria-label="Example wallet allocation request">
+      <div class="w-top"><span class="w-dot"></span>Allocation request<small>Talang repurchase</small></div>
+      <div class="w-row"><span>To Lender A</span><b>50,125.00 USDCx</b></div>
+      <div class="w-row"><span>To venue</span><b>2.08 USDCx</b></div>
+      <div class="w-row muted"><span>Returns</span><b>CBTC collateral</b></div>
+      <div class="w-foot"><span>Good for the day it names</span><span class="w-btn">Allocate</span></div>
+    </div>
+  </section>
+
+  <section id="agents" class="sec" aria-labelledby="ag-h">
+    <p class="kicker">06 · AI desks over MCP</p>
+    <h2 id="ag-h">Three agents, three nodes, same privacy</h2>
+    <p class="sub">Each agent reads only its own party's node, so it is bound by the same privacy as a human: a lender's agent never sees a rival's rate.</p>
+    <div class="trio">
+      <article class="glass agent"><h3>Lender desk</h3><p>Quotes, calls margin, reviews substitutions, offers rolls.</p><div class="tools"><code>open_requests</code><code>quote</code><code>call_margin</code><code>offer_roll</code><code>loss_history</code><code>privacy_check</code></div></article>
+      <article class="glass agent"><h3>Borrower desk</h3><p>Ranks quotes by coverage and takes the cheapest covered one.</p><div class="tools"><code>quotes</code><code>award</code><code>book</code><code>accept_roll</code><code>privacy_check</code></div></article>
+      <article class="glass agent"><h3>Regulator desk</h3><p>Every lifecycle event and every best-execution record, nothing upstream.</p><div class="tools"><code>lifecycle</code><code>best_execution</code><code>privacy_check</code></div></article>
+    </div>
+  </section>
+
+  <section class="sec split" aria-labelledby="fee-h">
+    <div>
+      <p class="kicker">07 · Business model</p>
+      <h2 id="fee-h">The venue earns on every repo</h2>
+      <p class="sub">A fee in basis points per annum of principal, ACT/360, collected inside the repurchase and every roll, so it cannot be skipped. Built and tested.</p>
+    </div>
+    <div class="glass fee">
+      <div class="f-eq"><span>4,800,000</span><i>×</i><span>10 bp</span><i>×</i><span>30 / 360</span></div>
+      <div class="f-res"><small>Venue fee on a 30-day repo</small><b>400 USDC</b></div>
+    </div>
+  </section>
+
+  <section class="cta" aria-labelledby="cta-h">
+    <h2 id="cta-h">Open the desk as any role</h2>
+    <p>Every number on the desk is read from that role's own node.</p>
+    <div class="ctas center">
+      <a class="btn btn-dark" href="/desk">Launch desk <span aria-hidden="true">→</span></a>
+      <a class="btn btn-glass" href="/desk?role=lenderB">As Lender B</a>
+      <a class="btn btn-glass" href="/desk?role=regulator">As Regulator</a>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span>talang · HackCanton Season 3</span>
+    <a href="https://github.com/PugarHuda/talang">github.com/PugarHuda/talang</a>
+  </footer>
+</div>
+
+<script>
+  document.getElementById('copy').addEventListener('click', async (e) => {
+    const label = e.currentTarget.querySelector('span');
+    try { await navigator.clipboard.writeText(document.getElementById('daml').innerText); label.textContent = 'Copied'; }
+    catch { label.textContent = 'Select to copy'; }
+    setTimeout(() => (label.textContent = 'Copy code'), 1800);
+  });
+</script>
+<script type="module" src="/landing.js"></script>
 </body>
 </html>

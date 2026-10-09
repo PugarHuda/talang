@@ -1,0 +1,133 @@
+-- The desk features around the core repo: the venue fee, best execution with
+-- loss notices that leak nothing, and rolling a live repo to a new rate.
+module DeskTest where
+
+import DA.Action (foldlA)
+import DA.Assert ((===))
+import DA.Time (addRelTime, days)
+import Daml.Script
+
+import Talang
+import TalangTest
+
+-- 10 bp a year to the venue on a 9.5M repo held 60 days: 1,583.33.
+venueFeeOnRepurchase : Script ()
+venueFeeOnRepurchase = do
+  p <- setup
+  operator <- allocateParty "VenueOperator"
+  r <- submit p.borrower do
+    createCmd RepoRFQ with
+      borrower = p.borrower; regulator = p.regulator; agent = p.agent
+      lenders = [p.lenderA, p.lenderB]; terms = stdTerms p; deadline = None
+      venue = Some Venue with operator; feeBps = 10.0
+  qA <- quote p r p.lenderA 530.0 0.02
+  col <- bond p "UST10Y" 100.0
+  m <- mark p "UST10Y" 98000.0
+  t <- submit p.borrower do
+    exerciseCmd r Award with winner = qA; losers = []; collateralCid = col; markCid = m; contexts = []
+  passTime (days 60)
+  loan <- heldCid p.borrower "USDC"
+  -- Principal and interest alone are not enough once the fee is due.
+  justPI <- cash p p.borrower 83916.67
+  short <- submit p.borrower do exerciseCmd loan Merge with other = justPI
+  submitMustFail p.borrower do exerciseCmd t Repurchase with cashCid = short; contexts = []
+  extra <- cash p p.borrower 2000.0
+  pot <- submit p.borrower do exerciseCmd short Merge with other = extra
+  submit p.borrower do exerciseCmd t Repurchase with cashCid = pot; contexts = []
+  held p.lenderA "USDC" >>= (=== 9583916.67)
+  held operator "USDC" >>= (=== 1583.33)
+  held p.borrower "USDC" >>= (=== 416.67)
+  reports <- query @RepoReport p.regulator
+  [(r.cashMoved, r.feePaid) | (_, r) <- reports, r.event == "CLOSE"] === [(9583916.67, 1583.33)]
+
+-- Three sealed quotes. The borrower takes the second-cheapest rate because the
+-- cheapest one's haircut does not cover the cash. Each loser learns only its
+-- rank; the regulator learns how many quotes, the winner's rank and the gap.
+bestExecution : Script ()
+bestExecution = do
+  p <- setup
+  lenderC <- allocateParty "LenderC"
+  r <- submit p.borrower do
+    createCmd RepoRFQ with
+      borrower = p.borrower; regulator = p.regulator; agent = p.agent
+      lenders = [p.lenderA, p.lenderB, lenderC]; terms = stdTerms p; deadline = None; venue = None
+  qA <- quote p r p.lenderA 540.0 0.01
+  qB <- quote p r p.lenderB 520.0 0.04
+  qC <- quote p r lenderC 530.0 0.03
+  col <- bond p "UST10Y" 100.0
+  m2 <- markFor p [p.borrower, p.lenderA, p.lenderB, lenderC] "UST10Y" 98000.0
+  -- B's 4% haircut lends 9,408,000 against 9,500,000: it cannot be taken.
+  submitMustFail p.borrower do
+    exerciseCmd r Award with winner = qB; losers = [qA, qC]; collateralCid = col; markCid = m2; contexts = []
+  _ <- submit p.borrower do
+    exerciseCmd r Award with winner = qC; losers = [qA, qB]; collateralCid = col; markCid = m2; contexts = []
+
+  [be] <- map snd <$> query @BestExecution p.regulator
+  be.quotesConsidered === 3
+  be.winnerRank === 2
+  be.winningRateBps === 530.0
+  be.spreadToBestBps === 10.0
+
+  -- Each loser sees exactly one notice: its own rank, no rate, no winner.
+  [nA] <- map snd <$> query @LossNotice p.lenderA
+  [nB] <- map snd <$> query @LossNotice p.lenderB
+  (nA.rank, nA.outOf) === (3, 3)
+  (nB.rank, nB.outOf) === (1, 3)
+  query @LossNotice lenderC >>= (=== []) . map snd
+  query @LossNotice p.regulator >>= (=== []) . map snd
+  query @BestExecution p.lenderA >>= (=== []) . map snd
+
+  -- Both losers have their cash back.
+  held p.lenderA "USDC" >>= (=== loanAmount)
+  held p.lenderB "USDC" >>= (=== loanAmount)
+
+-- 20 days at 530 bp, then roll 30 more days at 500 bp: 27,972.22 of interest is
+-- paid on the roll, the clock restarts, and the repurchase charges the new rate.
+rollToNewRate : Script ()
+rollToNewRate = do
+  (p, t) <- opened
+  passTime (days 20)
+  now <- getTime
+  offer <- submit p.lenderA do
+    createCmd RollOffer with
+      tradeCid = t; borrower = p.borrower; lender = p.lenderA
+      newRateBps = 500.0; extraDays = 30; expiresAt = addRelTime now (days 1)
+  m <- mark p "UST10Y" 98000.0
+  thin <- cash p p.borrower 20000.0
+  submitMustFail p.borrower do exerciseCmd offer AcceptRoll with cashCid = thin; markCid = m
+  pay <- cash p p.borrower 27972.22
+  t2 <- submit p.borrower do exerciseCmd offer AcceptRoll with cashCid = pay; markCid = m
+  held p.lenderA "USDC" >>= (=== 27972.22)
+  Some rolled <- queryContractId p.borrower t2
+  rolled.rateBps === 500.0
+  rolled.maturity === addRelTime (addRelTime now (days 70)) (days 30)
+
+  passTime (days 10)
+  -- The 20,000 left over from the refused roll pays part of the interest.
+  loan <- heldCid p.borrower "USDC"
+  others <- filter (/= loan) . map fst . filter (\(_, h) -> h.owner == p.borrower && h.instrument == "USDC")
+              <$> query @Holding p.borrower
+  pot <- foldlA (\pot0 c -> submit p.borrower do exerciseCmd pot0 Merge with other = c) loan others
+  held p.borrower "USDC" >>= (=== loanAmount + 20000.0)
+  submit p.borrower do exerciseCmd t2 Repurchase with cashCid = pot; contexts = []
+  held p.lenderA "USDC" >>= (=== 27972.22 + 9513194.44)
+  held p.borrower "USDC" >>= (=== 20000.0 - 13194.44)
+  evs <- events p
+  assert ("ROLL" `elem` evs)
+
+-- A roll needs the collateral to still cover the principal, and a live repo.
+rollRefusals : Script ()
+rollRefusals = do
+  (p, t) <- opened
+  passTime (days 10)
+  now <- getTime
+  offer <- submit p.lenderA do
+    createCmd RollOffer with
+      tradeCid = t; borrower = p.borrower; lender = p.lenderA
+      newRateBps = 500.0; extraDays = 30; expiresAt = addRelTime now (days 200)
+  low <- mark p "UST10Y" 90000.0
+  pay <- cash p p.borrower 100000.0
+  submitMustFail p.borrower do exerciseCmd offer AcceptRoll with cashCid = pay; markCid = low
+  passTime (days 90)
+  m <- mark p "UST10Y" 98000.0
+  submitMustFail p.borrower do exerciseCmd offer AcceptRoll with cashCid = pay; markCid = m

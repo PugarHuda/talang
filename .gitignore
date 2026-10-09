@@ -24,3 +24,6 @@ media/*.webm
 log/*.log
 
 .env*
+
+# local sandbox run (scripts/local.mjs)
+parties.local.json

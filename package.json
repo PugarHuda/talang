@@ -10,7 +10,11 @@
     "seed": "node scripts/seed.mjs",
     "marks": "node scripts/seed.mjs marks",
     "mcp": "node mcp/server.mjs",
-    "e2e:mcp": "node scripts/e2e-mcp.mjs"
+    "e2e:mcp": "node scripts/e2e-mcp.mjs",
+    "local": "node scripts/local.mjs",
+    "governance": "node scripts/governance.mjs",
+    "upload": "node scripts/upload.mjs",
+    "token-rail": "node scripts/token-rail.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.0"

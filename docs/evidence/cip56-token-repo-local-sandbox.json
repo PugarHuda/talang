@@ -1,0 +1,64 @@
+{
+  "ledger": "local Canton sandbox 3.4.11",
+  "ranAt": "2026-10-09T05:20:49.849Z",
+  "registries": "test/daml/MockRegistry.daml (implements Splice HoldingV1 / AllocationV1)",
+  "steps": [
+    {
+      "step": "two registries implementing Splice HoldingV1 / AllocationV1: USDCx and CBTC",
+      "usdcx": "talang-usdcx-registry-mv0iodro::122098a7cc84cec29979a2d6130078e96e5eba38f5fb678f97706c11af0758872c30",
+      "cbtc": "talang-cbtc-registry-mv0ioe10::122098a7cc84cec29979a2d6130078e96e5eba38f5fb678f97706c11af0758872c30"
+    },
+    {
+      "step": "RepoRFQ: 50,000 USDCx against 1 CBTC, 30 days, venue 10 bp",
+      "updateId": "12203d76a554a23efa7b4a58e0a1f2b15b6157cdde690298e522eb89e71295cf4829",
+      "offset": 334
+    },
+    {
+      "step": "sealed quote funded by a USDCx allocation (600 bp)",
+      "updateId": "122068aacc7c5ac2095f64cb9e4e84049b69b7c0436369a561e154c27f3cf7792cb5",
+      "offset": 343
+    },
+    {
+      "step": "sealed quote funded by a USDCx allocation (620 bp)",
+      "updateId": "12207c46349b09d396859997203e028496b6d316a2daca904d2d630670fe8c9f3a65",
+      "offset": 352
+    },
+    {
+      "step": "lender B's node holds 0 rival quotes",
+      "rivalQuotesOnLenderB": 0
+    },
+    {
+      "step": "award: USDCx allocation executed to the borrower, B's cancelled back to B, CBTC held for A",
+      "updateId": "12206a96e80be0dc79fbb42b83f9abc4619dbee2ecce27bdb5887f7847377cfecc42",
+      "offset": 361,
+      "borrowerUSDCx": 50000,
+      "lenderBUSDCx": 50000,
+      "borrowerCBTC": 0
+    },
+    {
+      "step": "repurchase notice read through the standard AllocationRequest interface",
+      "updateId": "1220c4f84e8531ef899289a6fdbc9cb1bba5827c525d1aeb77ac1302b01d6f32d07d",
+      "offset": 364,
+      "legs": [
+        {
+          "leg": "repurchase",
+          "to": "lenderA",
+          "amount": 50008.33
+        },
+        {
+          "leg": "venue-fee",
+          "to": "venue",
+          "amount": 0.14
+        }
+      ]
+    },
+    {
+      "step": "settled: USDCx to the lender and the venue, CBTC allocation cancelled back to the borrower",
+      "updateId": "122072ff6ef5db82c3e51b04bed58b5931c9c828a147ec5b40a34325c3b0df8fc77c",
+      "offset": 382,
+      "lenderAUSDCx": 50008.33,
+      "venueUSDCx": 0.14,
+      "borrowerCBTC": 1
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 {
   "outputDirectory": "web",
   "buildCommand": "",
-  "framework": null
+  "framework": null,
+  "rewrites": [{ "source": "/desk", "destination": "/desk.html" }]
 }

@@ -1,0 +1,95 @@
+-- A minimal token registry implementing the REAL CIP-0056 interfaces
+-- (Splice.Api.Token.HoldingV1.Holding, Splice.Api.Token.AllocationV1.Allocation),
+-- so the desk's TokenTrade settlement is exercised in `daml test` exactly the way
+-- a live registry (cETH, CBTC, Canton Coin) drives it on Devnet — same interface
+-- ids, same choice signatures, same controller sets.
+module MockRegistry where
+
+import DA.Action (when)
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1
+import Splice.Api.Token.AllocationV1
+
+-- | A registry-signed fungible holding, viewable through the standard interface.
+template MockHolding
+  with
+    registry : Party
+    owner : Party
+    instrumentTag : Text
+    amount : Decimal
+  where
+    signatory registry
+    observer owner
+    ensure amount > 0.0
+
+    interface instance Holding for MockHolding where
+      view = HoldingView with
+        owner
+        instrumentId = InstrumentId with admin = registry; id = instrumentTag
+        amount
+        lock = None
+        meta = emptyMetadata
+
+    -- Wallet-side: fund an allocation for one settlement leg. The remainder, if
+    -- any, stays with the owner. (A live registry runs this through its
+    -- AllocationFactory + off-ledger context; the on-ledger effect is the same.)
+    choice MockAllocate : ContractId MockAllocation
+      with spec : AllocationSpecification
+      controller owner
+      do assertMsg "allocation must match this holding's owner"
+           (spec.transferLeg.sender == owner)
+         assertMsg "allocation must match this instrument"
+           (spec.transferLeg.instrumentId == InstrumentId with admin = registry; id = instrumentTag)
+         assertMsg "insufficient holding" (amount >= spec.transferLeg.amount)
+         when (amount > spec.transferLeg.amount) do
+           _ <- create this with amount = amount - spec.transferLeg.amount
+           pure ()
+         create MockAllocation with registry; spec
+
+-- | Funded reservation for one settlement leg, driven through the standard
+-- Allocation interface by the app's settlement contract.
+template MockAllocation
+  with
+    registry : Party
+    spec : AllocationSpecification
+  where
+    signatory registry, spec.transferLeg.sender
+    observer spec.transferLeg.receiver, spec.settlement.executor
+
+    interface instance Allocation for MockAllocation where
+      view = AllocationView with
+        allocation = spec
+        holdingCids = []
+        meta = emptyMetadata
+
+      allocation_executeTransferImpl _self _arg = do
+        recvCid <- create MockHolding with
+          registry
+          owner = spec.transferLeg.receiver
+          instrumentTag = spec.transferLeg.instrumentId.id
+          amount = spec.transferLeg.amount
+        pure Allocation_ExecuteTransferResult with
+          senderHoldingCids = []
+          receiverHoldingCids = [toInterfaceContractId recvCid]
+          meta = emptyMetadata
+
+      allocation_cancelImpl _self _arg = do
+        sndCid <- create MockHolding with
+          registry
+          owner = spec.transferLeg.sender
+          instrumentTag = spec.transferLeg.instrumentId.id
+          amount = spec.transferLeg.amount
+        pure Allocation_CancelResult with
+          senderHoldingCids = [toInterfaceContractId sndCid]
+          meta = emptyMetadata
+
+      allocation_withdrawImpl _self _arg = do
+        sndCid <- create MockHolding with
+          registry
+          owner = spec.transferLeg.sender
+          instrumentTag = spec.transferLeg.instrumentId.id
+          amount = spec.transferLeg.amount
+        pure Allocation_WithdrawResult with
+          senderHoldingCids = [toInterfaceContractId sndCid]
+          meta = emptyMetadata
