@@ -92,7 +92,9 @@ repurchase and every roll, so it cannot be skipped. Built and tested.
 three-participant LocalNet; it publishes with one node down and cannot with two.
 Marks come from live sources (US Treasury par yields, three BTC exchanges).
 
-**Not yet:** the 1.0.0 package on DevNet; a live USDCx or CBTC registry; Grofty Wallet. The first version (0.1.0) was
+**On DevNet:** `talang-repo` 1.0.0 vetted on the NODERS participant and seeded; the hosted desk reads it (docs/evidence/devnet-run.log).
+
+**Not yet:** the governance committee on DevNet (waiting on act-as rights from NODERS); a live USDCx or CBTC registry; Grofty Wallet on TestNet. The first version (0.1.0) was
 uploaded to the NODERS DevNet participant and driven through the desk on 3 October
 (commit `900da46`; package `237ad836…54f78194b`, vetted since 3 October), with no update ids recorded.
 

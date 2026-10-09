@@ -99,7 +99,8 @@ marks, and wallets for the parties (CIP-0103).
   `237ad836…54f78194b` is vetted there since 3 October; no update ids were recorded for that run.
 - The valuation committee onboarded through BitSafe DecMan and hosted on three
   participants: it publishes with one node down and cannot with two (`docs/evidence/`).
-- Not yet: the 1.0.0 package on DevNet, a live USDCx or CBTC registry.
+- `talang-repo` 1.0.0 is vetted on the NODERS DevNet participant and seeded there; the hosted desk reads it.
+- Not yet: the governance committee on DevNet, a live USDCx or CBTC registry.
 
 ## Validation log
 

@@ -1,0 +1,98 @@
+Talang DevNet evidence run, 2026-10-09T09:39:16.631Z
+
+=== rights (exit 0) ===
+user 0d931a4c-1e36-4d5e-96b5-424fe47257d4: 10 rights
+  CanReadAs ecaf163a-22dc-40f3-9006-5055bb40a474::12204a9d883d1158141d8f099d06dd2e42cb52615deb42da5a46f042c8d0e1dbdf0e
+  CanActAs ecaf163a-22dc-40f3-9006-5055bb40a474::12204a9d883d1158141d8f099d06dd2e42cb52615deb42da5a46f042c8d0e1dbdf0e
+  CanActAs ecaf163a-ecaf163a-tirai-dealerB::12204a9d883d1158141d8f099d06dd2e42cb52615deb42da5a46f042c8d0e1dbdf0e
+  CanActAs ecaf163a-ecaf163a-tirai-bondissuer::12204a9d883d1158141d8f099d06dd2e42cb52615deb42da5a46f042c8d0e1dbdf0e
+  CanActAs ecaf163a-ecaf163a-tirai-dealerA::12204a9d883d1158141d8f099d06dd2e42cb52615deb42da5a46f042c8d0e1dbdf0e
+  CanActAs ecaf163a-ecaf163a-tirai-venue::12204a9d883d1158141d8f099d06dd2e42cb52615deb42da5a46f042c8d0e1dbdf0e
+  CanActAs ecaf163a-ecaf163a-tirai-buyer::12204a9d883d1158141d8f099d06dd2e42cb52615deb42da5a46f042c8d0e1dbdf0e
+  CanActAs ecaf163a-ecaf163a-tirai-regulator::12204a9d883d1158141d8f099d06dd2e42cb52615deb42da5a46f042c8d0e1dbdf0e
+  CanActAs ecaf163a-tirai-dealerC::12204a9d883d1158141d8f099d06dd2e42cb52615deb42da5a46f042c8d0e1dbdf0e
+  CanActAs ecaf163a-ecaf163a-tirai-cashissuer::12204a9d883d1158141d8f099d06dd2e42cb52615deb42da5a46f042c8d0e1dbdf0e
+✓ act as borrower
+✓ act as lenderA
+✓ act as lenderB
+✓ act as regulator
+✓ act as cashIssuer
+✓ act as bondIssuer
+✓ act as agent
+✗ act as ecaf163a-talang-valuation-committee
+✗ act as ecaf163a-talang-pricerA
+✗ act as ecaf163a-talang-pricerB
+✗ act as ecaf163a-talang-pricerC
+✗ grant refused (403) act/read as ecaf163a-talang-valuation-committee
+✗ grant refused (403) act/read as ecaf163a-talang-pricerA
+✗ grant refused (403) act/read as ecaf163a-talang-pricerB
+✗ grant refused (403) act/read as ecaf163a-talang-pricerC
+
+=== upload (exit 1) ===
+✗ .daml/dist/talang-repo-1.0.0.dar: 403 {"code":"NA","cause":"A security-sensitive error has been received","correlationId":"91c4decb8c7001b13c92696c5e0d6667","traceId":"91c4decb8c7001b13c92696c5e0d6667","context":{},"resources":[],"errorCategory":-1,"grpcCodeValue":7,"retryInfo":null,"definiteAnswer":null}
+
+=== seed (exit 0) ===
+  UST2Y 98349.17  (US Treasury par yield 2 Yr 4.75% on 10/08/2026, 3.875% coupon, 100,000 face)
+  UST5Y 95666.61  (US Treasury par yield 5 Yr 4.99% on 10/08/2026, 4% coupon, 100,000 face)
+  UST10Y 92517.23  (US Treasury par yield 10 Yr 5.22% on 10/08/2026, 4.25% coupon, 100,000 face)
+marks published: UST2Y 98349.17, UST5Y 95666.61, UST10Y 92517.23
+· repo 1  UST10Y x100 for 8.90M @ 530bp (lender A), substitution to UST5Y x98 pending
+marks published: UST2Y 94415.2
+marks published: UST2Y 98349.17
+· repo 2  UST2Y x50 for 4.79M @ 520bp (lender B), margin call after a -4% stress mark
+· request UST5Y x60 for 5.40M, 2 sealed quotes waiting for the borrower
+· repo 5  UST2Y x30 for 2.80M @ 470bp (lender B), repurchased
+
+=== e2e-mcp (exit 1) ===
+file:///vercel/path0/mcp/server.mjs:25
+  throw new Error(`TALANG_ROLE must be a lender, borrower or regulator role in the parties file, got ${ROLE}`);
+        ^
+
+Error: TALANG_ROLE must be a lender, borrower or regulator role in the parties file, got lenderC
+    at file:///vercel/path0/mcp/server.mjs:25:9
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.21.0
+file:///vercel/path0/node_modules/@modelcontextprotocol/sdk/dist/esm/types.js:2048
+        return new McpError(code, message, data);
+               ^
+
+McpError: MCP error -32000: Connection closed
+    at McpError.fromError (file:///vercel/path0/node_modules/@modelcontextprotocol/sdk/dist/esm/types.js:2048:16)
+    at Client._onclose (file:///vercel/path0/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/protocol.js:267:32)
+    at _transport.onclose (file:///vercel/path0/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/protocol.js:227:18)
+    at ChildProcess.<anonymous> (file:///vercel/path0/node_modules/@modelcontextprotocol/sdk/dist/esm/client/stdio.js:85:31)
+    at ChildProcess.emit (node:events:514:28)
+    at maybeClose (node:internal/child_process:1141:16)
+    at ChildProcess._handle.onexit (node:internal/child_process:306:5) {
+  code: -32000,
+  data: undefined
+}
+
+Node.js v24.21.0
+
+=== governance (exit 1) ===
+✓ governance-core-v1-0.1.0 upload refused (403): using the copy vetted on the participant
+file:///vercel/path0/lib/ledger.mjs:106
+    if (![409, 429, 500, 502, 503, 504].includes(r.status) || /DUPLICATE_COMMAND/.test(msg)) throw new Error(msg);
+                                                                                                   ^
+
+Error: submit 403: {"code":"NA","cause":"A security-sensitive error has been received","correlationId":"b8f9ccc4ebc4b14192b76fdb42e18543","traceId":"b8f9ccc4ebc4b14192b76fdb42e18543","context":{},"resources":[],"errorCategory":-1,"grpcCodeValue":7,"retryInfo":null,"definiteAnswer":null}
+    at submit (file:///vercel/path0/lib/ledger.mjs:106:100)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///vercel/path0/scripts/governance.mjs:64:19
+
+Node.js v24.21.0
+
+=== token-rail (exit 1) ===
+file:///vercel/path0/scripts/token-rail.mjs:33
+if (!up.ok) throw new Error('upload test DAR: ' + JSON.stringify(up.data).slice(0, 200));
+                  ^
+
+Error: upload test DAR: {"code":"NA","cause":"A security-sensitive error has been received","correlationId":"90cfbaf3230382cf40df0d4b29a6ea73","traceId":"90cfbaf3230382cf40df0d4b29a6ea73","context":{},"resources":[],"errorCa
+    at file:///vercel/path0/scripts/token-rail.mjs:33:19
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+Node.js v24.21.0
