@@ -76,8 +76,10 @@ async function openRepo(instrument, qty, principal, termDays, quotes, winner) {
 
 async function seed() {
   const { contracts } = await acs(p.borrower);
-  if (contracts.some((c) => c.tpl === 'RepoTrade' || c.tpl === 'RepoRFQ'))
-    throw new Error('already seeded: repos exist for this borrower');
+  // The open request is the last thing a complete seed leaves; without it a run was
+  // cut short, and seeding again only adds repos.
+  if (contracts.some((c) => c.tpl === 'RepoRFQ' && c.arg.lenders.length > 1 && c.arg.terms.termDays === '14'))
+    throw new Error('already seeded: the open request exists for this borrower');
   const px = await liveMarks();
   const fmt = (n) => (n / 1e6).toFixed(2) + 'M';
 

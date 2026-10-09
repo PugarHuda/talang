@@ -36,22 +36,31 @@ async function allocate(hint) {
 
 // 1. BitSafe's governance package, as released.
 const up = await api('/v2/packages', { method: 'POST', bytes: readFileSync('dars/governance-core-v1-0.1.0.dar') });
-if (!up.ok) throw new Error('upload governance-core-v1: ' + JSON.stringify(up.data).slice(0, 200));
-step('uploaded BitSafe governance-core-v1-0.1.0.dar', null);
+// A shared participant may refuse uploads to app users (403) while the package is
+// already vetted there; the first command against it is the real check.
+if (!up.ok && up.status !== 403) throw new Error('upload governance-core-v1: ' + JSON.stringify(up.data).slice(0, 200));
+step(up.ok ? 'uploaded BitSafe governance-core-v1-0.1.0.dar' : 'governance-core-v1-0.1.0 upload refused (403): using the copy vetted on the participant', null);
 
 // 2. The committee and its three pricing members. On DecMan LocalNet or DevNet the
 //    committee is the decentralized party DecMan created, with the GovernanceRules
 //    DecMan created for it: pass COMMITTEE_PARTY, COMMITTEE_MEMBERS (comma-separated,
 //    3 of them) and COMMITTEE_RULES. Without them the script stands up its own.
 let committee, pricerA, pricerB, pricerC, rules;
-if (process.env.COMMITTEE_PARTY) {
+if (process.env.COMMITTEE_PARTY && process.env.COMMITTEE_RULES) {
   committee = process.env.COMMITTEE_PARTY;
   [pricerA, pricerB, pricerC] = process.env.COMMITTEE_MEMBERS.split(',').map((x) => x.trim());
   rules = process.env.COMMITTEE_RULES;
   step('using the DecMan decentralized party and its GovernanceRules', null, { committee, members: [pricerA, pricerB, pricerC], rules });
 } else {
-  committee = await allocate('talang-valuation-committee');
-  [pricerA, pricerB, pricerC] = [await allocate('talang-pricerA'), await allocate('talang-pricerB'), await allocate('talang-pricerC')];
+  // Parties made beforehand (e.g. in the node operator's console) when the app user
+  // may not allocate: COMMITTEE_PARTY and COMMITTEE_MEMBERS without COMMITTEE_RULES.
+  if (process.env.COMMITTEE_PARTY) {
+    committee = process.env.COMMITTEE_PARTY;
+    [pricerA, pricerB, pricerC] = process.env.COMMITTEE_MEMBERS.split(',').map((x) => x.trim());
+  } else {
+    committee = await allocate('talang-valuation-committee');
+    [pricerA, pricerB, pricerC] = [await allocate('talang-pricerA'), await allocate('talang-pricerB'), await allocate('talang-pricerC')];
+  }
   const rulesTx = await submit(committee, { CreateCommand: { templateId: GOV, createArguments: {
     governanceParty: committee, members: { map: [[pricerA, {}], [pricerB, {}], [pricerC, {}]] }, threshold: '2',
     actionConfirmationTimeout: { microseconds: String(3600e6) }, additionalProposers: null } } });
