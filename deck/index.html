@@ -224,16 +224,16 @@ ul.list{ margin:0; padding-left:1.4rem } ul.list li{ font-size:1.3rem; line-heig
       </div>
       <ul class="ids" style="margin-top:1.2rem; color:var(--on-dark-muted)">
         <li>update <span style="color:var(--on-dark)">12203359acdb…a4138</span> · one node down</li>
-        <li>update <span style="color:var(--on-dark)">1220a204dcd8…b08</span> · 2-of-3 mark</li>
+        <li>update <span style="color:var(--on-dark)">1220db9dfd14…c42b</span> · 2-of-3 mark</li>
       </ul>
     </div>
   </div>
-  <p class="small" style="margin-top:1.4rem">Governance on DevNet: <span class="notyet">not yet</span> waiting on act-as rights for the committee's parties from NODERS (grant refused 403).</p>
+  <p class="small" style="margin-top:1.4rem">One command: <code>bash localnet/demo.sh reset</code>. In DecMan's own UI: <code>media/decman-demo-captioned.mp4</code>. Governance on DevNet: <span class="notyet">not yet</span> waiting on act-as rights for the committee's parties from NODERS (grant refused 403).</p>
 </section>
 
 <!-- 7 · CBTC ON DEVNET -->
 <section class="slide">
-  <div class="meta"><span>06 · Real CBTC on DevNet</span><span>7 / 14</span></div>
+  <div class="meta"><span>06 · Real tokens on DevNet</span><span>7 / 14</span></div>
   <h2>Real CBTC as collateral, <em>through the DA Utility registry</em></h2>
   <div class="grid" style="grid-template-columns:1.25fr 1fr; align-items:start">
     <div class="card tw">
@@ -249,7 +249,7 @@ ul.list{ margin:0; padding-left:1.4rem } ul.list li{ font-size:1.3rem; line-heig
     </div>
     <div>
       <p style="font-size:1.3rem">Choice context and disclosed contracts come from the registry's off-ledger API (<code>lib/registry.mjs</code>). Borrower holds 1 CBTC again after repurchase. 7 of 7 steps, 9 October.</p>
-      <p style="font-size:1.3rem">Cash leg here is desk USDC. Both legs as CIP-0056 allocations (USDCx quotes, CBTC collateral, repurchase as an <code>AllocationRequest</code>) run on a local participant against a registry implementing the Splice interfaces: 8 of 8.</p>
+      <p style="font-size:1.3rem">Cash leg here is desk USDC. <b>Both legs in real tokens</b>, same participant: Canton Coin cash (DevNet tap, quote funded by an Amulet allocation through the Scan registry) and CBTC collateral; award, repurchase, CBTC home. 12 of 12 steps, <code>token-repo-amulet-cbtc-devnet.json</code>.</p>
       <p style="font-size:1.3rem">USDCx on DevNet: <span class="notyet">not yet</span> no DevNet USDCx registry or faucet documented.</p>
     </div>
   </div>
@@ -317,11 +317,12 @@ ul.list{ margin:0; padding-left:1.4rem } ul.list li{ font-size:1.3rem; line-heig
       <tr><th>Run</th><th>Where</th><th>Result</th></tr>
       <tr><td><code>talang-repo</code> 1.0.0 vetted and seeded</td><td>NODERS DevNet <code>hackcanton-devnet-3</code></td><td>Hosted desk reads it live</td></tr>
       <tr><td>CBTC rail</td><td>NODERS DevNet, DA Utility registry</td><td>7 / 7 steps, update ids recorded</td></tr>
+<tr><td>Canton Coin cash + CBTC collateral</td><td>NODERS DevNet, Scan + DA Utility registries</td><td>12 / 12 steps, update ids recorded</td></tr>
       <tr><td>BitSafe 2-of-3 marks · node offline</td><td>DecMan LocalNet, 3 participants</td><td>8 / 8 · 6 / 6 steps</td></tr>
       <tr><td>CIP-0056 token rail · price oracle</td><td>Local Canton 3.4.11 participant</td><td>8 / 8 · 4 / 4 steps</td></tr>
     </table>
   </div>
-  <p class="small" style="margin-top:1rem">CI: GitHub Actions run 37890916049, commit e053a49. Evidence JSON in <code>docs/evidence/</code>. Users or pilots: none yet.</p>
+  <p class="small" style="margin-top:1rem">CI: GitHub Actions run 37917378702, commit 045f9f7. Evidence JSON in <code>docs/evidence/</code>. Users or pilots: none yet.</p>
 </section>
 
 <!-- 12 · WHY CANTON -->
@@ -349,7 +350,7 @@ ul.list{ margin:0; padding-left:1.4rem } ul.list li{ font-size:1.3rem; line-heig
     <div class="card"><span class="pill p-m">then</span><h3 style="margin-top:1rem">Independent marks, regulator node</h3><p>Committee run by independent price providers as a BitSafe decentralized party; an auditor runs an observer node.</p></div>
   </div>
   <div class="card dark" style="margin-top:1.6rem; padding:1.3rem 2rem">
-    <p style="margin:0; font-size:1.25rem"><span class="notyet">not yet</span> &nbsp; Governance committee on DevNet · USDCx on DevNet · live Grofty wallet on TestNet · any pilot user. Pilot success: award in under 10 minutes, two or more lenders quoting, zero rival quotes on any lender node.</p>
+    <p style="margin:0; font-size:1.25rem"><span class="notyet">not yet</span> &nbsp; Governance committee on DevNet · 1.1.0 on DevNet · USDCx on DevNet · live Grofty wallet on TestNet · any pilot user. Pilot success: award in under 10 minutes, two or more lenders quoting, zero rival quotes on any lender node.</p>
   </div>
 </section>
 

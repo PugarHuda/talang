@@ -98,10 +98,13 @@ marks, and wallets for the parties (CIP-0103).
   sealed quotes, open repos, a margin call, a substitution and a repurchase. Package
   `237ad836…54f78194b` is vetted there since 3 October; no update ids were recorded for that run.
 - The valuation committee onboarded through BitSafe DecMan and hosted on three
-  participants: it publishes with one node down and cannot with two (`docs/evidence/`).
+  participants: it publishes with one node down and cannot with two (`docs/evidence/`);
+  a mark confirmed 2 of 3 in DecMan's own UI is recorded in `media/decman-demo-captioned.mp4`.
 - `talang-repo` 1.0.0 is vetted on the NODERS DevNet participant and seeded there; the hosted desk reads it.
-- Real CBTC on DevNet: allocated through the DA Utility registry as repo collateral and released at repurchase (`docs/evidence/cbtc-rail-devnet.json`).
-- Not yet: the governance committee on DevNet, USDCx on DevNet.
+- Real CBTC on DevNet: allocated through the DA Utility registry as repo collateral and released at repurchase (`docs/evidence/cbtc-rail-devnet.json`, 7 of 7 steps).
+- Both legs in real tokens on DevNet: Canton Coin as cash and CBTC as collateral, each allocated through its registry, awarded and repurchased (`docs/evidence/token-repo-amulet-cbtc-devnet.json`, 12 of 12 steps).
+- The desk in a browser: 29/29 Playwright checks through every role and button (`npm run qa:desk`); the hosted read-only API: 45/45 checks (`npm run test:proxy`).
+- Not yet: the governance committee on DevNet, USDCx on DevNet, a live Grofty wallet, any pilot user.
 
 ## Validation log
 

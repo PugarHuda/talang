@@ -6,6 +6,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
   const role = req.body?.role;
   if (!Object.hasOwn(PARTIES, role)) return res.status(400).json({ error: 'unknown role' });
-  try { return res.status(200).json(await acs(PARTIES[role])); }
+  // `since`: the offset of this page's last read, so an unchanged view is not re-sent every poll.
+  try { return res.status(200).json(await acs(PARTIES[role], req.body?.since)); }
   catch (e) { return res.status(502).json({ error: 'ledger unreachable: ' + e.message }); }
 }

@@ -116,7 +116,12 @@ export async function checkWalletSignature({ message, signature, publicKey, part
 const CHALLENGES = new Map();
 export const RECEIPTS = [];
 const TTL = 5 * 60e3;
-const choiceOf = (c) => c.ExerciseCommand ? `${c.ExerciseCommand.choice} on ${c.ExerciseCommand.templateId.split(':').pop()} ${c.ExerciseCommand.contractId}`
+// Anyone who can reach the desk can ask for a challenge, unsigned; without a bound that is a
+// memory leak on demand. Expired ones go first, then the oldest live one.
+const MAX_CHALLENGES = 1000, MAX_RECEIPTS = 5000;
+// The action line is what a wallet user reads before signing: one line, no forged "nonce:" lines.
+const choiceOf = (c) => String(choiceLine(c ?? {})).replace(/[\u0000-\u001f\u007f]/g, ' ');
+const choiceLine = (c) => c.ExerciseCommand ? `${c.ExerciseCommand.choice} on ${c.ExerciseCommand.templateId.split(':').pop()} ${c.ExerciseCommand.contractId}`
   : c.CreateCommand ? `create ${c.CreateCommand.templateId.split(':').pop()}` : Object.keys(c)[0];
 
 // What the wallet shows its user and signs: the role, the exact command, a single-use nonce.
@@ -125,6 +130,8 @@ function challenge(role, command) {
   const message = ['Talang desk command, signed by the wallet that drives this role',
     `role: ${role} (${PARTIES[role]})`, `signer: ${WALLET_ROLES[role]}`, `action: ${choiceOf(command)}`,
     `command: ${JSON.stringify(command)}`, `nonce: ${nonce}`, `issued: ${new Date().toISOString()}`].join('\n');
+  for (const [k, v] of CHALLENGES) if (v.expires < Date.now()) CHALLENGES.delete(k);
+  while (CHALLENGES.size >= MAX_CHALLENGES) CHALLENGES.delete(CHALLENGES.keys().next().value);
   CHALLENGES.set(nonce, { message, role, command: JSON.stringify(command), expires: Date.now() + TTL });
   return message;
 }
@@ -134,8 +141,10 @@ function challenge(role, command) {
 export async function walletSubmit(role, command, auth, submit) {
   const signer = WALLET_ROLES[role];
   if (!signer) return [200, await submit(PARTIES[role], command)];
+  if (typeof command !== 'object' || !command || !(command.ExerciseCommand || command.CreateCommand)) return [400, { error: 'command must be one ExerciseCommand or CreateCommand' }];
   if (!auth) return [401, { error: `${role} is driven by wallet ${signer}: sign this command with it`, walletChallenge: challenge(role, command) }];
-  const nonce = /\nnonce: (.+)\n/.exec(auth.message ?? '')?.[1];
+  if (typeof auth !== 'object' || typeof auth.message !== 'string') return [400, { error: 'walletAuth must carry the signed message' }];
+  const nonce = /\nnonce: (.+)\n/.exec(auth.message)?.[1];
   const c = nonce && CHALLENGES.get(nonce);
   CHALLENGES.delete(nonce);
   if (!c || c.expires < Date.now()) return [401, { error: 'the signed challenge is unknown, used or expired; try again' }];
@@ -147,6 +156,7 @@ export async function walletSubmit(role, command, auth, submit) {
   const tx = await submit(PARTIES[role], command);
   const created = (tx?.transaction?.events ?? []).map((e) => e.CreatedEvent).filter(Boolean)
     .map((e) => ({ templateId: e.templateId, contractId: e.contractId }));
+  if (RECEIPTS.length >= MAX_RECEIPTS) RECEIPTS.shift();
   RECEIPTS.push({ role, signer, message: auth.message, signature: auth.signature, publicKey: auth.publicKey,
     updateId: tx?.transaction?.updateId, created, at: new Date().toISOString() });
   return [200, tx];

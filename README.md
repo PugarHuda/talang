@@ -1,7 +1,23 @@
 # Talang
 
-Landing: https://talang-desk.vercel.app · desk: https://talang-desk.vercel.app/desk
-(read-only; it reads `talang-repo` 1.0.0 contracts seeded on the NODERS DevNet participant) · desk walkthrough: [media/talang-desk-captioned.mp4](media/talang-desk-captioned.mp4) (73 s, captioned screen capture of the local desk, recorded by `scripts/record-desk.mjs`)
+**Live desk:** https://talang-desk.vercel.app/desk (read-only, live DevNet data) · **Landing:** https://talang-desk.vercel.app
+**Pitch video:** [media/talang-pitch.mp4](media/talang-pitch.mp4) (subtitled) · **Desk walkthrough:** [media/talang-desk-captioned.mp4](media/talang-desk-captioned.mp4) · **BitSafe DecMan demo:** [media/decman-demo-captioned.mp4](media/decman-demo-captioned.mp4) · **Deck:** [media/talang-pitch-deck.pdf](media/talang-pitch-deck.pdf)
+
+| Sponsor | What runs, and where the proof is |
+|---|---|
+| **NODERS DevNet** | `talang-repo` 1.0.0 (package `24fdd6f4…3fc3bb`) vetted on `hackcanton-devnet-3` and seeded; the hosted desk reads it live ([run log](docs/evidence/devnet-run.log)). The 1.1.0 upgrade (`a3dc67f1…07bc8`) is vetted on `hackcanton-devnet-3` too (uploaded through the NODERS console on 9 October; the console lists it as Vetted, package id matches `devnet/talang-repo-1.1.0.dar`) and runs on the local sandbox, LocalNet and CI |
+| **CIP-0056 tokens** | A repo with **Canton Coin cash and CBTC collateral** on DevNet, both allocated through their registries and settled at repurchase, 12 of 12 steps ([evidence](docs/evidence/token-repo-amulet-cbtc-devnet.json)); any CIP-0056 instrument by env ([docs/token-legs.md](docs/token-legs.md)). USDCx: not yet (no DevNet registry) |
+| **BitSafe DecMan** | Valuation committee hosted on 3 participants, in one command: `bash localnet/demo.sh reset`; 1-of-3 refused, 2-of-3 executed, survives one node down ([docs/bitsafe.md](docs/bitsafe.md)); the same flow clicked through DecMan's own UI in the [DecMan demo](media/decman-demo-captioned.mp4). On DevNet: not yet |
+| **Grofty / CIP-0103** | The wallet key authorises desk commands by signed single-use challenges; venue fee in USDCx/CC; tested with a stub wallet, not yet run with a live Grofty wallet |
+
+## Verify in 2 minutes
+
+1. **Live desk, one role at a time** (read-only, NODERS DevNet): [regulator](https://talang-desk.vercel.app/desk?role=regulator) sees lifecycle reports and best-execution records with no lender named and no requests or quotes; [lender B](https://talang-desk.vercel.app/desk?role=lenderB) sees its own quotes only; [borrower](https://talang-desk.vercel.app/desk?role=borrower) sees every quote made to it. The same data as JSON: `curl -s -X POST -H 'content-type: application/json' -d '{"role":"regulator"}' https://talang-desk.vercel.app/api/acs`.
+2. **Evidence with update ids** (as returned by the participant; there is no public explorer for it): [Canton Coin + CBTC repo on DevNet](docs/evidence/token-repo-amulet-cbtc-devnet.json) (12 steps), [CBTC collateral on DevNet](docs/evidence/cbtc-rail-devnet.json) (7), [committee on 3 LocalNet nodes](docs/evidence/bitsafe-governed-marks-localnet.json) (8), [one node down, then two](docs/evidence/bitsafe-node-offline-localnet.json) (6).
+3. **BitSafe LocalNet, one command** (Docker, Node 20, `daml build --all` once): `bash localnet/demo.sh reset`. Or watch it: [media/decman-demo-captioned.mp4](media/decman-demo-captioned.mp4) (79 s).
+4. **Tests**: `cd test && daml test` (22 scripts) and `npm run test:proxy` (45 checks, no network). CI [run 37917378702](https://github.com/PugarHuda/talang/actions/runs/37917378702) (commit `045f9f7`) runs the 22 Daml scripts, then the 33 MCP end-to-end checks, governance and the token rail on a Canton sandbox.
+
+DevNet party ids carry the `tirai-` prefix of the NODERS tenant's earlier project; `parties.json` maps them to the desk roles.
 
 A sealed-bid repo desk on Canton. A borrower asks a panel of lenders for cash
 against collateral; each lender's rate and haircut reach the borrower and nobody
@@ -49,7 +65,7 @@ The desk is at `/desk` (`?role=lenderB` opens it as a role); the landing page is
 | **Best execution and loss notices.** | `award` in `daml/Talang.daml` | `bestExecution`, and from every node in `npm run e2e:mcp` |
 | **Venue fee**, bp per annum ACT/360, inside repurchase and roll. | `Venue`, `Repurchase`, `Roll` | `venueFeeOnRepurchase`, `tokenLifecycle` |
 | **Rolls.** | `RollOffer`, `Roll` | `rollToNewRate`, `rollRefusals` |
-| **Three MCP desks**: lender, borrower, regulator. | `mcp/server.mjs` | 19 checks in `scripts/e2e-mcp.mjs` on a Canton participant |
+| **Three MCP desks**: lender, borrower, regulator. | `mcp/server.mjs` | 33 checks in `scripts/e2e-mcp.mjs` on a Canton participant |
 
 ## Build and test
 
@@ -62,8 +78,8 @@ npm run test:proxy          # hosted read-only API, no network or credentials
 ## Tests
 
 Counts are what was observed, with where. "CI" is GitHub Actions run
-[37890916049](https://github.com/PugarHuda/talang/actions/runs/37890916049) (commit
-`e053a49`, local Canton sandbox 3.4.11).
+[37917378702](https://github.com/PugarHuda/talang/actions/runs/37917378702) (commit
+`045f9f7`, local Canton sandbox 3.4.11).
 
 | Suite | Covers | Result | Where observed |
 |---|---|---|---|
@@ -72,6 +88,7 @@ Counts are what was observed, with where. "CI" is GitHub Actions run
 | `npm run e2e:mcp` | Every MCP desk end to end: tool lists per role, privacy read from each node, award, roll offered and withdrawn, substitution declined, margin call refused under 2 hours then answered, claim and default refused early, cancel and withdraw unlock cash, repurchase, regulator exposure | 33 of 33 checks (31 of 31 with two lenders) | Local sandbox on 9 October, and in CI |
 | `npm run qa:desk` | Playwright through every role and every desk button, outcomes re-read from each node; refusals (short haircut, stale mark, early default, bad inputs, double click), privacy in page and API, read-only mode, server hardening, accessible names, 390 px layout | 29 of 29 checks | Local sandbox on 9 October |
 | `scripts/cbtc-rail.mjs` | Real CBTC on DevNet: the faucet's transfer offer accepted through the registry, CBTC allocated through the registry's `AllocationFactory` as repo collateral, award, repurchase cancelling the allocation | 7 of 7 steps | [NODERS DevNet](docs/evidence/cbtc-rail-devnet.json) |
+| `scripts/token-repo.mjs` (`PRESET=cc-cash,cbtc-collateral`) | Both legs real tokens on DevNet: Canton Coin tapped, the lender's quote funded by an Amulet allocation through the Scan registry, CBTC collateral allocated through the DA Utility registry, award, repurchase notice, the borrower's Amulet allocation for the 50.01 due, settlement with CBTC home | 12 of 12 steps | [NODERS DevNet](docs/evidence/token-repo-amulet-cbtc-devnet.json) |
 | `npm run governance` | BitSafe 2-of-3 marks: 1-of-3 refused, 2-of-3 executed, margin call on one pricer's own mark refused | 8 of 8 steps (2 expected refusals) | [local sandbox](docs/evidence/bitsafe-governed-marks-local-sandbox.json); [DecMan LocalNet](docs/evidence/bitsafe-governed-marks-localnet.json), 8 of 8 steps |
 | `scripts/localnet-offline.mjs` | Committee on three LocalNet participants: publishes with one node stopped, cannot with two | 6 of 6 steps (1 expected refusal) | [DecMan LocalNet](docs/evidence/bitsafe-node-offline-localnet.json) |
 | `npm run token-rail` | USDCx-funded sealed quotes, CBTC collateral as an allocation, repurchase read as an `AllocationRequest`, settlement | 8 of 8 steps | [local sandbox](docs/evidence/cip56-token-repo-local-sandbox.json), and in CI |
@@ -98,8 +115,10 @@ Put the M2M client settings in `.env.noders` (gitignored), then `npm run upload`
 (talang-repo and BitSafe's governance DARs), `npm run seed`, `npm run e2e:mcp`,
 `npm run governance` and `npm run desk`, as above without `ENV_FILE`.
 `npm run marks` re-publishes fresh marks; the contract refuses marks older than 24h.
+On the NODERS participant the app user may not upload packages (403, in the
+[run log](docs/evidence/devnet-run.log)), so the DARs go in through the NODERS console.
 
-The package is `talang-repo` 1.0.0, a new package name: the `talang-desk` 0.1.0
+`talang-repo` (1.0.0, then 1.1.0 as a smart-contract upgrade) is a new package name: the `talang-desk` 0.1.0
 package from the first commits was uploaded to the NODERS DevNet participant, and this
 version changes template shapes in ways a smart-contract upgrade may not.
 
@@ -127,8 +146,8 @@ and the regulator's agent sees reports and nothing upstream.
 
 | | Status |
 |---|---|
-| **NODERS DevNet / NaaS** | `talang-desk` 0.1.0 was uploaded to the HackCanton DevNet participant and driven through the desk on 3 October (commit `900da46`; package `237ad836995110225ea8cc6337f8af63d2ed3625d6ee8a5421644b154f78194b`, vetted on participant `hackcanton-devnet-3` since 3 October per the NODERS console); no update ids were recorded for that run. `talang-repo` 1.0.0 (package `24fdd6f484e99f2f5d3c2b84f6e7fdd706ee5eeffed214023347c38bcd3fc3bb`) was uploaded through the NODERS console on 9 October and is vetted on `hackcanton-devnet-3`; the seed ran there from a Vercel build (`scripts/devnet-ci.mjs`), so the hosted desk reads live DevNet repos, margin calls, substitutions, loss notices and best-execution records ([run log](docs/evidence/devnet-run.log)). On DevNet the app user may not upload packages or grant itself rights (both 403), so lender C and the governance committee's parties wait on NODERS granting act-as; the governance run there is **not yet**. |
-| **BitSafe Decentralization Manager** | Valuation committee and lender syndicate as `GovernableAction`s on BitSafe's own `GovernanceRules`. Threshold refusal and execution proven in Daml scripts and on a participant. Also run on a three-participant DecMan LocalNet: the committee is onboarded through DecMan and hosted on all three nodes; with one node stopped it still publishes, with two stopped it cannot ([docs/bitsafe.md](docs/bitsafe.md#decman-localnet-three-participants), [evidence](docs/evidence/bitsafe-node-offline-localnet.json)). |
+| **NODERS DevNet / NaaS** | `talang-desk` 0.1.0 was uploaded to the HackCanton DevNet participant and driven through the desk on 3 October (commit `900da46`; package `237ad836995110225ea8cc6337f8af63d2ed3625d6ee8a5421644b154f78194b`, vetted on participant `hackcanton-devnet-3` since 3 October per the NODERS console); no update ids were recorded for that run. `talang-repo` 1.0.0 (package `24fdd6f484e99f2f5d3c2b84f6e7fdd706ee5eeffed214023347c38bcd3fc3bb`) was uploaded through the NODERS console on 9 October and is vetted on `hackcanton-devnet-3`; the seed ran there from a Vercel build (`scripts/devnet-ci.mjs`), so the hosted desk reads live DevNet repos, margin calls, substitutions, loss notices and best-execution records ([run log](docs/evidence/devnet-run.log)). The 1.1.0 upgrade (`a3dc67f1…07bc8`) on DevNet: not yet recorded in the evidence. On DevNet the app user may not upload packages or grant itself rights (both 403), so lender C and the governance committee's parties wait on NODERS granting act-as; the governance run there is **not yet**. |
+| **BitSafe Decentralization Manager** | Valuation committee and lender syndicate as `GovernableAction`s on BitSafe's own `GovernanceRules`. Threshold refusal and execution proven in Daml scripts and on a participant. Also run on a three-participant DecMan LocalNet: the committee is onboarded through DecMan and hosted on all three nodes; with one node stopped it still publishes, with two stopped it cannot ([docs/bitsafe.md](docs/bitsafe.md#decman-localnet-three-participants), [evidence](docs/evidence/bitsafe-node-offline-localnet.json)). One command: `bash localnet/demo.sh reset`. A mark proposed, confirmed 2 of 3 and executed in DecMan's own UI, with the third node's audit trail: [media/decman-demo-captioned.mp4](media/decman-demo-captioned.mp4). On DevNet: **not yet**. |
 | **CIP-0056: USDCx, CBTC, Canton Coin** | Both legs implemented through the standard `Allocation` / `AllocationRequest` interfaces, tested against a registry implementing them, in Daml scripts and on a participant ([evidence](docs/evidence/cip56-token-repo-local-sandbox.json)). **CBTC is run against the live registry on DevNet** ([evidence](docs/evidence/cbtc-rail-devnet.json)): the BitSafe faucet's transfer offer accepted through the DA Utility registry, CBTC allocated through its `AllocationFactory` (choice context and disclosed contracts from the registry's off-ledger API, `lib/registry.mjs`), held as collateral while the desk's USDC funds the loan, and the allocation cancelled through the registry at repurchase. **Both legs in real tokens on DevNet** ([evidence](docs/evidence/token-repo-amulet-cbtc-devnet.json)): Canton Coin as cash (DevNet tap, the lender's quote funded by an Amulet allocation through the Scan registry's AllocationFactory) and CBTC as collateral; award, repurchase notice, the borrower's Amulet allocation for the 50.01 due, settlement with Amulet to the lender and CBTC home. Any CIP-0056 instrument can be either leg by env (`scripts/token-repo.mjs`, [docs/token-legs.md](docs/token-legs.md)). USDCx: **not yet** on DevNet, where no USDCx registry exists; the TestNet/MainNet presets are ready. |
 | **Grofty Wallet (CIP-0103)** | Grofty signs only standard token operations on its own participant, so Talang does not send its Daml commands through it. Instead the wallet's key **authorises the desk**: a desk role bound to a wallet (`TALANG_WALLET_ROLES`) acts only after the wallet signs a single-use challenge naming the exact command (CIP-0103 `signMessage`); the server checks nonce, signer, Ed25519/P-256 signature and that the key's fingerprint is the party's namespace before submitting (`api/wallet-verify.mjs`). Each signed command leaves a receipt, so a borrower can verify which wallet key sealed a lender's quote while rival lenders see nothing. The venue fee can be paid in USDCx or CC with `prepareExecuteAndWait({receiver, amount, tokenSymbol})` on TestNet or MainNet, network shown on the receipt (`web/wallet.js`, `web/wallet-pay.js`, `web/wallet-receipts.js`). Verified with a stub wallet holding a real Ed25519 key against the local ledger; **not yet run with a live Grofty wallet**. |
 

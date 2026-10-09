@@ -206,7 +206,7 @@ No user interviews have happened yet. Ecosystem conversations that changed the b
 | --- | --- | --- | --- |
 | Users who tried the demo | Not tracked | 0 external | — |
 | Users who completed the core flow | Not tracked | 0 external | — |
-| Transactions on DevNet | Live `talang-repo` contracts read from the NODERS participant | 13 open repos, 23 lifecycle reports, 15 best-execution records, 6 margin calls, 14 loss notices; 1 CBTC-collateral repo and 1 repo with Canton Coin cash and CBTC collateral, both opened and repurchased | same |
+| Transactions on DevNet | Live `talang-repo` contracts read from the NODERS participant through the hosted API (9 October, evening) | 13 open repos, 25 lifecycle reports, 16 best-execution records, 6 margin calls, 14 loss notices; 1 CBTC-collateral repo and 1 repo with Canton Coin cash and CBTC collateral, both opened and repurchased | same |
 | Active parties | Desk parties with act-as on DevNet | 7 (borrower, 2 lenders, regulator, cash issuer, bond issuer, valuation agent) | 12 once NODERS grants lender C and the committee |
 
 ### 6. Success criteria after the hackathon
@@ -241,9 +241,9 @@ Upload `media/talang-pitch-deck.pdf` (max 10 MB).
 
 - **Built and running:** Daml model (RFQ, sealed quotes, award, best execution, loss notices, margin, substitution, roll, repurchase with venue fee, default with excess returned), 22 Daml tests; desk UI per role with a side-by-side privacy view; three MCP agents; hosted desk reading live DevNet data.
 - **On DevNet (NODERS):** `talang-repo` 1.0.0 vetted and seeded; a repo with both legs in real tokens — Canton Coin cash and CBTC collateral, allocated through their registries, awarded and repurchased (docs/evidence/token-repo-amulet-cbtc-devnet.json).
-- **BitSafe:** valuation committee onboarded through DecMan on a 3-participant LocalNet, one command (`bash localnet/demo.sh reset`); 1-of-3 refused, 2-of-3 executed, survives one node down.
+- **BitSafe:** valuation committee onboarded through DecMan on a 3-participant LocalNet, one command (`bash localnet/demo.sh reset`); 1-of-3 refused, 2-of-3 executed, survives one node down; the same flow in DecMan's own UI in `media/decman-demo-captioned.mp4`.
 - **Wallet:** CIP-0103 wallet key authorises desk commands (signed single-use challenges); venue fee payable in USDCx/CC via Grofty.
-- **Not yet:** governance committee on DevNet (waiting on rights from NODERS), USDCx on DevNet, a live Grofty wallet run, user validation.
+- **Not yet:** governance committee on DevNet (waiting on rights from NODERS), `talang-repo` 1.1.0 on DevNet, USDCx on DevNet, a live Grofty wallet run, user validation.
 
 ---
 

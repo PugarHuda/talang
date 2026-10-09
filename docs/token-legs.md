@@ -39,7 +39,7 @@ All checked live on 9 October 2026 with `DRY_RUN=1` (metadata info, instrument, 
 | Preset | Instrument | Admin | Registry base | Status |
 |---|---|---|---|---|
 | `cbtc-collateral` | CBTC (DevNet) | `cbtc-network::12202a83c6f4082217c175e29bc53da5f2703ba2675778ab99217a5a881a949203ff` | DA Utility DevNet | Registry live; collateral allocate + cancel already run on DevNet by `scripts/cbtc-rail.mjs` ([evidence](evidence/cbtc-rail-devnet.json)). CBTC from the BitSafe faucet. |
-| `cc-cash`, `cc-collateral` | Canton Coin, id `Amulet` (DevNet) | `DSO::1220be58c29e65de40bf273be1dc2b266d43a9a002ea5b18955aeef7aac881bb471a` | `https://scan.sv-1.dev.global.canton.network.sync.global` (Scan serves `/registry/...` publicly; `/api/scan/...` is IP-allowlisted) | Registry and factory answer. CC comes from `CC_TAP` (`AmuletRules_DevNet_Tap`, with AmuletRules and OpenMiningRound taken from the registry's disclosed contracts), or the validator wallet's tap. Ledger run: **not yet**. |
+| `cc-cash`, `cc-collateral` | Canton Coin, id `Amulet` (DevNet) | `DSO::1220be58c29e65de40bf273be1dc2b266d43a9a002ea5b18955aeef7aac881bb471a` | `https://scan.sv-1.dev.global.canton.network.sync.global` (Scan serves `/registry/...` publicly; `/api/scan/...` is IP-allowlisted) | Registry and factory answer. CC comes from `CC_TAP` (`AmuletRules_DevNet_Tap`, with AmuletRules and OpenMiningRound taken from the registry's disclosed contracts), or the validator wallet's tap. Run on DevNet with `cbtc-collateral` on 9 October: tap, quote funded by an Amulet allocation, repurchase allocation executed, 12 of 12 steps ([evidence](evidence/token-repo-amulet-cbtc-devnet.json)). |
 | `usdcx-testnet-cash` | USDCx (TestNet) | `decentralized-usdc-interchain-rep::122049e2af8a725bd19759320fc83c638e7718973eac189d8f201309c512d1ffec61` | `https://api.utilities.digitalasset-staging.com/api/token-standard/v0/registrars/<admin>` | Registry answers. Needs a TestNet participant and USDCx minted via the xReserve Sepolia bridge (https://digital-asset.github.io/xreserve-deposits/). Not run. |
 | (env only) | USDCx (MainNet) | `decentralized-usdc-interchain-rep::12208115f1e168dd7e792320be9c4ca720c751a02a3053c7606e1c1cd3dad9bf60ef` | `https://api.utilities.digitalasset.com/api/token-standard/v0/registrars/<admin>` | Registry answers. Not run. |
 | (env only) | Canton Coin (TestNet) | `DSO::1220f22a8b8f2d813c25b9a684dc4dd52b532a0174d8e73a13cdf2baabfff7518337` | `https://scan.sv-1.test.global.canton.network.sync.global` | Registry info answers. No tap on TestNet. Not run. |
@@ -65,6 +65,8 @@ CASH_ADMIN=... CASH_ID=USDCx CASH_REGISTRY_URL=... node scripts/token-repo.mjs
 On DevNet through the Vercel build: `--build-env TALANG_DEVNET_CI=1 --build-env DEVNET_STEPS=rights,token-repo --build-env PRESET=cc-cash,cbtc-collateral`.
 Evidence: `docs/evidence/token-repo-<cash>-<collateral>-<devnet|local-sandbox>.json`.
 
-Unverified until a ledger run: whether the participant has the current `splice-amulet`
-package for the tap (any Splice validator does), and whether a DA Utility allocation
-executes (`execute-transfer`) as cleanly as it cancels; only cancel has been run.
+Run on DevNet (`PRESET=cc-cash,cbtc-collateral`, [evidence](evidence/token-repo-amulet-cbtc-devnet.json)): the tap works on the
+NODERS participant, Amulet allocations execute through the Scan registry, and the CBTC
+allocation is cancelled through the DA Utility registry. Still unverified: whether a DA
+Utility allocation executes (`execute-transfer`) as cleanly as it cancels (CBTC as cash,
+or a CBTC default); only cancel has been run on that registry.

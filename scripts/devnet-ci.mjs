@@ -27,20 +27,28 @@ const STEPS = [
 // DEVNET_STEPS=rights,cbtc-rail runs only those steps (the rest already ran on this node).
 const only = process.env.DEVNET_STEPS?.split(',').map((x) => x.trim());
 mkdirSync('web/evidence', { recursive: true });
+// Never publish anything that looks like a credential, a bearer token or the tenant's endpoints,
+// and redact BEFORE printing too: the Vercel build log is a publication of its own.
+const secrets = ['DEVNET_CLIENT_SECRET', 'DEVNET_CLIENT_ID', 'DEVNET_TOKEN_URL', 'DEVNET_AUDIENCE', 'LEDGER_HMAC_SECRET']
+  .map((k) => process.env[k]?.trim()).filter((v) => v && v.length > 6);
+const ledgers = [process.env.DEVNET_LEDGER_URL, ...(() => { try { return Object.values(JSON.parse(process.env.PARTY_LEDGERS)); } catch { return []; } })()]
+  .filter(Boolean).map((u) => u.trim().replace(/\/$/, ''));
+const redact = (t) => {
+  for (const s of secrets) t = t.split(s).join('[redacted]');
+  // The participant's URL is the tenant's endpoint, not something to publish.
+  for (const u of ledgers) t = t.split(u).join('NODERS HackCanton DevNet participant');
+  return t.replace(/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*/g, '[redacted-jwt]')
+    .replace(/(bearer\s+|"access_token"\s*:\s*")[^\s"]+/gi, '$1[redacted]')
+    .replace(/(client_secret=)[^&\s]+/gi, '$1[redacted]');
+};
 let log = `Talang DevNet evidence run, ${new Date().toISOString()}\n`;
 for (const [name, file] of STEPS.filter(([n]) => !only || only.includes(n))) {
   const r = spawnSync(process.execPath, [file], { encoding: 'utf8', env: process.env, timeout: 10 * 60e3 });
-  const out = `\n=== ${name} (exit ${r.status}) ===\n${r.stdout ?? ''}${r.stderr ?? ''}`;
+  const out = redact(`\n=== ${name} (exit ${r.status}) ===\n${r.stdout ?? ''}${r.stderr ?? ''}`);
   log += out; console.log(out);
 }
-// Belt and braces: never publish anything that looks like a secret or a bearer token.
-const secrets = ['DEVNET_CLIENT_SECRET', 'DEVNET_CLIENT_ID'].map((k) => process.env[k]).filter((v) => v && v.length > 6);
-for (const s of secrets) log = log.split(s).join('[redacted]');
-log = log.replace(/eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[redacted-jwt]');
-// The participant's URL is the tenant's endpoint, not something to publish.
-const scrub = (t) => (process.env.DEVNET_LEDGER_URL ? t.split(process.env.DEVNET_LEDGER_URL.replace(/\/$/, '')).join('NODERS HackCanton DevNet participant') : t);
-writeFileSync('web/evidence/devnet-run.log', scrub(log));
+writeFileSync('web/evidence/devnet-run.log', log);
 for (const f of existsSync('docs/evidence') ? readdirSync('docs/evidence') : []) {
-  if (f.includes('devnet')) writeFileSync(`web/evidence/${f}`, scrub(readFileSync(`docs/evidence/${f}`, 'utf8')));
+  if (f.includes('devnet')) writeFileSync(`web/evidence/${f}`, redact(readFileSync(`docs/evidence/${f}`, 'utf8')));
 }
 console.log('evidence published under web/evidence/');

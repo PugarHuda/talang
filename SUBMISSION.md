@@ -1,9 +1,11 @@
 # Talang · HackCanton Season 3 submission
 
 **Track:** Financial Applications / DeFi
-**Sponsor challenges:** BitSafe Decentralization Manager (Contribution Pool); CIP-0056 token settlement (USDCx, CBTC)
+**Sponsor challenges:** BitSafe Decentralization Manager (Contribution Pool); NODERS DevNet; CIP-0056 token settlement (Canton Coin, CBTC; USDCx not yet)
 **Repo:** https://github.com/PugarHuda/talang
-**Desk walkthrough:** `media/talang-desk-captioned.mp4` (73 s, captioned, recorded against a seeded local ledger by `scripts/record-desk.mjs`). A narrated pitch video: not yet, script below.
+**Live desk:** https://talang-desk.vercel.app/desk (read-only, NODERS DevNet)
+**Videos:** pitch `media/talang-pitch.mp4` (subtitled); desk walkthrough `media/talang-desk-captioned.mp4` (73 s, captioned, recorded against a seeded local ledger by `scripts/record-desk.mjs`); BitSafe DecMan demo `media/decman-demo-captioned.mp4` (79 s, DecMan's own UI on the three-participant LocalNet)
+**Verify in 2 minutes:** README.md, section "Verify in 2 minutes".
 
 ## One line
 
@@ -41,14 +43,15 @@ no single operator can move it.
 
 ## Metrics
 
-Measured today, on a Canton 3.4.11 participant (`npm run e2e:mcp`, `npm run governance`, CI):
+Measured on 9 October: on a Canton 3.4.11 sandbox (`npm run e2e:mcp`, `npm run governance`, `npm run qa:desk`, CI), and with fetch stubbed for the hosted API (`npm run test:proxy`):
 
 | Metric | Value |
 |---|---|
 | Rival quotes visible on any lender node | 0, checked on every run |
 | Requests, quotes or loss notices visible to the regulator | 0 |
 | Repo states seeded through the Ledger API | 6 (sealed, live, substitution pending, margin call, roll, closed with fee) |
-| Daml scripts / MCP end-to-end checks | 19 / 19 |
+| Daml scripts / MCP end-to-end checks | 22 / 33 |
+| Playwright desk checks / read-only API checks | 29 / 45 |
 | Governed mark below threshold | refused by BitSafe's `GovernanceRules` |
 
 Targets for the pilot (BRIEF.md):
@@ -92,9 +95,9 @@ repurchase and every roll, so it cannot be skipped. Built and tested.
 three-participant LocalNet; it publishes with one node down and cannot with two.
 Marks come from live sources (US Treasury par yields, three BTC exchanges).
 
-**On DevNet:** `talang-repo` 1.0.0 vetted on the NODERS participant and seeded; the hosted desk reads it (docs/evidence/devnet-run.log).
+**On DevNet:** `talang-repo` 1.0.0 vetted on the NODERS participant and seeded; the hosted desk reads it (docs/evidence/devnet-run.log). A repo with both legs in real tokens, Canton Coin cash and CBTC collateral, each allocated through its registry, awarded and repurchased, 12 of 12 steps (docs/evidence/token-repo-amulet-cbtc-devnet.json).
 
-**Not yet:** the governance committee on DevNet (waiting on act-as rights from NODERS); USDCx on DevNet (no registry or faucet documented there); Grofty Wallet on TestNet.
+**Not yet:** the governance committee on DevNet (act-as rights granted by NODERS on 9 October; run pending); USDCx on DevNet (no registry or faucet documented there); Grofty Wallet on TestNet.
 
 **Real CBTC on DevNet:** the BitSafe faucet's CBTC accepted, allocated through the DA Utility registry as repo collateral, and released at repurchase (docs/evidence/cbtc-rail-devnet.json). The first version (0.1.0) was
 uploaded to the NODERS DevNet participant and driven through the desk on 3 October
@@ -114,7 +117,8 @@ uploaded to the NODERS DevNet participant and driven through the desk on 3 Octob
    margin call; the governed markdown can.
 5. **(2:30) Life of the repo.** Lender's agent calls margin on a short repo; offers a
    roll; borrower's agent accepts and pays the interest so far plus the venue fee.
-6. **(3:15) Real assets.** `TokenTest`: USDCx quotes and CBTC collateral as standard
-   allocations; repurchase appears in any wallet as an allocation request; default
-   executes the CBTC to the lender.
+6. **(3:15) Real assets.** On DevNet, Canton Coin cash and CBTC collateral as registry
+   allocations, awarded and repurchased (`docs/evidence/token-repo-amulet-cbtc-devnet.json`).
+   `TokenTest`: USDCx quotes; repurchase appears in any wallet as an allocation request;
+   default executes the CBTC to the lender.
 7. **(3:45) Close.** Regulator view: every event, every fee, no losing rate anywhere.

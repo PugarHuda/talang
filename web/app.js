@@ -18,7 +18,8 @@ const units = (n) => N(n).toLocaleString('en-US', { maximumFractionDigits: 4 });
 const pct = (n) => (N(n) * 100).toFixed(2) + '%';
 const when = (t) => new Date(t).toLocaleString();
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const roleOf = (party) => Object.entries(CFG.parties).find(([, v]) => v === party)?.[0] ?? party.split('::')[0];
+// A party this desk has no role for (lender C on DevNet) shows by the last word of its hint, e.g. dealerC.
+const roleOf = (party) => Object.entries(CFG.parties).find(([, v]) => v === party)?.[0] ?? party.split('::')[0].split('-').pop();
 const NAMES = { borrower: 'Borrower', lenderA: 'Lender A', lenderB: 'Lender B', lenderC: 'Lender C', regulator: 'Regulator', agent: 'Agent', venue: 'Venue' };
 const LENDERS = ['lenderA', 'lenderB', 'lenderC'];
 const name = (party) => esc(NAMES[roleOf(party)] ?? roleOf(party));
@@ -315,13 +316,15 @@ function sbsCard(role, res) {
     <p class="verdict">${sbsVerdict(role, c)}</p><p class="off">offset ${esc(res.value.offset)}</p></div>`;
 }
 
-async function sideBySide() {
+async function sideBySide(force) {
   const roles = deskRoles();
-  const res = await Promise.allSettled(roles.map((role) => post('/api/acs', { role })));
+  const res = await Promise.allSettled(roles.map((role) => read(role)));
   const ok = res.filter((r) => r.status === 'fulfilled');
   if (!ok.length) throw res[0]?.reason ?? new Error('no roles');
   $('#status').textContent = `● live · ${Math.max(...ok.map((r) => r.value.offset))}`; $('#status').className = 'status';
   if (!SBS) return; // left the view while the reads were in flight
+  if (!force && res.every((r) => r.status === 'fulfilled' && r.value.same) && Date.now() - painted < 60000) return;
+  painted = Date.now();
   $('#view').innerHTML = `<section class="sbs-head"><div><p class="kicker">Side by side</p><h1>Every role, its own node</h1></div>
     <p class="note">Each column is one read of that party's active contracts, the same read the desk makes when acting as it. Nothing is filtered by this page.</p></section>
     <div class="sbs" id="sbs">${roles.map((r, i) => sbsCard(r, res[i])).join('')}</div>`;
@@ -462,18 +465,33 @@ document.addEventListener('click', async (e) => {
 });
 
 // ---- refresh ----
+// Last read per role. The next poll sends its offset as `since`; a server that finds nothing
+// new for that party answers `unchanged` and the contracts are not sent again.
+const LAST = {};
+async function read(role) {
+  const prev = LAST[role];
+  const r = await post('/api/acs', { role, ...(prev ? { since: prev.offset } : {}) });
+  if (r.unchanged && prev) return (LAST[role] = { ...prev, offset: r.offset, same: true });
+  const same = !!prev && JSON.stringify(r.contracts) === JSON.stringify(prev.contracts);
+  return (LAST[role] = { offset: r.offset, contracts: r.contracts, same });
+}
+let painted = 0;
 async function refresh(force) {
   // Never repaint under a field being typed in.
   if (!force && (busy || document.activeElement?.matches('input, select.in'))) return;
   const role = ROLE;
   try {
-    if (SBS) return await sideBySide();
-    const r = await post('/api/acs', { role });
+    if (SBS) return await sideBySide(force);
+    const r = await read(role);
     // Switched to side by side, or to another role, while this read was in flight: painting
     // it now would show the previous role's contracts under the new role's name.
     if (SBS || role !== ROLE) return;
     DATA = r.contracts;
     $('#status').textContent = `● live · ${r.offset}`; $('#status').className = 'status';
+    // Same contracts: keep the page (and keyboard focus) as it is; repaint once a minute so
+    // clock-based labels (fresh/stale mark, past maturity) still move.
+    if (!force && r.same && Date.now() - painted < 60000) return;
+    painted = Date.now();
     $('#view').innerHTML = (VIEWS[ROLE] ?? venueView)();
   } catch (err) {
     $('#status').textContent = '● ' + err.message; $('#status').className = 'status err';
@@ -497,7 +515,10 @@ function rolePills() {
 
 async function start() {
   CFG = await (await fetch('/api/config')).json();
-  // ?role= or a remembered role this desk does not run (a typo, an issuer, a venue-less ledger).
+  // Roles this ledger has no party for (lender C and the venue on DevNet) get no pill:
+  // picking one would only ask the API for an unknown role.
+  [...$('#role').options].forEach((o) => CFG.parties[o.value] || o.remove());
+  // ?role=or a remembered role this desk does not run (a typo, an issuer, a venue-less ledger).
   if (!CFG.parties[ROLE] || ![...$('#role').options].some((o) => o.value === ROLE)) ROLE = 'borrower';
   syncReadOnly();
   $('#wallet').onclick = async () => {

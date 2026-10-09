@@ -96,7 +96,7 @@
       </div>
 
       <figure class="chip code">
-        <figcaption><span>daml/Talang.daml</span><span>L446</span></figcaption>
+        <figcaption><span>daml/Talang.daml</span><span>L455</span></figcaption>
 <pre id="daml"><code><span class="k">template</span> <span class="t">RepoQuote</span>
   <span class="k">with</span>
     borrower : <span class="t">Party</span>
@@ -131,7 +131,7 @@
   <section class="stats" aria-label="Measured on a Canton 3.4.11 participant">
     <div><b>0</b><span>rival quotes visible on any lender node, checked every run</span></div>
     <div><b>0</b><span>requests, quotes or loss notices visible to the regulator</span></div>
-    <div><b>19 / 19</b><span>Daml scripts and MCP end-to-end checks passing</span></div>
+    <div><b>22 / 22</b><span>Daml scripts passing, plus 33 / 33 MCP end-to-end checks on a participant</span></div>
     <div><b>6</b><span>repo states seeded through the Ledger API</span></div>
   </section>
 
@@ -211,7 +211,7 @@
       <ul class="facts">
         <li>Uses BitSafe's released <code>governance-action-v1</code> and <code>governance-core-v1</code> DARs unchanged.</li>
         <li>Threshold refusal and execution proven in Daml scripts and on a Canton participant.</li>
-        <li class="muted">The three-participant DecMan LocalNet run is written up, not yet run.</li>
+        <li>Run on a three-participant DecMan LocalNet: it still publishes with one node down, not with two.</li>
       </ul>
     </div>
   </section>
@@ -224,7 +224,8 @@
       <ul class="facts">
         <li>Repurchase appears in any CIP-0056 wallet as a standard allocation request.</li>
         <li>Built and tested on the <code>Allocation</code> / <code>AllocationRequest</code> interfaces, against a registry implementing them.</li>
-        <li class="muted">Not yet run against a live registry.</li>
+        <li>CBTC and Canton Coin run through their live registries on DevNet.</li>
+        <li class="muted">USDCx not yet: DevNet has no USDCx registry.</li>
       </ul>
     </div>
     <div class="wallet glass" aria-label="Example wallet allocation request">

@@ -3,6 +3,21 @@
 Researched 9 October 2026. Every item has a source, an effort (S < 1 h, M 1-3 h,
 L > 3 h) and a sketch naming Talang files. "Unverified" means no doc confirmed it.
 
+**Status at submission (9 October, evening).** This note was written before the work;
+what happened to each item:
+
+| Item | Status |
+|---|---|
+| 1. Real CBTC on DevNet | Done: [evidence/cbtc-rail-devnet.json](evidence/cbtc-rail-devnet.json), 7 of 7 steps |
+| 2. CIP-0103 primary account | Done: `web/wallet.js` asks for `getPrimaryAccount` |
+| 3. Featured-app activity marker | Not done |
+| 4. Minimum transfer amount, 5. haircut schedule | Not in the submitted 1.1.0 package |
+| 6. Cross-trade netting | Not done |
+| 7. Canton Coin as the cash leg | Done on DevNet through the Scan registry: [evidence/token-repo-amulet-cbtc-devnet.json](evidence/token-repo-amulet-cbtc-devnet.json), 12 of 12 steps |
+| 8. USDCx on DevNet | Still blocked: no DevNet admin party found |
+
+The "1.0.0 is not on DevNet yet" remarks below date from before the upload; it is vetted there now.
+
 Already in Talang (no work needed): ACT/360 interest (`interest` in
 `daml/Talang.daml`), haircut per quote, substitution with lender consent, rolls,
 per-trade GMRA-style close-out on `Default` (lender keeps what is owed at the call's

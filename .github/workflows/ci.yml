@@ -8,7 +8,7 @@ on:
 
 jobs:
   daml:
-    name: Daml build + 19 scripts
+    name: Daml build + 22 scripts
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
