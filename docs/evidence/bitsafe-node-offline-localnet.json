@@ -1,29 +1,29 @@
 {
   "ledger": "DecMan LocalNet: 3 Canton 3.5.8 participants",
-  "committee": "talang-valuation-committee::12204843e66ceded5e65fe3086bccc1f44831f43c13164f30174c9cdb33a09ac7772",
-  "ranAt": "2026-10-09T08:41:02.447Z",
+  "committee": "talang-valuation-committee::12206b9726fc15e0cb4f9ec3bf325cef3ceea0e8dd00571a76ce886a956dd580fcf6",
+  "ranAt": "2026-10-09T10:08:27.907Z",
   "steps": [
     {
-      "step": "stop participant3 ok at 2026-10-09T08:40:12.446582779Z"
+      "step": "stop participant3 ok at 2026-10-09T10:07:20.557465684Z"
     },
     {
       "step": "participant 3 down: mark UST10Y 97,500 published by members on nodes 1 and 2",
-      "updateId": "12201698d9cb3c2af47ffc23394aed2dd579b3af129ee7baff7b6a97e3e43147fd2a",
-      "mark": "00ac2b4c522183fa7dd8d8bf63b22886ae4d5d9eb41f91217b45e727fd04739483ca121220e0ff8a5fd04c50eaddc45f1fbc20ce07694d1bb7911806e565b5ab817bf9d5f9"
+      "updateId": "12203359acdbd90ffea69d77b4163c20f0fb848d79e93619abe48ed476a62e0a4138",
+      "mark": "000bd8f8a07bbfdfddcb37c12adde9fcf34b4558454937d5fd462119203d6e2bc5ca121220ad033b7f2a7a76e1ae7a98c7c6767a9294f5e8e3b4620c57104ebaf5b8c67386"
     },
     {
-      "step": "stop participant2 ok at 2026-10-09T08:40:21.676376089Z"
+      "step": "stop participant2 ok at 2026-10-09T10:07:28.723323834Z"
     },
     {
       "step": "participants 2 and 3 down: publish failed",
       "refused": true,
-      "reason": "stopped at: confirm by member on node 1 (GovernanceRules is signed by the committee, so its hosting nodes must confirm): This operation was aborted"
+      "reason": "stopped at: confirm by member on node 1 (GovernanceRules is signed by the committee, so its hosting nodes must confirm): submit gave up after retries"
     },
     {
-      "step": "start participant2 ok at 2026-10-09T08:40:47.438375541Z"
+      "step": "start participant2 ok at 2026-10-09T10:08:13.150814590Z"
     },
     {
-      "step": "start participant3 ok at 2026-10-09T08:40:57.368616489Z"
+      "step": "start participant3 ok at 2026-10-09T10:08:22.413836986Z"
     }
   ]
 }

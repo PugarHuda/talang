@@ -1,8 +1,8 @@
 {
   "ledger": "DecMan LocalNet: 3 Canton 3.5.8 participants, committee hosted on all three (threshold 2)",
-  "ranAt": "2026-10-09T08:38:25.924Z",
+  "ranAt": "2026-10-09T10:07:19.462Z",
   "packages": [
-    "talang-repo-1.0.0",
+    "talang-repo (1.0.0, or its 1.1.0 upgrade where vetted)",
     "governance-core-v1-0.1.0 (BitSafe, unmodified)",
     "governance-action-v1-0.1.0 (BitSafe, unmodified)"
   ],
@@ -12,13 +12,13 @@
     },
     {
       "step": "using the DecMan decentralized party and its GovernanceRules",
-      "committee": "talang-valuation-committee::12204843e66ceded5e65fe3086bccc1f44831f43c13164f30174c9cdb33a09ac7772",
+      "committee": "talang-valuation-committee::12206b9726fc15e0cb4f9ec3bf325cef3ceea0e8dd00571a76ce886a956dd580fcf6",
       "members": [
-        "talang-valuation-committee-member-p1::12208b354f67b399f7d46bd55acaae9b99de1f73a98b4dd5a51d0234c2d53c57ee7a",
-        "talang-valuation-committee-member-p2::12200d60d316044b6e87ccafc5c0defc4ebe3c04abcff85786a87b9ccab10d6147e2",
-        "talang-valuation-committee-member-p3::1220846922ed0b508d5385a0c10a897db4ce7869d633c17a6c6e13720b2327e06b6f"
+        "talang-valuation-committee-member-p1::12206069e5f772963f0a09f9de1da36b0079acc06195f348b0f83b0f0c8ab3507db6",
+        "talang-valuation-committee-member-p2::1220d36e468af674b19634eb04df321c4e629a84e722660b8dc38fc81f673d227255",
+        "talang-valuation-committee-member-p3::122078a46e358f9b8a7827d20123f488fedefc292fc6bedf49fd00b216fb48c92e4f"
       ],
-      "rules": "00da6f3a315b1b1a7a35ad1bcdc3a2af2edce39645edd563dbd73e5acea14869afca12122097567f5bb7ca84e62f4d3e8db1e4146eeec1faa3cd13d17c1b89743a58250344"
+      "rules": "00b10b2bd8085726cd2d326051329e74674605e525422edd137ed8f46c28410d82ca1212207b765349339920c67e6610f088ff3fca80a48d953fed5beda1f5900764e69eb9"
     },
     {
       "step": "MarkProposal UST10Y 98,000 with 1 of 3 confirmations",
@@ -27,15 +27,15 @@
     },
     {
       "step": "MarkProposal UST10Y 98,000 executed with 2 of 3: Mark signed by the committee",
-      "updateId": "12205cf603d77acb5d70421c8b090070611b3a0aecc6f4092e017693168ce45e1344",
+      "updateId": "1220a204dcd818f79d27b47ebc034a406ee63186f4433649ff59d367b1b0ce915b08",
       "offset": 87,
-      "mark": "0063878f5894613eae062bc4858fccaf07fbd177d321f924a67611b413c8f2e317ca12122058ca260cdf679efbcec3744916f198a1c4850bd6fb3ac7580c71e81cd2ea26a1"
+      "mark": "0081458ceee4eb122c21d669993cde2a36eee6f8141ac83664d24804ee0b466b94ca121220ba229e8c67f1af4fc060797eba72ef7e68dd3f6ca574a29b6894aaa70b189473"
     },
     {
       "step": "repo opened on the committee mark (agent = the decentralized party)",
-      "updateId": "12205919870368cc7e786b9a105324ad6631eacae5e7002d3f51667784831f1e18f8",
+      "updateId": "122084518c6c871d88c00d9c49b4f46fba1fe72c120139dc19bd9ccb318fc285a5ce",
       "offset": 94,
-      "trade": "00fdc88ac0d94e8c263f4212d20506ef68d172e8d0c0733b9c1cced80eaaff5a57ca121220547802202c6e9ed8be3c69fb0df3ffa55d7e58c42b400bc664f69094080e7d91"
+      "trade": "00fc6661f7befe73bb9cee863bcfb8d631edb8a80457b214575125c0760729bb8cca121220a86b45d14194a6e4bd702d2e5f3a9eec0c92a7986d5e812a7181ae2eca617ebb"
     },
     {
       "step": "margin call on one pricer's own mark at 50,000",
@@ -44,15 +44,15 @@
     },
     {
       "step": "governed markdown UST10Y 92,000 executed with 2 of 3",
-      "updateId": "122013b94c952cc5f75c391fb697cf31aac7076499a3f39e25b3c61ef197e4f4ddc5",
+      "updateId": "1220aa013550c0868ef0c9f098e9ae7b604e476ecc43dd1e77a8376401d585b37852",
       "offset": 111,
-      "mark": "007a259d0322e1e0f9c6c6326f533d4db1d756f1af122057604ce3e32a60329e2cca121220e6c14a97bfedae76f8775a4fb03ed69f4daab35e3e81912e1761161f515b8103"
+      "mark": "00aa5327fce982bb82a8172b2509f479afc73ef05dec3bfca2252754a6f20f3790ca121220f7ab8d3e8bfeb029915d9ef8111ce2c2a22604c7b9f4ad8e85c9d270a2fca280"
     },
     {
       "step": "margin call issued on the governed mark",
-      "updateId": "12207343847dbabc81170f029004d94a13538530d2ebcec7c6c82326183a44d5fa89",
+      "updateId": "12201db54fef868a4511ceebec32b2c7b20f9523ff2cce611cfcac8f3bfff964ddbe",
       "offset": 111,
-      "marginCall": "000917b3e57ab03f90c5ed66da3738839d015e3499affeb4faf753f99d4e263cc7ca121220c68838b8a31126e122a1f932b96ce92b6f56b42427dc68f198c319688214437d"
+      "marginCall": "00948a9be70e9495b5b9c328820903174e152f0d071ba98dc52dd8df6e438fb650ca121220fd8944f7a5d9e48c26d99a6e2b234c2446b5241f2864abd79e9d1bb768395fec"
     }
   ]
 }

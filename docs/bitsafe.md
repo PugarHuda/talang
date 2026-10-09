@@ -46,6 +46,8 @@ the threshold and the authority flow, not the hosting topology.
 
 ## DecMan LocalNet: three participants
 
+One command, from a clean checkout after `daml build --all`: `bash localnet/demo.sh reset` (verified from an empty LocalNet on 9 October; it runs every step below and prints where the evidence is).
+
 The committee hosted on three participants, set up through BitSafe DecMan's own
 API, then driven by the same scripts as above. Everything is in `localnet/`:
 one Canton 3.5.8 process (the build in Splice 0.6.12; DecMan v1.13.0 needs protocol
