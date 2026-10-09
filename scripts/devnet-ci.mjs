@@ -19,10 +19,13 @@ const STEPS = [
   ['e2e-mcp', 'scripts/e2e-mcp.mjs'],
   ['governance', 'scripts/governance.mjs'],
   ['token-rail', 'scripts/token-rail.mjs'],
+  ['cbtc-rail', 'scripts/cbtc-rail.mjs'],
 ];
+// DEVNET_STEPS=rights,cbtc-rail runs only those steps (the rest already ran on this node).
+const only = process.env.DEVNET_STEPS?.split(',').map((x) => x.trim());
 mkdirSync('web/evidence', { recursive: true });
 let log = `Talang DevNet evidence run, ${new Date().toISOString()}\n`;
-for (const [name, file] of STEPS) {
+for (const [name, file] of STEPS.filter(([n]) => !only || only.includes(n))) {
   const r = spawnSync(process.execPath, [file], { encoding: 'utf8', env: process.env, timeout: 10 * 60e3 });
   const out = `\n=== ${name} (exit ${r.status}) ===\n${r.stdout ?? ''}${r.stderr ?? ''}`;
   log += out; console.log(out);
