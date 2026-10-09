@@ -1,0 +1,114 @@
+{
+  "ledger": "NODERS HackCanton DevNet participant",
+  "ranAt": "2026-10-09T10:23:25.991Z",
+  "preset": [
+    "cc-cash",
+    "cbtc-collateral"
+  ],
+  "cash": {
+    "admin": "DSO::1220be58c29e65de40bf273be1dc2b266d43a9a002ea5b18955aeef7aac881bb471a",
+    "id": "Amulet",
+    "url": "https://scan.sv-1.dev.global.canton.network.sync.global",
+    "instrumentId": {
+      "admin": "DSO::1220be58c29e65de40bf273be1dc2b266d43a9a002ea5b18955aeef7aac881bb471a",
+      "id": "Amulet"
+    }
+  },
+  "collateral": {
+    "admin": "cbtc-network::12202a83c6f4082217c175e29bc53da5f2703ba2675778ab99217a5a881a949203ff",
+    "id": "CBTC",
+    "url": "https://api.utilities.digitalasset-dev.com/api/token-standard/v0/registrars/cbtc-network%3A%3A12202a83c6f4082217c175e29bc53da5f2703ba2675778ab99217a5a881a949203ff",
+    "instrumentId": {
+      "admin": "cbtc-network::12202a83c6f4082217c175e29bc53da5f2703ba2675778ab99217a5a881a949203ff",
+      "id": "CBTC"
+    }
+  },
+  "steps": [
+    {
+      "step": "DevNet tap: 200 CC to ecaf163a-ecaf163a-tirai-dealerA",
+      "updateId": "122091ec823504058bf1c441417d8f8c5bae44c522a0dcba7ecc8c177a1bcacdd4d7",
+      "offset": 2722195
+    },
+    {
+      "step": "DevNet tap: 200 CC to ecaf163a-ecaf163a-tirai-buyer",
+      "updateId": "1220e2b4e652825a9ea8ad580f6e2ad8794858023cc9f5e5cf786cfee91664e0dc70",
+      "offset": 2722201
+    },
+    {
+      "step": "balances: lender A 200 Amulet, borrower 200 Amulet"
+    },
+    {
+      "step": "balance: borrower 1 CBTC"
+    },
+    {
+      "step": "RepoRFQ: 50 Amulet against 0.001 CBTC, 1 day",
+      "updateId": "1220ed18c7a58edc44988f11d7cfe9193ae289056dce0058c057a3f059bffbb4031b",
+      "offset": 2722210
+    },
+    {
+      "step": "50 Amulet allocated ecaf163a-ecaf163a-tirai-dealerA -> ecaf163a-ecaf163a-tirai-buyer (cash)",
+      "updateId": "12206788ad8bfa6bbf95b7c519ec58228eafb23593376751702384c913b63637a94c",
+      "offset": 2722219,
+      "allocationCid": "004b044ba4b0525a7c8d225d004977ea5658a3ecaf21a877cd2e573aeb2af557baca12122015db87c76843fb9ea698efdcfa1cd02d442d7d3a0df1f2dd241dd39150fa3ce0",
+      "allocationTemplate": "8fe7573f5535dc5b910a1f24d7d980da0e10ab38f8d29cb397146119bbfb7b3a:Splice.AmuletAllocation:AmuletAllocation",
+      "factoryId": "009f00e5bf00640118d849080aaf22bc963a8458d322585cebf1119cb7bf37a955ca11122065b775fb8a4199904ed32fa9277fd9c0e82bb82319a7151249df124182072381",
+      "disclosedContracts": [
+        "fb10433a48c24f30076a7aee03a3e314b7ab02fe9a22e2069e3af92d2b6ac88a:Splice.AmuletRules:AmuletRules",
+        "8fe7573f5535dc5b910a1f24d7d980da0e10ab38f8d29cb397146119bbfb7b3a:Splice.Round:OpenMiningRound",
+        "8fe7573f5535dc5b910a1f24d7d980da0e10ab38f8d29cb397146119bbfb7b3a:Splice.ExternalPartyConfigState:ExternalPartyConfigState",
+        "a5b055492fb8f08b2e7bc0fc94da6da50c39c2e1d7f24cd5ea8db12fc87c1332:Splice.ExternalPartyAmuletRules:ExternalPartyAmuletRules"
+      ]
+    },
+    {
+      "step": "sealed quote funded by a Amulet allocation",
+      "updateId": "1220c35548152d6074ce5a021a4dc2b23bc58501b09660a72326f21a176628ebbd2b",
+      "offset": 2722228
+    },
+    {
+      "step": "0.001 CBTC allocated ecaf163a-ecaf163a-tirai-buyer -> ecaf163a-ecaf163a-tirai-dealerA (collateral)",
+      "updateId": "1220896fca98deaf5cf27f4def1f023d76634e071c16bef4f0bba70dad637734ee24",
+      "offset": 2722235,
+      "allocationCid": "00f4a617edb1ecf3183662d1e72a84ac03988bc1814c35e166710ded5d57706414ca121220e3c3279494d574cd9307bef904a9dc49f173a51207b4d82a941805f5f9aec994",
+      "allocationTemplate": "8c654487d9f5fb195fbcdd7b44cd8e365b1ea39c15ae62ce6c7a48343f1210dd:Utility.Registry.V0.Holding.Allocation:DvpLegAllocation",
+      "factoryId": "00d58a5f061f086b3c4b405b57ca08f4cefcb7f3a27a26089be6388eb62ee619a8ca1112200991d565daa04ca691901bc04238a8655e2c068039130e4c00027eac2675d9f4",
+      "disclosedContracts": [
+        "82798df018301852704f210b97adaabf76d3ecd37d889e1bf96b5f31a20eea34:Utility.Registry.App.V0.Service.AllocationFactory:AllocationFactory",
+        "ed73d5b9ab717333f3dbd122de7be3156f8bf2614a67360c3dd61fc0135133fa:Utility.Registry.V0.Configuration.Instrument:InstrumentConfiguration"
+      ]
+    },
+    {
+      "step": "award: Amulet to the borrower, CBTC held for the lender",
+      "updateId": "1220a909b4339a1a89ab1c5f435a35d10f5441ae1310c0a3dd8c85c88f8f97152572",
+      "offset": 2722249,
+      "trade": "0053bc3898393840300bc1a82efce5d66e633af6e3c45e6bd06451a69208175337ca121220579e1f0ad86f8157add695ef0364aaa683025eda185f3c700c91a6e6e92c428c",
+      "borrowerCash": 250
+    },
+    {
+      "step": "repurchase notice: 50.0100000000 Amulet due to lender A",
+      "updateId": "12203509316b7aa57061be42cadc11dcaaf390c46ff6bab13ec3d176e2c86f2ab5f6",
+      "offset": 2722258,
+      "due": "50.0100000000"
+    },
+    {
+      "step": "50.0100000000 Amulet allocated ecaf163a-ecaf163a-tirai-buyer -> ecaf163a-ecaf163a-tirai-dealerA (repurchase)",
+      "updateId": "122094bc4fb1e4ca192f93e4222fcacc46c2d281418e13916716165622bceffe6264",
+      "offset": 2722305,
+      "allocationCid": "006241c224261926aa0439be5f5fd1be40884b4d2b12bfcb0c007cad1d254ab2f9ca1212205146c63d229533065f23475745ded81c27e9c847a520a670b0f17f2087192ed8",
+      "allocationTemplate": "8fe7573f5535dc5b910a1f24d7d980da0e10ab38f8d29cb397146119bbfb7b3a:Splice.AmuletAllocation:AmuletAllocation",
+      "factoryId": "009f00e5bf00640118d849080aaf22bc963a8458d322585cebf1119cb7bf37a955ca11122065b775fb8a4199904ed32fa9277fd9c0e82bb82319a7151249df124182072381",
+      "disclosedContracts": [
+        "fb10433a48c24f30076a7aee03a3e314b7ab02fe9a22e2069e3af92d2b6ac88a:Splice.AmuletRules:AmuletRules",
+        "8fe7573f5535dc5b910a1f24d7d980da0e10ab38f8d29cb397146119bbfb7b3a:Splice.Round:OpenMiningRound",
+        "8fe7573f5535dc5b910a1f24d7d980da0e10ab38f8d29cb397146119bbfb7b3a:Splice.ExternalPartyConfigState:ExternalPartyConfigState",
+        "a5b055492fb8f08b2e7bc0fc94da6da50c39c2e1d7f24cd5ea8db12fc87c1332:Splice.ExternalPartyAmuletRules:ExternalPartyAmuletRules"
+      ]
+    },
+    {
+      "step": "repurchase: Amulet to the lender, CBTC home to the borrower",
+      "updateId": "12208b74e3f23241d5bd1e505b2dc6a474ace6681e9ed4f5e943c1bd421525691ef6",
+      "offset": 2722329,
+      "lenderCashAfter": 200.01,
+      "borrowerCollateralAfter": 1
+    }
+  ]
+}
