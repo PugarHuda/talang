@@ -20,6 +20,8 @@ const STEPS = [
   ['governance', 'scripts/governance.mjs'],
   ['token-rail', 'scripts/token-rail.mjs'],
   ['cbtc-rail', 'scripts/cbtc-rail.mjs'],
+  // Any CIP-0056 legs by env, e.g. --build-env PRESET=cc-cash (scripts/token-repo.mjs, docs/token-legs.md).
+  ['token-repo', 'scripts/token-repo.mjs'],
   ['tidy', 'scripts/devnet-tidy.mjs'],
 ];
 // DEVNET_STEPS=rights,cbtc-rail runs only those steps (the rest already ran on this node).
