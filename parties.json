@@ -2,7 +2,7 @@
   "borrower": "ecaf163a-ecaf163a-tirai-buyer::12204a9d883d1158141d8f099d06dd2e42cb52615deb42da5a46f042c8d0e1dbdf0e",
   "lenderA": "ecaf163a-ecaf163a-tirai-dealerA::12204a9d883d1158141d8f099d06dd2e42cb52615deb42da5a46f042c8d0e1dbdf0e",
   "lenderB": "ecaf163a-ecaf163a-tirai-dealerB::12204a9d883d1158141d8f099d06dd2e42cb52615deb42da5a46f042c8d0e1dbdf0e",
-  "lenderC": "ecaf163a-tirai-dealerC::12204a9d883d1158141d8f099d06dd2e42cb52615deb42da5a46f042c8d0e1dbdf0e",
+  "lenderC": "ecaf163a-ecaf163a-tirai-dealerC::12204a9d883d1158141d8f099d06dd2e42cb52615deb42da5a46f042c8d0e1dbdf0e",
   "regulator": "ecaf163a-ecaf163a-tirai-regulator::12204a9d883d1158141d8f099d06dd2e42cb52615deb42da5a46f042c8d0e1dbdf0e",
   "cashIssuer": "ecaf163a-ecaf163a-tirai-cashissuer::12204a9d883d1158141d8f099d06dd2e42cb52615deb42da5a46f042c8d0e1dbdf0e",
   "bondIssuer": "ecaf163a-ecaf163a-tirai-bondissuer::12204a9d883d1158141d8f099d06dd2e42cb52615deb42da5a46f042c8d0e1dbdf0e",

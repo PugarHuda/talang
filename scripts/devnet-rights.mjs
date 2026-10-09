@@ -10,3 +10,13 @@ const acts = new Set(rights.filter((l) => l.startsWith('CanActAs')).map((l) => l
 for (const [role, party] of Object.entries(PARTIES)) console.log(`${acts.has(party) ? '✓' : '✗'} act as ${role}`);
 for (const party of [process.env.COMMITTEE_PARTY, ...(process.env.COMMITTEE_MEMBERS ?? '').split(',')].filter(Boolean))
   console.log(`${acts.has(party) ? '✓' : '✗'} act as ${party.split('::')[0]}`);
+
+// Parties made in the node operator's console after this user was set up: try to
+// grant it act and read on them. A participant that keeps rights admin-only refuses.
+const missing = [PARTIES.lenderC, process.env.COMMITTEE_PARTY, ...(process.env.COMMITTEE_MEMBERS ?? '').split(',')]
+  .filter((x) => x && !acts.has(x));
+for (const party of missing) {
+  const g = await api(`/v2/users/${encodeURIComponent(USER)}/rights`, { method: 'POST', json: { userId: USER, identityProviderId: '',
+    rights: [{ kind: { CanActAs: { value: { party } } } }, { kind: { CanReadAs: { value: { party } } } }] } });
+  console.log(`${g.ok ? '✓ granted' : `✗ grant refused (${g.status})`} act/read as ${party.split('::')[0]}`);
+}
