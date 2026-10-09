@@ -8,13 +8,14 @@
 //   DRY_RUN=1 node scripts/cbtc-rail.mjs  (no ledger: prints the factory request, calls the registry)
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { PARTIES as p, LEDGER, api, submit, create, exercise, created } from '../lib/ledger.mjs';
-import { allocationFactory, allocationContext, disclosed } from '../lib/registry.mjs';
+import { allocationFactory, allocationContext, transferInstructionContext, disclosed } from '../lib/registry.mjs';
 
 const ADMIN = process.env.CBTC_ADMIN ?? 'cbtc-network::12202a83c6f4082217c175e29bc53da5f2703ba2675778ab99217a5a881a949203ff';
 const CBTC = { admin: ADMIN, id: 'CBTC' };
 const QTY = process.env.CBTC_QTY ?? '0.001';     // units pledged; mark 62,000 -> 62 USDC of value
 const PRINCIPAL = '50', TERM_DAYS = 1, HAIRCUT = '0.10', RATE = '600';
 const HOLDING = '#splice-api-token-holding-v1:Splice.Api.Token.HoldingV1:Holding';
+const TRANSFER = '#splice-api-token-transfer-instruction-v1:Splice.Api.Token.TransferInstructionV1:TransferInstruction';
 const ALLOCATION = '#splice-api-token-allocation-v1:Splice.Api.Token.AllocationV1:Allocation';
 const FACTORY = '#splice-api-token-allocation-instruction-v1:Splice.Api.Token.AllocationInstructionV1:AllocationFactory';
 const DRY = !!process.env.DRY_RUN;
@@ -63,6 +64,26 @@ if (DRY) {
 }
 
 try {
+  // 0. What the borrower sees: every HoldingV1 (any instrument) and every pending
+  // TransferInstructionV1. A faucet without a transfer preapproval leaves an offer,
+  // not a holding; the borrower accepts it with the registry's accept context.
+  const short = (x) => String(x ?? '').split('::')[0];
+  const seenH = await views(p.borrower, HOLDING);
+  console.log(`HoldingV1 visible to borrower: ${seenH.length}`);
+  for (const h of seenH) console.log(`  ${h.cid.slice(0, 16)} owner=${short(h.view?.owner)} ${h.view?.instrumentId?.id}@${short(h.view?.instrumentId?.admin)} amount=${h.view?.amount} locked=${h.view?.lock != null} tpl=${h.templateId}${h.view ? '' : ` viewStatus=${JSON.stringify(h.viewStatus)}`}`);
+  const seenT = await views(p.borrower, TRANSFER);
+  console.log(`TransferInstructionV1 visible to borrower: ${seenT.length}`);
+  for (const t of seenT) { const x = t.view?.transfer;
+    console.log(`  ${t.cid.slice(0, 16)} ${short(x?.sender)} -> ${short(x?.receiver)} ${x?.amount} ${x?.instrumentId?.id}@${short(x?.instrumentId?.admin)} status=${t.view?.status?.tag ?? JSON.stringify(t.view?.status)} tpl=${t.templateId}${t.view ? '' : ` viewStatus=${JSON.stringify(t.viewStatus)}`}`); }
+  for (const t of seenT.filter((t) => t.view?.transfer?.receiver === p.borrower && sameInstrument(t.view.transfer.instrumentId)
+    && t.view.status?.tag === 'TransferPendingReceiverAcceptance')) {
+    const c = await transferInstructionContext(ADMIN, t.cid, 'accept');
+    const tx = await submit(p.borrower, { ExerciseCommand: { templateId: TRANSFER, contractId: t.cid, choice: 'TransferInstruction_Accept',
+      choiceArgument: { extraArgs: { context: c.choiceContextData, meta } } } }, [], { disclosedContracts: disclosed(c.disclosedContracts) });
+    step(`accepted CBTC transfer offer of ${t.view.transfer.amount} from ${short(t.view.transfer.sender)}`, tx,
+      { instructionCid: t.cid, amount: t.view.transfer.amount, sender: t.view.transfer.sender, disclosedContracts: c.disclosedContracts.map((d) => d.templateId) });
+  }
+
   // 1. The borrower's CBTC, read through the standard HoldingV1 interface.
   const holdings = await unlockedCbtc(p.borrower);
   const total = holdings.reduce((s, h) => s + Number(h.view.amount), 0);
