@@ -20,6 +20,7 @@ const STEPS = [
   ['governance', 'scripts/governance.mjs'],
   ['token-rail', 'scripts/token-rail.mjs'],
   ['cbtc-rail', 'scripts/cbtc-rail.mjs'],
+  ['tidy', 'scripts/devnet-tidy.mjs'],
 ];
 // DEVNET_STEPS=rights,cbtc-rail runs only those steps (the rest already ran on this node).
 const only = process.env.DEVNET_STEPS?.split(',').map((x) => x.trim());
