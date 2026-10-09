@@ -39,7 +39,7 @@ async function post(url, body) {
 }
 // A connected CIP-0103 wallet signs for its own party; every other role goes through the desk server.
 const viaWallet = (role) => wallet.party && wallet.party === CFG.parties[role];
-const act = (command, role = ROLE) => (viaWallet(role) ? wallet.submit(command) : post('/api/submit', { role, command }));
+const act = (command, role = ROLE) => (viaWallet(role) ? wallet.submit(command) : wallet.deskSubmit(role, command));
 // The hosted copy is read-only unless the acting role is the connected wallet's party.
 const canAct = () => !CFG.readOnly || viaWallet(ROLE);
 function syncReadOnly() {
@@ -129,7 +129,7 @@ function borrowerView() {
     <label>Units<input id="n-qty" type="number" value="50" /></label>
     <label>Cash wanted (USDC)<input id="n-cash" type="number" value="4800000" /></label>
     <label>Term (days)<input id="n-term" type="number" value="30" /></label>
-    <label>Ask<span>${LENDERS.map((l) => `<label style="display:inline;flex-direction:row"><input type="checkbox" class="n-lender" value="${l}" ${l === 'lenderC' ? '' : 'checked'} style="width:auto" /> ${NAMES[l]}</label>`).join(' ')}</span></label>
+    <div class="ask" role="group" aria-labelledby="n-ask"><span id="n-ask">Ask</span><span>${LENDERS.map((l) => `<label style="display:inline;flex-direction:row"><input type="checkbox" class="n-lender" value="${l}" ${l === 'lenderC' ? '' : 'checked'} style="width:auto" /> ${NAMES[l]}</label>`).join(' ')}</span></div>
     <button data-act="request">Send request</button>
     <button class="ghost" data-act="bonds">Demo issuer: give me bonds</button></div></div>`;
 
@@ -175,7 +175,7 @@ function borrowerView() {
     const others = mine().filter((x) => x.arg.instrument !== 'USDC' && x.arg.instrument !== t.arg.collateralInstrument);
     return tradeCard(t, `<button data-act="repurchase" data-cid="${t.cid}">Repurchase for ${money(owed(t.arg) + fee(t.arg))}</button>
       ${pending ? '<span class="pill warn">substitution waiting for lender</span>'
-        : others.length ? `<select class="in" id="sub-${t.cid.slice(0, 12)}">${others.map((x) => `<option value="${x.cid}">${units(x.arg.amount)} ${esc(x.arg.instrument)}</option>`).join('')}</select>
+        : others.length ? `<select class="in" id="sub-${t.cid.slice(0, 12)}" aria-label="Collateral to offer as substitute">${others.map((x) => `<option value="${x.cid}">${units(x.arg.amount)} ${esc(x.arg.instrument)}</option>`).join('')}</select>
           <button class="ghost" data-act="substitute" data-cid="${t.cid}">Offer as substitute</button>` : ''}
       <button class="ghost" data-act="cash">Demo issuer: give me 100k USDC</button>`);
   }).join('') : '<p class="empty">No open repos.</p>');
@@ -348,17 +348,25 @@ function setSbs(on) {
 
 // ---- actions ----
 const val = (id) => $(id)?.value;
+// A number field as the decimal text the ledger expects. A browser number input turns
+// blank or non-numeric text into "", and N("") is 0, so a cleared haircut would quote
+// 0%: refuse it here, naming the field. Whether the value is allowed stays the contract's call.
+function num(id, label) {
+  const v = val(id)?.trim();
+  if (!v || !Number.isFinite(N(v))) throw new Error(`${label}: enter a number`);
+  return v;
+}
 const ACTIONS = {
   async request() {
     await act(create('RepoRFQ', { borrower: me(), regulator: CFG.parties.regulator, agent: CFG.parties.agent,
       venue: CFG.parties.venue ? { operator: CFG.parties.venue, feeBps: '10.0' } : null,
       lenders: [...document.querySelectorAll('.n-lender:checked')].map((x) => CFG.parties[x.value]), deadline: null, terms: {
-        cashIssuer: CFG.parties.cashIssuer, cashInstrument: 'USDC', principal: val('#n-cash'),
+        cashIssuer: CFG.parties.cashIssuer, cashInstrument: 'USDC', principal: num('#n-cash', 'Cash wanted'),
         collateralIssuer: CFG.parties.bondIssuer, collateralInstrument: val('#n-inst'),
-        collateralQty: val('#n-qty'), termDays: val('#n-term') } }));
+        collateralQty: num('#n-qty', 'Units'), termDays: num('#n-term', 'Term') } }));
     return 'Request sent to the panel';
   },
-  async bonds() { await faucet('bondIssuer', val('#n-inst'), val('#n-qty')); return 'Bonds issued to you'; },
+  async bonds() { await faucet('bondIssuer', val('#n-inst'), num('#n-qty', 'Units')); return 'Bonds issued to you'; },
   async 'bonds-for'(b) { await faucet('bondIssuer', b.dataset.inst, b.dataset.amount); return 'Bonds issued to you'; },
   async cash() { await faucet('cashIssuer', 'USDC', 100000); return '100,000 USDC issued to you'; },
   async 'cash-for'(b) { await faucet('cashIssuer', 'USDC', b.dataset.amount); return 'Cash issued to you'; },
@@ -399,9 +407,12 @@ const ACTIONS = {
   },
   async quote(b) {
     const r = of('RepoRFQ').find((x) => x.cid === b.dataset.cid), t = r.arg.terms, k = b.dataset.cid.slice(0, 12);
+    // Percent to a fraction with at most 10 decimals: 1.1 / 100 is 0.011000000000000001 in
+    // floating point, which the ledger's Numeric 10 refuses to decode.
+    const rate = num(`#r-${k}`, 'Rate'), haircut = (N(num(`#h-${k}`, 'Haircut')) / 100).toFixed(10);
     const cash = await exact('USDC', t.cashIssuer, t.principal);
-    await act(exercise('RepoRFQ', r.cid, 'SubmitQuote', { lender: me(), rateBps: val(`#r-${k}`),
-      haircut: String(N(val(`#h-${k}`)) / 100), cashCid: cash }));
+    await act(exercise('RepoRFQ', r.cid, 'SubmitQuote', { lender: me(), rateBps: rate,
+      haircut, cashCid: cash }));
     return 'Quote sealed to the borrower; cash locked behind it';
   },
   async withdraw(b) { await act(exercise('RepoQuote', b.dataset.cid, 'WithdrawQuote', { contexts: NO_CONTEXTS })); return 'Quote withdrawn, cash returned'; },
@@ -417,16 +428,16 @@ const ACTIONS = {
       respondBy: new Date(Date.now() + DAY).toISOString() }));
     return 'Margin called';
   },
-  async default(b) { await act(exercise('MarginCall', b.dataset.cid, 'Default', { contexts: NO_CONTEXTS })); return 'Default declared: collateral is yours'; },
+  async default(b) { await act(exercise('MarginCall', b.dataset.cid, 'Default', { contexts: NO_CONTEXTS })); return 'Default declared: you keep collateral up to what is owed, the rest goes back to the borrower'; },
   async claim(b) { await act(exercise('RepoTrade', b.dataset.cid, 'ClaimAfterMaturity', { contexts: NO_CONTEXTS })); return 'Collateral claimed'; },
   async 'offer-roll'(b) {
     const t = of('RepoTrade').find((x) => x.cid === b.dataset.cid).arg, k = b.dataset.cid.slice(0, 12);
     await act(create('RollOffer', { tradeCid: b.dataset.cid, borrower: t.borrower, lender: me(),
-      newRateBps: val(`#ro-r-${k}`), extraDays: val(`#ro-d-${k}`), expiresAt: new Date(Date.now() + 2 * DAY).toISOString() }));
+      newRateBps: num(`#ro-r-${k}`, 'Roll rate'), extraDays: num(`#ro-d-${k}`, 'Extra days'), expiresAt: new Date(Date.now() + 2 * DAY).toISOString() }));
     return 'Roll offered to the borrower';
   },
   async mark() {
-    await act(create('Mark', { agent: me(), instrument: val('#m-inst'), price: val('#m-price'), asOf: new Date().toISOString(),
+    await act(create('Mark', { agent: me(), instrument: val('#m-inst'), price: num('#m-price', 'Price'), asOf: new Date().toISOString(),
       audience: [CFG.parties.borrower, ...LENDERS.map((l) => CFG.parties[l])] }));
     return 'Mark published';
   },
@@ -437,22 +448,30 @@ function toast(msg, err) {
   clearTimeout(toast.t); toast.t = setTimeout(() => (t.hidden = true), err ? 9000 : 4000);
 }
 
+// One action at a time: a second click, or the 5 s repaint handing back a fresh enabled
+// button, while a command is in flight would submit it twice (a second request, a second
+// sealed quote locking more cash).
+let busy = false;
 document.addEventListener('click', async (e) => {
   const b = e.target.closest('button[data-act]');
-  if (!b || !canAct()) return;
-  b.disabled = true;
+  if (!b || busy || !canAct()) return;
+  busy = true; b.disabled = true;
   try { toast(await ACTIONS[b.dataset.act](b)); await refresh(true); }
   catch (err) { toast(err.message.replace(/^submit \d+: /, ''), true); b.disabled = false; }
+  finally { busy = false; }
 });
 
 // ---- refresh ----
 async function refresh(force) {
   // Never repaint under a field being typed in.
-  if (!force && document.activeElement?.matches('input, select.in')) return;
+  if (!force && (busy || document.activeElement?.matches('input, select.in'))) return;
+  const role = ROLE;
   try {
     if (SBS) return await sideBySide();
-    const r = await post('/api/acs', { role: ROLE });
-    if (SBS) return; // switched to side by side while this read was in flight
+    const r = await post('/api/acs', { role });
+    // Switched to side by side, or to another role, while this read was in flight: painting
+    // it now would show the previous role's contracts under the new role's name.
+    if (SBS || role !== ROLE) return;
     DATA = r.contracts;
     $('#status').textContent = `● live · ${r.offset}`; $('#status').className = 'status';
     $('#view').innerHTML = (VIEWS[ROLE] ?? venueView)();
@@ -478,6 +497,8 @@ function rolePills() {
 
 async function start() {
   CFG = await (await fetch('/api/config')).json();
+  // ?role= or a remembered role this desk does not run (a typo, an issuer, a venue-less ledger).
+  if (!CFG.parties[ROLE] || ![...$('#role').options].some((o) => o.value === ROLE)) ROLE = 'borrower';
   syncReadOnly();
   $('#wallet').onclick = async () => {
     try {
@@ -485,7 +506,7 @@ async function start() {
       const role = Object.entries(CFG.parties).find(([, v]) => v === party)?.[0];
       $('#wallet').textContent = role ? `Wallet · ${NAMES[role] ?? role}` : `Wallet · ${party.split('::')[0].slice(0, 18)}`;
       $('#wallet').title = party;
-      if (!role) return toast(`Wallet connected as ${party.slice(0, 40)}…: not a party on this desk's ledger, so it cannot act here yet`, true);
+      if (!role) return toast(`Wallet connected as ${party.slice(0, 40)}…: its participant does not host Talang's contracts; the wallet panel says what it can do on this desk`, true);
       ROLE = role; $('#role').value = role; $('#role').dispatchEvent(new Event('change'));
       toast(`Signing as ${NAMES[role] ?? role} with your wallet`);
     } catch (err) { toast('Wallet: ' + err.message, true); }

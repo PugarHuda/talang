@@ -47,7 +47,7 @@ let fail = 0;
 const ok = (n, c) => { console.log((c ? 'ok   ' : 'FAIL ') + n); if (!c) fail++; };
 
 // A new file in api/ is a new public endpoint; this suite has to be extended for it first.
-ok('api/ holds only acs.mjs and config.mjs', readdirSync(join(ROOT, 'api')).sort().join() === 'acs.mjs,config.mjs');
+ok('api/ holds only acs.mjs, config.mjs and wallet-verify.mjs', readdirSync(join(ROOT, 'api')).sort().join() === 'acs.mjs,config.mjs,wallet-verify.mjs');
 
 // Failures first, before a token is cached: the 502 names no credential.
 mode = 'token-down';
@@ -88,10 +88,17 @@ for (const [role, party] of Object.entries(PARTIES)) {
 // Config: the role -> party map and readOnly, nothing else.
 r = await call(config, 'GET');
 ok('config GET: 200, readOnly true, the desk parties', r._s === 200 && r._j.readOnly === true && JSON.stringify(r._j.parties) === JSON.stringify(PARTIES));
-ok('config GET: only parties and readOnly', Object.keys(r._j).sort().join() === 'parties,readOnly');
+ok('config GET: only parties, readOnly and (when set) public wallet recipients', Object.keys(r._j).filter((k) => k !== 'walletRecipients').sort().join() === 'parties,readOnly');
 ok('config GET: no secret or token, no ledger call', clean(r) && calls.length === 0);
 for (const m of ['POST', 'PUT', 'DELETE'])
   ok(`config ${m}: 405`, (await call(config, m))._s === 405);
+
+// Wallet signature check: POST only, stateless, never reaches the ledger.
+const { default: verify } = await import('../api/wallet-verify.mjs');
+for (const m of ['GET', 'PUT', 'DELETE'])
+  ok(`wallet-verify ${m}: 405, no ledger call`, (r = await call(verify, m))._s === 405 && calls.length === 0);
+r = await call(verify, 'POST', { message: 'x', signature: 'AAAA', publicKey: 'AAAA', partyId: 'p::1220' + '0'.repeat(64) });
+ok('wallet-verify POST junk: answers, does not verify, no ledger call', r._s === 200 && r._j?.ok !== true && r._j?.valid !== true && calls.length === 0);
 
 console.log(fail ? `\n${fail} FAILED` : '\nall passed');
 process.exit(fail ? 1 : 0);
