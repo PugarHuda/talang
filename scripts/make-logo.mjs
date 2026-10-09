@@ -12,7 +12,7 @@ const b = await chromium.launch();
 const p = await b.newPage({ viewport: { width: 480, height: 480 } });
 await p.setContent(html);
 await p.screenshot({ path: 'media/talang-logo.png' });
-await p.setContent(html.replace('<b>talang</b>', ''));
+await p.setContent(html.replace('<b>talang</b>', '').replace('width="230" height="230"', 'width="330" height="330"'));
 await p.screenshot({ path: 'media/talang-logo-mark.png' });
 await b.close();
 console.log('wrote media/talang-logo.png, media/talang-logo-mark.png');
