@@ -1,0 +1,42 @@
+[
+  {
+    "at": 0,
+    "label": "Three BitSafe Decentralization Manager nodes, one per Canton participant, connected as peers"
+  },
+  {
+    "at": 3.98,
+    "label": "Talang's valuation committee: one decentralized party, hosted on all three participants. 2 of 3 must confirm"
+  },
+  {
+    "at": 14.27,
+    "label": "A pricer on node 1 proposes a markdown: UST10Y to 92,000. The MarkProposal is a BitSafe GovernableAction"
+  },
+  {
+    "at": 22.55,
+    "label": "Node 1 confirms. 1 of 2: not enough, nothing is published"
+  },
+  {
+    "at": 29.02,
+    "label": "Node 2, in its own DecMan, sees the same proposal and confirms"
+  },
+  {
+    "at": 37.75,
+    "label": "2 of 2: the threshold is met"
+  },
+  {
+    "at": 40.78,
+    "label": "Back on node 1: Execute. BitSafe's GovernanceRules publishes the mark as the committee"
+  },
+  {
+    "at": 52.31,
+    "label": "Node 3 did not vote. Its audit trail shows every step on-chain: propose, two confirmations, execute"
+  },
+  {
+    "at": 69.75,
+    "label": "Talang: the lender calls margin on an open repo with the committee's mark. No single pricer could move it"
+  },
+  {
+    "at": 79.07,
+    "label": "end"
+  }
+]

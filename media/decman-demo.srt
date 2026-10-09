@@ -1,0 +1,35 @@
+1
+00:00:00,000 --> 00:00:03,980
+Three BitSafe Decentralization Manager nodes, one per Canton participant, connected as peers
+
+2
+00:00:03,980 --> 00:00:14,270
+Talang's valuation committee: one decentralized party, hosted on all three participants. 2 of 3 must confirm
+
+3
+00:00:14,270 --> 00:00:22,550
+A pricer on node 1 proposes a markdown: UST10Y to 92,000. The MarkProposal is a BitSafe GovernableAction
+
+4
+00:00:22,550 --> 00:00:29,020
+Node 1 confirms. 1 of 2: not enough, nothing is published
+
+5
+00:00:29,020 --> 00:00:37,750
+Node 2, in its own DecMan, sees the same proposal and confirms
+
+6
+00:00:37,750 --> 00:00:40,780
+2 of 2: the threshold is met
+
+7
+00:00:40,780 --> 00:00:52,310
+Back on node 1: Execute. BitSafe's GovernanceRules publishes the mark as the committee
+
+8
+00:00:52,310 --> 00:01:09,750
+Node 3 did not vote. Its audit trail shows every step on-chain: propose, two confirmations, execute
+
+9
+00:01:09,750 --> 00:01:19,070
+Talang: the lender calls margin on an open repo with the committee's mark. No single pricer could move it
