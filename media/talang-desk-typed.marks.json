@@ -1,0 +1,58 @@
+[
+  {
+    "at": 25.72,
+    "label": "Borrower: a new request, typed in. Collateral, units, cash wanted, term"
+  },
+  {
+    "at": 34.86,
+    "label": "Asks three lenders, Lender C included"
+  },
+  {
+    "at": 41.79,
+    "label": "Lender A quotes: 470 bp, haircut 2%, cash locked behind it"
+  },
+  {
+    "at": 60.49,
+    "label": "Lender A's node: its own quotes only. Rival quotes never reached it"
+  },
+  {
+    "at": 63.12,
+    "label": "Lender B quotes: 455 bp, haircut 6%, cash locked behind it"
+  },
+  {
+    "at": 81.72,
+    "label": "Lender C quotes: 495 bp, haircut 3%, cash locked behind it"
+  },
+  {
+    "at": 111.86,
+    "label": "Back to the borrower: three sealed quotes. The cheapest is short at the mark"
+  },
+  {
+    "at": 124.96,
+    "label": "It takes the cheapest quote that covers: Lender A"
+  },
+  {
+    "at": 128.63,
+    "label": "Lender B lost: told its rank, and nothing else"
+  },
+  {
+    "at": 140.7,
+    "label": "The regulator: best execution, winner rank 2, no lender named, no losing rates"
+  },
+  {
+    "at": 152.62,
+    "label": "Every node side by side, each reading only its own ledger"
+  },
+  {
+    "at": 170.51,
+    "label": "The valuation agent types a new UST5Y mark and publishes it"
+  },
+  {
+    "at": 192.74,
+    "label": "Lender A: at the new mark the repo is short, so it calls margin"
+  },
+  {
+    "at": 208.17,
+    "label": "end"
+  }
+]

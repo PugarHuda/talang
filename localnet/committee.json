@@ -1,23 +1,23 @@
 {
-  "committee": "talang-valuation-committee::12204843e66ceded5e65fe3086bccc1f44831f43c13164f30174c9cdb33a09ac7772",
+  "committee": "talang-valuation-committee::12206b9726fc15e0cb4f9ec3bf325cef3ceea0e8dd00571a76ce886a956dd580fcf6",
   "members": [
-    "talang-valuation-committee-member-p1::12208b354f67b399f7d46bd55acaae9b99de1f73a98b4dd5a51d0234c2d53c57ee7a",
-    "talang-valuation-committee-member-p2::12200d60d316044b6e87ccafc5c0defc4ebe3c04abcff85786a87b9ccab10d6147e2",
-    "talang-valuation-committee-member-p3::1220846922ed0b508d5385a0c10a897db4ce7869d633c17a6c6e13720b2327e06b6f"
+    "talang-valuation-committee-member-p1::12206069e5f772963f0a09f9de1da36b0079acc06195f348b0f83b0f0c8ab3507db6",
+    "talang-valuation-committee-member-p2::1220d36e468af674b19634eb04df321c4e629a84e722660b8dc38fc81f673d227255",
+    "talang-valuation-committee-member-p3::122078a46e358f9b8a7827d20123f488fedefc292fc6bedf49fd00b216fb48c92e4f"
   ],
-  "rules": "00da6f3a315b1b1a7a35ad1bcdc3a2af2edce39645edd563dbd73e5acea14869afca12122097567f5bb7ca84e62f4d3e8db1e4146eeec1faa3cd13d17c1b89743a58250344",
+  "rules": "00b10b2bd8085726cd2d326051329e74674605e525422edd137ed8f46c28410d82ca1212207b765349339920c67e6610f088ff3fca80a48d953fed5beda1f5900764e69eb9",
   "participants": [
-    "participant1::12208b354f67b399f7d46bd55acaae9b99de1f73a98b4dd5a51d0234c2d53c57ee7a",
-    "participant2::12200d60d316044b6e87ccafc5c0defc4ebe3c04abcff85786a87b9ccab10d6147e2",
-    "participant3::1220846922ed0b508d5385a0c10a897db4ce7869d633c17a6c6e13720b2327e06b6f"
+    "participant1::12206069e5f772963f0a09f9de1da36b0079acc06195f348b0f83b0f0c8ab3507db6",
+    "participant2::1220d36e468af674b19634eb04df321c4e629a84e722660b8dc38fc81f673d227255",
+    "participant3::122078a46e358f9b8a7827d20123f488fedefc292fc6bedf49fd00b216fb48c92e4f"
   ],
   "governanceState": {
-    "contract_id": "00da6f3a315b1b1a7a35ad1bcdc3a2af2edce39645edd563dbd73e5acea14869afca12122097567f5bb7ca84e62f4d3e8db1e4146eeec1faa3cd13d17c1b89743a58250344",
-    "governance_party": "talang-valuation-committee::12204843e66ceded5e65fe3086bccc1f44831f43c13164f30174c9cdb33a09ac7772",
+    "contract_id": "00b10b2bd8085726cd2d326051329e74674605e525422edd137ed8f46c28410d82ca1212207b765349339920c67e6610f088ff3fca80a48d953fed5beda1f5900764e69eb9",
+    "governance_party": "talang-valuation-committee::12206b9726fc15e0cb4f9ec3bf325cef3ceea0e8dd00571a76ce886a956dd580fcf6",
     "members": [
-      "talang-valuation-committee-member-p1::12208b354f67b399f7d46bd55acaae9b99de1f73a98b4dd5a51d0234c2d53c57ee7a",
-      "talang-valuation-committee-member-p2::12200d60d316044b6e87ccafc5c0defc4ebe3c04abcff85786a87b9ccab10d6147e2",
-      "talang-valuation-committee-member-p3::1220846922ed0b508d5385a0c10a897db4ce7869d633c17a6c6e13720b2327e06b6f"
+      "talang-valuation-committee-member-p1::12206069e5f772963f0a09f9de1da36b0079acc06195f348b0f83b0f0c8ab3507db6",
+      "talang-valuation-committee-member-p2::1220d36e468af674b19634eb04df321c4e629a84e722660b8dc38fc81f673d227255",
+      "talang-valuation-committee-member-p3::122078a46e358f9b8a7827d20123f488fedefc292fc6bedf49fd00b216fb48c92e4f"
     ],
     "threshold": 2,
     "additional_proposers": [],
@@ -26,41 +26,41 @@
     "out_of_date": false
   },
   "decmanParty": {
-    "party_id": "talang-valuation-committee::12204843e66ceded5e65fe3086bccc1f44831f43c13164f30174c9cdb33a09ac7772",
+    "party_id": "talang-valuation-committee::12206b9726fc15e0cb4f9ec3bf325cef3ceea0e8dd00571a76ce886a956dd580fcf6",
     "threshold": 2,
     "owners": [
-      "12201777886ddcbded28d78bc7552fe4e9873c7048608b36c7b9a7daa150ba921d10",
-      "12202fbc1efe1b0e284f7f68255e1edc72c047e38cdaa63f422c1ddabb4e2228dc4c",
-      "12208ef4bfc7e07cf429faa6a9e9e4febc8eda038e1d3b248c6edff59790eec091d3"
+      "1220355110f1318c6dd3a61a6dfd9310ea8ee12c7929c39c9d6ae8509a877a965ed0",
+      "122058eb925495757ea08034300d2cc5f964791e851b4aeb635d2723de869b5fe958",
+      "1220a743fc67cb30029770783e8d865bc88b6605893169cc6fdb4e201459c55b1aa5"
     ],
-    "my_owner_key": "12208ef4bfc7e07cf429faa6a9e9e4febc8eda038e1d3b248c6edff59790eec091d3",
+    "my_owner_key": "1220a743fc67cb30029770783e8d865bc88b6605893169cc6fdb4e201459c55b1aa5",
     "participants": [
       {
-        "participant_uid": "participant1::12208b354f67b399f7d46bd55acaae9b99de1f73a98b4dd5a51d0234c2d53c57ee7a",
+        "participant_uid": "participant1::12206069e5f772963f0a09f9de1da36b0079acc06195f348b0f83b0f0c8ab3507db6",
         "permission": "confirmation",
-        "owner_key": "12208ef4bfc7e07cf429faa6a9e9e4febc8eda038e1d3b248c6edff59790eec091d3"
+        "owner_key": "1220a743fc67cb30029770783e8d865bc88b6605893169cc6fdb4e201459c55b1aa5"
       },
       {
-        "participant_uid": "participant2::12200d60d316044b6e87ccafc5c0defc4ebe3c04abcff85786a87b9ccab10d6147e2",
+        "participant_uid": "participant2::1220d36e468af674b19634eb04df321c4e629a84e722660b8dc38fc81f673d227255",
         "permission": "confirmation",
-        "owner_key": "12201777886ddcbded28d78bc7552fe4e9873c7048608b36c7b9a7daa150ba921d10"
+        "owner_key": "122058eb925495757ea08034300d2cc5f964791e851b4aeb635d2723de869b5fe958"
       },
       {
-        "participant_uid": "participant3::1220846922ed0b508d5385a0c10a897db4ce7869d633c17a6c6e13720b2327e06b6f",
+        "participant_uid": "participant3::122078a46e358f9b8a7827d20123f488fedefc292fc6bedf49fd00b216fb48c92e4f",
         "permission": "confirmation",
-        "owner_key": "12202fbc1efe1b0e284f7f68255e1edc72c047e38cdaa63f422c1ddabb4e2228dc4c"
+        "owner_key": "1220355110f1318c6dd3a61a6dfd9310ea8ee12c7929c39c9d6ae8509a877a965ed0"
       }
     ],
     "contracts": [
       {
-        "contract_id": "00da6f3a315b1b1a7a35ad1bcdc3a2af2edce39645edd563dbd73e5acea14869afca12122097567f5bb7ca84e62f4d3e8db1e4146eeec1faa3cd13d17c1b89743a58250344",
+        "contract_id": "00b10b2bd8085726cd2d326051329e74674605e525422edd137ed8f46c28410d82ca1212207b765349339920c67e6610f088ff3fca80a48d953fed5beda1f5900764e69eb9",
         "template_id": "Governance.Rules:GovernanceRules",
         "package_id": "361d1f2857f833f8094caf86ecdd5daaa3e2075c22dafe2bf18cde63ee98d488",
         "package_name": "governance-core-v1",
         "package_version": "0.1.0",
-        "created_at": "2026-10-09T08:37:46.585298000Z"
+        "created_at": "2026-10-09T10:06:27.554630000Z"
       }
     ]
   },
-  "at": "2026-10-09T08:37:58.322Z"
+  "at": "2026-10-09T10:32:27.680Z"
 }
