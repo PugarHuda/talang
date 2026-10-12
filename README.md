@@ -30,14 +30,16 @@ be real Canton Token Standard assets such as USDCx and CBTC.
 |---|---|---|
 | Request | borrower | Only the invited lenders see it, and it carries no rate |
 | Quote | lender | Full principal locked behind the quote, as a desk escrow or a CIP-0056 allocation; rivals and the regulator never receive it |
-| Award | borrower | Opening leg atomic: collateral pledged, cash delivered, losers refunded unrevealed |
+| Award | borrower | Opening leg atomic: collateral pledged, cash delivered, losers refunded unrevealed. Since 1.2.0 `AwardSealed` is nonconsuming and archives the request at the end, so an invited lender is not an informee of the award (the consuming `Award` is kept for the upgrade and refuses) |
 | Loss notice | each loser | Told its rank among the quotes weighed, and nothing else: no winning rate, no winner |
-| Best execution | regulator | How many quotes were weighed, the winner's rank on rate, the gap to the best rate in bp; no lender named |
-| Margin call | lender | Shortfall computed from the valuation agent's mark, refused while the repo is covered |
-| Substitution | borrower, then lender | Swap happens only if the substitute covers what is owed at a fresh mark |
+| Best execution | regulator | How many quotes were weighed, the winner's rank on rate, the gap to the best rate as a band (0, 1-5, 6-25, >25 bp; an exact gap would give away the best losing rate); no lender named |
+| Margin call | lender | Shortfall computed from the valuation agent's mark, refused while the repo is covered, on a mark over an hour old, with under 2 hours to answer, or (1.2.0) for a shortfall below the repo's minimum transfer amount. The borrower cancels a call with a newer mark from the same agent that shows cover (`RefuteMarginCall`) |
+| Substitution | borrower, then lender | Swap happens only if the substitute covers what is owed at a fresh mark and (1.2.0) comes from the repo's collateral issuer; the borrower can withdraw an unanswered offer |
 | Roll | lender offers, borrower accepts | Interest so far paid now, new rate from today, coverage re-checked at a fresh mark |
 | Repurchase | borrower | Principal plus ACT/360 interest to the lender, the venue's fee to the operator, collateral home, change returned |
-| Default | lender | After an unanswered call or past maturity, the pledge goes to the lender |
+| Default | lender | After an unanswered call (within a day of its deadline, 1.2.0) or past maturity, the lender keeps collateral worth what is owed and the rest goes back |
+| Haircut schedule (1.2.0) | lender signs, borrower sees | Quotes and substitution approvals made through it are refused below the lender's floor for that collateral, or for collateral it does not list |
+| Master agreement (1.2.0) | one side offers, the other signs | On an event of default (a repo past maturity, or a call past its deadline) the lender closes out every repo it names under the agreement in one transaction, at fresh marks with no haircut; excess on one repo covers a shortfall on another; one `CloseOutReport` to the regulator |
 | Report | regulator | Every lifecycle event of an open repo, nothing upstream of it |
 
 ## Why Canton for a sealed-bid repo RFQ
@@ -66,6 +68,7 @@ The desk is at `/desk` (`?role=lenderB` opens it as a role); the landing page is
 | **Venue fee**, bp per annum ACT/360, inside repurchase and roll. | `Venue`, `Repurchase`, `Roll` | `venueFeeOnRepurchase`, `tokenLifecycle` |
 | **Rolls.** | `RollOffer`, `Roll` | `rollToNewRate`, `rollRefusals` |
 | **Three MCP desks**: lender, borrower, regulator. | `mcp/server.mjs` | 41 checks in `scripts/e2e-mcp.mjs` on a Canton participant |
+| **talang-repo 1.2.0 (smart-contract upgrade of 1.1.0).** Minimum transfer amount on `Terms`; lender `HaircutSchedule` (`QuoteWithinSchedule`, `ApproveWithinSchedule`); `MasterAgreement` with `CloseOut` netting and `CloseOutReport`; security fixes: `AwardSealed`, substitute issuer check, `WithdrawSubstitution`, one-hour mark for a call plus `RefuteMarginCall`, one-day default window, best-execution band. The desk drives all of it: a lender signs, revises and withdraws its schedule and quotes through it, the borrower sets a minimum transfer on a request and refutes a call, either side offers a master agreement, the lender closes out and all three sides see the report. | `daml/TalangAgreements.daml`, `daml/Talang.daml`, `web/app.js` | `AgreementsTest`, `SecurityTest`; in the browser by `npm run qa:desk` (10 checks on 1.2.0) and its `close-out` run |
 
 ## Build and test
 
@@ -118,12 +121,14 @@ Put the M2M client settings in `.env.noders` (gitignored), then `npm run upload`
 On the NODERS participant the app user may not upload packages (403, in the
 [run log](docs/evidence/devnet-run.log)), so the DARs go in through the NODERS console.
 
-`talang-repo` (1.0.0, then 1.1.0 as a smart-contract upgrade) is a new package name: the `talang-desk` 0.1.0
+`talang-repo` (1.0.0, then 1.1.0 and 1.2.0 as smart-contract upgrades) is a new package name: the `talang-desk` 0.1.0
 package from the first commits was uploaded to the NODERS DevNet participant, and this
 version changes template shapes in ways a smart-contract upgrade may not.
 
 The hosted copy is read-only: `api/` exposes reads only, scoped to this desk's
 parties, and has no submit endpoint.
+Where the node does not vet 1.2.0, the desk's read leaves out the 1.2.0 templates
+(schedules, master agreements, close-outs) and shows the rest (`deskAcs` in `lib/ledger.mjs`).
 
 ### CBTC default on DevNet (two phases)
 
