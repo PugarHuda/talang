@@ -157,6 +157,10 @@ phase 2 passes it as a disclosed contract fetched as the borrower; without that 
 submit fails with `CONTRACT_NOT_FOUND` (the 12 October run). Offline check of phase 2:
 `node scripts/test-cbtc-default.mjs`.
 
+Last run: phase 1 on 9 October (1.1.0), phase 2 on 12 October from `c94758a`: 0.001 CBTC
+executed to lender A through the registry, allocation gone, offset 3209860
+([evidence](docs/evidence/cbtc-default-devnet.json)).
+
 ## AI desk agents (MCP)
 
 `mcp/server.mjs` puts Claude at one desk. It reads only that party's node, so it is

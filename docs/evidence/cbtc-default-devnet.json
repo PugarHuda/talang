@@ -59,6 +59,30 @@
       "offset": 2730812,
       "marginCall": "00f517c617f6252256c31c977099d03c185333c665932a56be2de65a9fa3bbbc25ca1212208d785645f8de11ba2f7612a91c91e10a570c947d33ffda8ccf7b0cda2aa19420",
       "respondBy": "2026-10-09T13:46:19.947Z"
+    },
+    {
+      "phase": "default",
+      "step": "open margin call found on the ledger: respondBy 2026-10-09T13:46:19.947Z has passed",
+      "marginCall": "00f517c617f6252256c31c977099d03c185333c665932a56be2de65a9fa3bbbc25ca1212208d785645f8de11ba2f7612a91c91e10a570c947d33ffda8ccf7b0cda2aa19420",
+      "trade": "00c43f03a5f90a018d8612dd93a864d10de025e8b2f1750d1a3095394047163e0eca1212202ef07f5df403c8fbaaf0b95b85151cd3a302ad4f8eab83167d17ef1fae8a00f0",
+      "allocationCid": "0022ce4ebaa61dc3789ac56f5229865df71db0d2998a72b405674fe8b6c6d0badfca1212201d0cde86d8d09d00badf3418fd227dbbd9e582c3c8154988a166c0eff3958afe",
+      "unitsDue": "0.0001000000",
+      "price": "52000.0000000000"
+    },
+    {
+      "phase": "default",
+      "step": "default: 0.001 CBTC executed to lender A through the registry (execute-transfer), allocation gone",
+      "updateId": "122099d77843fe1b6201a80a80ae57a2e23ce65c6132d4c2da2b59cb3692f7a0945a",
+      "offset": 3209860,
+      "lenderCBTCBefore": 0,
+      "lenderCBTCAfter": 0.001,
+      "disclosedContracts": [
+        "8c654487d9f5fb195fbcdd7b44cd8e365b1ea39c15ae62ce6c7a48343f1210dd:Utility.Registry.V0.Holding.Allocation:DvpLegAllocation",
+        "415a1ec96a9e2839453e9aa1c5c71b6511c008c79511cb6f873e0b7393fe3b92:Utility.Registry.Holding.V0.Holding:Holding",
+        "ed73d5b9ab717333f3dbd122de7be3156f8bf2614a67360c3dd61fc0135133fa:Utility.Registry.V0.Configuration.Instrument:InstrumentConfiguration",
+        "ed73d5b9ab717333f3dbd122de7be3156f8bf2614a67360c3dd61fc0135133fa:Utility.Registry.V0.Rule.Transfer:TransferRule"
+      ]
     }
-  ]
+  ],
+  "defaultedAt": "2026-10-12T13:50:20.668Z"
 }
