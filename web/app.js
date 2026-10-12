@@ -4,7 +4,7 @@ import { wallet } from '/wallet.js';
 
 const $ = (s) => document.querySelector(s);
 const PKG = '#talang-repo';
-const DAY = 864e5;
+const DAY = 864e5, HOUR = 36e5;
 let CFG, ROLE, DATA = [], timer;
 
 // ?role=lenderB opens the desk as that role (handy for demo links); otherwise the last one used.
@@ -26,11 +26,15 @@ const name = (party) => esc(NAMES[roleOf(party)] ?? roleOf(party));
 const me = () => CFG.parties[ROLE];
 const of = (tpl) => DATA.filter((c) => c.tpl === tpl);
 
-const create = (tpl, args) => ({ CreateCommand: { templateId: `${PKG}:Talang:${tpl}`, createArguments: args } });
+// talang-repo 1.2.0 templates live in their own module (lib/ledger.mjs AGREEMENTS).
+const AGREEMENTS = ['HaircutSchedule', 'MasterAgreementProposal', 'MasterAgreement', 'CloseOutReport'];
+const mod = (tpl) => (AGREEMENTS.includes(tpl) ? 'TalangAgreements' : 'Talang');
+const create = (tpl, args) => ({ CreateCommand: { templateId: `${PKG}:${mod(tpl)}:${tpl}`, createArguments: args } });
 const exercise = (tpl, cid, choice, arg = {}) =>
-  ({ ExerciseCommand: { templateId: `${PKG}:Talang:${tpl}`, contractId: cid, choice, choiceArgument: arg } });
-const createdCid = (tx, tpl) => (tx?.transaction?.events ?? []).map((e) => e.CreatedEvent).filter(Boolean)
-  .find((c) => c.templateId?.endsWith(`:Talang:${tpl}`))?.contractId;
+  ({ ExerciseCommand: { templateId: `${PKG}:${mod(tpl)}:${tpl}`, contractId: cid, choice, choiceArgument: arg } });
+const createdEvent = (tx, tpl) => (tx?.transaction?.events ?? []).map((e) => e.CreatedEvent).filter(Boolean)
+  .find((c) => c.templateId?.endsWith(`:${mod(tpl)}:${tpl}`));
+const createdCid = (tx, tpl) => createdEvent(tx, tpl)?.contractId;
 
 async function post(url, body) {
   const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
@@ -51,8 +55,23 @@ function syncReadOnly() {
 
 // ---- money arithmetic, mirrored from the contract so the page can show it ----
 function mark(instrument) {
-  const m = of('Mark').filter((c) => c.arg.instrument === instrument).sort((a, b) => b.arg.asOf.localeCompare(a.arg.asOf))[0];
-  return m && { cid: m.cid, price: N(m.arg.price), asOf: m.arg.asOf, fresh: Date.now() - Date.parse(m.arg.asOf) < DAY };
+  // Only marks from the desk's agent or its valuation committee, as mcp/server.mjs: anyone may
+  // publish a "Mark" to a party, and the contract would refuse one from another agent anyway.
+  const trusted = [CFG.parties.agent, CFG.parties.committee].filter(Boolean);
+  const m = of('Mark').filter((c) => c.arg.instrument === instrument && trusted.includes(c.arg.agent)).sort((a, b) => b.arg.asOf.localeCompare(a.arg.asOf))[0];
+  const age = m && Date.now() - Date.parse(m.arg.asOf);
+  // A margin call needs a mark under an hour old (1.2.0), anything else one under a day.
+  return m && { cid: m.cid, price: N(m.arg.price), asOf: m.arg.asOf, fresh: age < DAY, callable: age < HOUR };
+}
+// A lender's published haircut schedule (1.2.0): instrument -> minimum haircut.
+const schedule = (lender) => of('HaircutSchedule').find((c) => c.arg.lender === lender);
+const floorOf = (lender, instrument) => { const s = schedule(lender); return s && (instrument in s.arg.floors ? N(s.arg.floors[instrument]) : null); };
+// Repos under a master agreement, and its event of default if there is one.
+const underAgreement = (ma) => of('RepoTrade').filter((t) => t.arg.borrower === ma.borrower && t.arg.lender === ma.lender && t.arg.regulator === ma.regulator);
+function defaultEvent(trades) {
+  const call = of('MarginCall').find((c) => trades.some((t) => t.cid === c.arg.tradeCid) && Date.now() > Date.parse(c.arg.respondBy));
+  const matured = trades.filter((t) => Date.now() > Date.parse(t.arg.maturity));
+  return { call, matured, any: !!call || matured.length > 0 };
 }
 const interest = (principal, rateBps, openedAt) =>
   Math.round(principal * rateBps / 10000 * Math.max(1, Math.floor((Date.now() - Date.parse(openedAt)) / DAY)) / 360 * 100) / 100;
@@ -109,6 +128,7 @@ function tradeCard(t, actions) {
   return `<div class="card"><h3>${money(a.terms.principal)} USDC against ${units(a.collateralQty)} ${esc(a.collateralInstrument)} ${pill}</h3>
     <div class="row"><span>Funded by <b>${name(a.lender)}</b></span><span>Rate <b>${N(a.rateBps)} bp</b></span>
     <span>Haircut <b>${pct(a.haircut)}</b></span><span>Owed now <b>${money(o)}</b></span>
+    ${a.terms.minTransfer != null ? `<span>Min transfer <b>${money(a.terms.minTransfer)}</b></span>` : ''}
     ${a.venue ? `<span>Venue fee <b>${money(fee(a))}</b> <small>(${N(a.venue.feeBps)} bp)</small></span>` : ''}
     ${tokenLegs(a) ? `<span><span class="pill ok">${tokenLegs(a)} CIP-0056 allocation${tokenLegs(a) > 1 ? 's' : ''}</span></span>` : ''}
     <span>Mark <b>${m ? money(m.price) + (m.fresh ? '' : ' (stale)') : '—'}</b></span>
@@ -130,6 +150,7 @@ function borrowerView() {
     <label>Units<input id="n-qty" type="number" value="50" /></label>
     <label>Cash wanted (USDC)<input id="n-cash" type="number" value="4800000" /></label>
     <label>Term (days)<input id="n-term" type="number" value="30" /></label>
+    <label>Minimum transfer (USDC)<input id="n-mta" type="number" placeholder="none" /></label>
     <div class="ask" role="group" aria-labelledby="n-ask"><span id="n-ask">Ask</span><span>${LENDERS.map((l) => `<label style="display:inline;flex-direction:row"><input type="checkbox" class="n-lender" value="${l}" ${l === 'lenderC' ? '' : 'checked'} style="width:auto" /> ${NAMES[l]}</label>`).join(' ')}</span></div>
     <button data-act="request">Send request</button>
     <button class="ghost" data-act="bonds">Demo issuer: give me bonds</button></div></div>`;
@@ -141,7 +162,10 @@ function borrowerView() {
       .sort((x, y) => N(x.arg.rateBps) - N(y.arg.rateBps) || N(x.arg.haircut) - N(y.arg.haircut));
     return `<div class="card"><h3>${money(t.principal)} USDC against ${units(t.collateralQty)} ${esc(t.collateralInstrument)}, ${esc(t.termDays)} days</h3>
       <div class="row"><span>Asked <b>${r.arg.lenders.map(name).join(', ')}</b></span><span>Mark <b>${m ? money(m.price) : '—'}</b></span>
-      ${r.arg.venue ? `<span>Venue fee <b>${N(r.arg.venue.feeBps)} bp</b></span>` : ''}</div>
+      ${r.arg.venue ? `<span>Venue fee <b>${N(r.arg.venue.feeBps)} bp</b></span>` : ''}
+      ${t.minTransfer != null ? `<span>Min transfer <b>${money(t.minTransfer)}</b></span>` : ''}
+      ${r.arg.lenders.filter(schedule).map((l) => { const f = floorOf(l, t.collateralInstrument);
+        return `<span>${name(l)} schedule <b>${f == null ? 'not eligible' : 'min ' + pct(f)}</b></span>`; }).join('')}</div>
       <p class="empty" style="margin:6px 0 0">Taking a quote refunds the others unrevealed: each losing lender is told only its rank, and the regulator gets a best-execution record with no names.</p>
       ${qs.length ? `<table><tr><th>#</th><th>Lender</th><th>Rate</th><th>Haircut</th><th>Lends at mark</th><th></th></tr>
       ${qs.map((q, i) => {
@@ -154,12 +178,20 @@ function borrowerView() {
       <div class="actions"><button class="ghost" data-act="cancel" data-cid="${r.cid}">Cancel request</button></div></div>`;
   }).join('') : '<p class="empty">No open requests.</p>';
 
-  h += `<h2>Margin calls</h2>` + (calls.length ? calls.map((c) => `<div class="card"><h3>${name(c.arg.lender)} calls ${units(c.arg.unitsDue)} ${esc(c.arg.instrument)}</h3>
+  h += `<h2>Margin calls</h2>` + (calls.length ? calls.map((c) => {
+    // 1.2.0: a fresh mark newer than the call's that shows cover cancels the call.
+    const t = trades.find((x) => x.cid === c.arg.tradeCid), m = mark(c.arg.instrument);
+    const newer = m?.fresh && (!c.arg.markAsOf || Date.parse(m.asOf) > Date.parse(c.arg.markAsOf));
+    const cover = t && newer ? lendable(N(t.arg.haircut), N(t.arg.collateralQty), m.price) / owed(t.arg) : null;
+    return `<div class="card"><h3>${name(c.arg.lender)} calls ${units(c.arg.unitsDue)} ${esc(c.arg.instrument)}</h3>
     <div class="row"><span>Owed <b>${money(c.arg.owed)}</b></span><span>At mark <b>${money(c.arg.price)}</b></span>
-    <span>Respond by <b>${when(c.arg.respondBy)}</b></span></div>
+    ${c.arg.markAsOf ? `<span>Mark struck <b>${when(c.arg.markAsOf)}</b></span>` : ''}
+    <span>Respond by <b>${when(c.arg.respondBy)}</b></span>
+    ${cover != null ? `<span>Newer mark <b>${money(m.price)}</b> covers <b>${pct(cover)}</b></span>` : ''}</div>
     <div class="actions"><button data-act="post" data-cid="${c.cid}">Post ${units(c.arg.unitsDue)} ${esc(c.arg.instrument)}</button>
-    <button class="ghost" data-act="bonds-for" data-inst="${esc(c.arg.instrument)}" data-amount="${c.arg.unitsDue}">Demo issuer: give me the bonds</button></div></div>`).join('')
-    : '<p class="empty">None.</p>');
+    ${cover != null ? `<button class="ghost" data-act="refute" data-cid="${c.cid}" ${cover >= 1 ? '' : 'disabled'}>${cover >= 1 ? 'Refute with the newer mark' : 'Newer mark still short'}</button>` : ''}
+    <button class="ghost" data-act="bonds-for" data-inst="${esc(c.arg.instrument)}" data-amount="${c.arg.unitsDue}">Demo issuer: give me the bonds</button></div></div>`;
+  }).join('') : '<p class="empty">None.</p>');
 
   const rolls = of('RollOffer');
   h += `<h2>Roll offers</h2>` + (rolls.length ? rolls.map((o) => {
@@ -172,15 +204,23 @@ function borrowerView() {
   }).join('') : '<p class="empty">None.</p>');
 
   h += `<h2>Open repos</h2>` + (trades.length ? trades.map((t) => {
-    const pending = subs.some((s) => s.arg.tradeCid === t.cid);
-    const others = mine().filter((x) => x.arg.instrument !== 'USDC' && x.arg.instrument !== t.arg.collateralInstrument);
+    const pending = subs.find((s) => s.arg.tradeCid === t.cid);
+    // 1.2.0 takes substitutes from the repo's own collateral issuer only.
+    const others = mine(null, t.arg.collateralIssuer).filter((x) => x.arg.instrument !== 'USDC' && x.arg.instrument !== t.arg.collateralInstrument);
     return tradeCard(t, `<button data-act="repurchase" data-cid="${t.cid}">Repurchase for ${money(owed(t.arg) + fee(t.arg))}</button>
-      ${pending ? '<span class="pill warn">substitution waiting for lender</span>'
+      ${pending ? `<span class="pill warn">substitution waiting for lender</span>
+          <button class="ghost" data-act="withdraw-sub" data-cid="${pending.cid}">Withdraw substitute</button>`
         : others.length ? `<select class="in" id="sub-${t.cid.slice(0, 12)}" aria-label="Collateral to offer as substitute">${others.map((x) => `<option value="${x.cid}">${units(x.arg.amount)} ${esc(x.arg.instrument)}</option>`).join('')}</select>
           <button class="ghost" data-act="substitute" data-cid="${t.cid}">Offer as substitute</button>` : ''}
       <button class="ghost" data-act="cash">Demo issuer: give me 100k USDC</button>`);
   }).join('') : '<p class="empty">No open repos.</p>');
-  return h + holdingsCard();
+
+  const scheds = of('HaircutSchedule');
+  h += `<h2>Lender haircut schedules</h2>` + (scheds.length ? `<div class="card"><table><tr><th>Lender</th><th>Minimum haircut by collateral</th></tr>
+    ${scheds.map((c) => `<tr><td>${name(c.arg.lender)}</td><td>${Object.entries(c.arg.floors).map(([i, f]) => `${esc(i)} ${pct(f)}`).join(' · ')}</td></tr>`).join('')}</table>
+    <p class="empty">A lender quoting through its schedule cannot go below these floors, and collateral not listed is refused.</p></div>`
+    : '<p class="empty">No lender has published one to you.</p>');
+  return h + agreementsSection() + holdingsCard();
 }
 
 function lenderView() {
@@ -193,12 +233,16 @@ function lenderView() {
   h += `<h2>Requests you were asked to quote</h2>` + (rfqs.length ? rfqs.map((r) => {
     const t = r.arg.terms, m = mark(t.collateralInstrument);
     const mineQ = quotes.find((q) => q.arg.rfqId === r.cid);
+    const sched = schedule(me()), floor = floorOf(me(), t.collateralInstrument);
     return `<div class="card"><h3>${name(r.arg.borrower)} wants ${money(t.principal)} USDC against ${units(t.collateralQty)} ${esc(t.collateralInstrument)}, ${esc(t.termDays)} days</h3>
-      <div class="row"><span>Mark <b>${m ? money(m.price) : '—'}</b></span><span>Collateral value <b>${m ? money(N(t.collateralQty) * m.price) : '—'}</b></span></div>
+      <div class="row"><span>Mark <b>${m ? money(m.price) : '—'}</b></span><span>Collateral value <b>${m ? money(N(t.collateralQty) * m.price) : '—'}</b></span>
+      ${t.minTransfer != null ? `<span>Min transfer <b>${money(t.minTransfer)}</b></span>` : ''}
+      ${sched ? `<span>Your schedule <b>${floor == null ? 'not eligible' : 'min ' + pct(floor)}</b></span>` : ''}</div>
+      ${sched && floor == null ? `<p class="empty" style="margin:6px 0 0"><span class="pill warn">${esc(t.collateralInstrument)} is not on your haircut schedule</span> a quote goes through the schedule, so the ledger will refuse it.</p>` : ''}
       ${mineQ ? `<div class="actions"><span class="pill ok">your sealed quote: ${N(mineQ.arg.rateBps)} bp, ${pct(mineQ.arg.haircut)}</span>
         <button class="ghost" data-act="withdraw" data-cid="${mineQ.cid}">Withdraw</button></div>`
       : `<div class="form" style="margin-top:10px"><label>Rate (bp)<input id="r-${r.cid.slice(0, 12)}" type="number" value="525" /></label>
-        <label>Haircut (%)<input id="h-${r.cid.slice(0, 12)}" type="number" step="0.5" value="2" /></label>
+        <label>Haircut (%)<input id="h-${r.cid.slice(0, 12)}" type="number" step="0.5" value="${floor != null ? Math.max(2, +(floor * 100).toFixed(4)) : 2}" /></label>
         <button data-act="quote" data-cid="${r.cid}">Seal quote, lock ${money(t.principal)} USDC</button>
         <button class="ghost" data-act="cash-for" data-amount="${t.principal}">Demo issuer: give me the cash</button></div>`}</div>`;
   }).join('') : '<p class="empty">No requests.</p>');
@@ -212,45 +256,104 @@ function lenderView() {
   h += `<h2>Substitutions to approve</h2>` + (subs.length ? subs.map((s) => {
     const t = trades.find((x) => x.cid === s.arg.tradeCid), m = mark(s.arg.newInstrument);
     const cover = t && m ? lendable(N(t.arg.haircut), N(s.arg.newQty), m.price) / owed(t.arg) : null;
+    const issuerOk = !t || s.arg.newIssuer === t.arg.collateralIssuer, floor = floorOf(me(), s.arg.newInstrument);
+    const schedOk = !schedule(me()) || (floor != null && t && N(t.arg.haircut) >= floor);
     return `<div class="card"><h3>${name(s.arg.borrower)} offers ${units(s.arg.newQty)} ${esc(s.arg.newInstrument)}${t ? ` for ${units(t.arg.collateralQty)} ${esc(t.arg.collateralInstrument)}` : ''}</h3>
-      <div class="row"><span>Mark <b>${m ? money(m.price) : '—'}</b></span><span>Would cover <b>${cover == null ? '—' : pct(cover)}</b></span></div>
-      <div class="actions"><button data-act="approve" data-cid="${s.cid}" ${cover >= 1 && m?.fresh ? '' : 'disabled'}>Approve swap</button>
+      <div class="row"><span>Mark <b>${m ? money(m.price) : '—'}</b></span><span>Would cover <b>${cover == null ? '—' : pct(cover)}</b></span>
+      ${issuerOk ? '' : `<span><span class="pill bad">issued by another issuer than the repo's collateral</span></span>`}
+      ${schedOk ? '' : `<span><span class="pill warn">outside your haircut schedule</span></span>`}</div>
+      <div class="actions"><button data-act="approve" data-cid="${s.cid}" ${cover >= 1 && m?.fresh && issuerOk ? '' : 'disabled'}>Approve swap</button>
       <button class="ghost" data-act="decline" data-cid="${s.cid}">Decline</button></div></div>`;
   }).join('') : '<p class="empty">None.</p>');
 
   h += `<h2>Your margin calls</h2>` + (calls.length ? calls.map((c) => {
     const due = Date.now() > Date.parse(c.arg.respondBy);
+    // 1.2.0: a default must follow the deadline within a day; after that, call again on a fresh mark.
+    const lapsed = Date.now() > Date.parse(c.arg.respondBy) + DAY;
     return `<div class="card"><h3>${units(c.arg.unitsDue)} ${esc(c.arg.instrument)} called from ${name(c.arg.borrower)}</h3>
-      <div class="row"><span>Respond by <b>${when(c.arg.respondBy)}</b></span></div>
-      <div class="actions"><button data-act="default" data-cid="${c.cid}" ${due ? '' : 'disabled'}>${due ? 'Declare default, keep collateral' : 'Borrower still has time'}</button></div></div>`;
+      <div class="row"><span>At mark <b>${money(c.arg.price)}</b></span>${c.arg.markAsOf ? `<span>Mark struck <b>${when(c.arg.markAsOf)}</b></span>` : ''}
+      <span>Respond by <b>${when(c.arg.respondBy)}</b></span></div>
+      <div class="actions"><button data-act="default" data-cid="${c.cid}" ${due && !lapsed ? '' : 'disabled'}>${lapsed ? 'Over a day past the deadline: call again' : due ? 'Declare default, keep collateral' : 'Borrower still has time'}</button></div></div>`;
   }).join('') : '<p class="empty">None.</p>');
 
   h += `<h2>Repos you funded</h2>` + (trades.length ? trades.map((t) => {
     const m = mark(t.arg.collateralInstrument);
-    const short = m && lendable(N(t.arg.haircut), N(t.arg.collateralQty), m.price) < owed(t.arg);
-    const called = calls.some((c) => c.arg.tradeCid === t.cid);
+    const gap = m ? owed(t.arg) - lendable(N(t.arg.haircut), N(t.arg.collateralQty), m.price) : 0, short = gap > 0;
+    const called = calls.some((c) => c.arg.tradeCid === t.cid && Date.now() <= Date.parse(c.arg.respondBy) + DAY);
+    const mta = t.arg.terms.minTransfer != null ? N(t.arg.terms.minTransfer) : null;
     const late = Date.now() > Date.parse(t.arg.maturity);
     const offered = of('RollOffer').some((o) => o.arg.tradeCid === t.cid), k = t.cid.slice(0, 12);
-    return tradeCard(t, `${short && !called ? `<button data-act="call" data-cid="${t.cid}" ${m.fresh ? '' : 'disabled'}>Call margin (24h)</button>` : ''}
+    return tradeCard(t, `${short && !called ? `<span class="form"><label>Respond within (h)<input id="mc-h-${k}" type="number" min="2" value="24" /></label>
+        <button data-act="call" data-cid="${t.cid}" ${m.fresh ? '' : 'disabled'}>Call margin on ${money(gap)} short</button></span>
+        ${m.callable ? '' : '<span class="pill warn">mark over an hour old: the ledger wants a newer one for a call</span>'}
+        ${mta != null && gap < mta ? `<span class="pill warn">shortfall below the ${money(mta)} minimum transfer: the ledger will refuse a call</span>` : ''}` : ''}
       ${late ? `<button data-act="claim" data-cid="${t.cid}">Claim collateral, past maturity</button>`
         : offered ? '<span class="pill warn">roll offered, waiting for the borrower</span>'
         : `<span class="form"><label>Roll at (bp)<input id="ro-r-${k}" type="number" value="${N(t.arg.rateBps) - 15}" /></label>
            <label>Extra days<input id="ro-d-${k}" type="number" value="30" /></label>
            <button class="ghost" data-act="offer-roll" data-cid="${t.cid}">Offer roll</button></span>`}`);
   }).join('') : '<p class="empty">None.</p>');
-  return h + holdingsCard();
+  return h + scheduleSection() + agreementsSection() + holdingsCard();
 }
+
+// 1.2.0: the lender's own haircut floors per collateral instrument, published to the borrower.
+function scheduleSection() {
+  const s = schedule(me());
+  const insts = [...new Set([...of('Mark').map((m) => m.arg.instrument), ...Object.keys(s?.arg.floors ?? {})])].sort();
+  return `<h2>Your haircut schedule</h2><div class="card">
+    <p class="empty" style="margin:0 0 10px">${s ? 'Published to the borrower. Your quotes and substitution approvals go through it: the ledger refuses a haircut under the floor and collateral left blank.'
+      : 'None published: quotes go out unchecked. Set a minimum haircut per collateral; leave one blank to refuse it.'}</p>
+    <div class="form">${insts.map((i) => `<label>${esc(i)} min haircut (%)<input class="hs-floor" data-inst="${esc(i)}" type="number" step="0.5" min="0" max="49.99"
+      value="${s && i in s.arg.floors ? +(N(s.arg.floors[i]) * 100).toFixed(4) : ''}" placeholder="not eligible" /></label>`).join('')}
+    ${canAct() ? `<button data-act="schedule">${s ? 'Revise schedule' : 'Sign and publish schedule'}</button>
+      ${s ? `<button class="ghost" data-act="drop-schedule" data-cid="${s.cid}">Withdraw schedule</button>` : ''}` : ''}</div></div>`;
+}
+
+// 1.2.0: master agreements (GMRA-style), one per borrower-lender pair, and close-out netting.
+function agreementsSection() {
+  const lender = LENDERS.includes(ROLE), side = lender ? 'borrower' : 'lender';
+  const mas = of('MasterAgreement'), props = of('MasterAgreementProposal');
+  const reps = of('CloseOutReport').sort((a, b) => b.arg.at.localeCompare(a.arg.at));
+  const taken = (party) => [...mas, ...props].some((c) => c.arg[side] === party);
+  const open = (lender ? ['borrower'] : LENDERS).filter((r) => CFG.parties[r] && !taken(CFG.parties[r]));
+  let h = `<h2>Master agreements</h2>`;
+  if (canAct() && open.length) h += `<div class="card"><div class="form">
+    <label>Counterparty<select class="in" id="ma-cp">${open.map((r) => `<option value="${r}">${NAMES[r]}</option>`).join('')}</select></label>
+    <label>Form<input id="ma-form" value="GMRA 2011" /></label>
+    <button data-act="propose-master">Offer master agreement</button></div></div>`;
+  h += props.map((p) => `<div class="card"><h3>${esc(p.arg.form)} between ${name(p.arg.borrower)} and ${name(p.arg.lender)} <span class="pill warn">offered by ${name(p.arg.proposer)}</span></h3>
+    <div class="actions">${p.arg.proposer === me() ? `<button class="ghost" data-act="withdraw-master" data-cid="${p.cid}">Withdraw offer</button>`
+      : `<button data-act="sign-master" data-cid="${p.cid}">Sign master agreement</button>`}</div></div>`).join('');
+  h += mas.map((c) => {
+    const trades = underAgreement(c.arg), ev = defaultEvent(trades);
+    const why = ev.call ? 'margin call past its deadline' : ev.matured.length ? `${ev.matured.length} repo${ev.matured.length > 1 ? 's' : ''} past maturity` : null;
+    return `<div class="card"><h3>${esc(c.arg.form)} between ${name(c.arg.borrower)} and ${name(c.arg.lender)} <span class="pill ok">signed by both</span></h3>
+      <div class="row"><span>Repos under it <b>${trades.length}</b></span><span>Owed across them <b>${money(trades.reduce((a, t) => a + owed(t.arg), 0))}</b></span>
+      <span>Event of default <b>${why ?? 'none'}</b></span></div>
+      ${lender ? `<div class="actions"><button data-act="close-out" data-cid="${c.cid}" ${trades.length ? '' : 'disabled'}>${why ? `Close out all ${trades.length} repos, net to one sum` : 'Close out (the ledger refuses without an event of default)'}</button></div>` : ''}</div>`;
+  }).join('');
+  if (!props.length && !mas.length && !(canAct() && open.length)) h += '<p class="empty">None.</p>';
+  return h + closeOutTable(reps);
+}
+
+const closeOutTable = (reps) => `<h2>Close-outs</h2>` + (reps.length ? `<div class="card"><table><tr><th>When</th><th>Borrower</th><th>Lender</th><th>Trigger</th><th>Repos netted</th>
+  <th>Owed</th><th>Collateral value</th><th>Kept by lender</th><th>Returned</th></tr>
+  ${reps.map((r) => `<tr><td>${when(r.arg.at)}</td><td>${name(r.arg.borrower)}</td><td>${name(r.arg.lender)}</td>
+    <td><span class="pill bad">${esc(r.arg.trigger)}</span></td><td>${esc(r.arg.reposNetted)}</td><td>${money(r.arg.owed)}</td><td>${money(r.arg.collateralValue)}</td>
+    <td>${money(r.arg.valueKept)}</td><td>${money(r.arg.valueReturned)}</td></tr>`).join('')}</table>
+  <p class="empty">Valued at fresh marks with no haircut; excess collateral on one repo covers a shortfall on another.</p></div>`
+  : '<p class="empty">None.</p>');
 
 function regulatorView() {
   const reps = of('RepoReport').sort((a, b) => b.arg.at.localeCompare(a.arg.at));
   const bex = of('BestExecution').sort((a, b) => b.arg.at.localeCompare(a.arg.at));
-  const seen = DATA.filter((c) => c.tpl !== 'RepoReport' && c.tpl !== 'BestExecution').length;
+  const seen = DATA.filter((c) => !['RepoReport', 'BestExecution', 'CloseOutReport'].includes(c.tpl)).length;
   return `<div class="card proof"><b>Privacy, read from this node:</b> ${reps.length} lifecycle reports, and
     ${seen === 0 ? 'no request, quote, loss notice or position. Losing rates never reached the regulator.' : `<span class="pill bad">${seen} other contracts</span>`}</div>
-    <h2>Best execution</h2><div class="card">${bex.length ? `<table><tr><th>When</th><th>Quotes weighed</th><th>Winner's rank</th><th>Rate taken</th><th>Haircut</th><th>Over best rate</th></tr>
+    <h2>Best execution</h2><div class="card">${bex.length ? `<table><tr><th>When</th><th>Quotes weighed</th><th>Winner's rank</th><th>Rate taken</th><th>Haircut</th><th>Over best rate (band)</th></tr>
     ${bex.map((b) => `<tr><td>${when(b.arg.at)}</td><td>${esc(b.arg.quotesConsidered)}</td>
       <td>${N(b.arg.winnerRank) === 1 ? '<span class="pill ok">1 · best</span>' : `<span class="pill warn">${esc(b.arg.winnerRank)}</span>`}</td>
-      <td>${N(b.arg.winningRateBps)} bp</td><td>${pct(b.arg.winningHaircut)}</td><td>${N(b.arg.spreadToBestBps) ? N(b.arg.spreadToBestBps) + ' bp' : '—'}</td></tr>`).join('')}</table>
+      <td>${N(b.arg.winningRateBps)} bp</td><td>${pct(b.arg.winningHaircut)}</td><td>${b.arg.spreadBucket != null ? (b.arg.spreadBucket === '0' ? '—' : esc(b.arg.spreadBucket) + ' bp') : N(b.arg.spreadToBestBps) ? N(b.arg.spreadToBestBps) + ' bp' : '—'}</td></tr>`).join('')}</table>
       <p class="empty">No lender is named and no losing quote is shown: the regulator learns how price discovery went, not who lost.</p>`
     : '<p class="empty">No awards yet.</p>'}</div>
     <h2>Repo lifecycle reports</h2><div class="card">${reps.length ? `<table><tr><th>When</th><th>Event</th><th>Borrower</th><th>Lender</th>
@@ -258,7 +361,7 @@ function regulatorView() {
     ${reps.map((r) => `<tr><td>${when(r.arg.at)}</td><td><span class="pill ${r.arg.event === 'DEFAULT' ? 'bad' : r.arg.event === 'CLOSE' ? 'ok' : r.arg.event === 'ROLL' ? 'warn' : 'mute'}">${esc(r.arg.event)}</span></td>
       <td>${name(r.arg.borrower)}</td><td>${name(r.arg.lender)}</td><td>${money(r.arg.terms.principal)}</td><td>${N(r.arg.rateBps)} bp</td>
       <td>${pct(r.arg.haircut)}</td><td>${units(r.arg.collateralQty)} ${esc(r.arg.collateralInstrument)}</td><td>${N(r.arg.cashMoved) ? money(r.arg.cashMoved) : ''}</td><td>${N(r.arg.feePaid) ? money(r.arg.feePaid) : ''}</td></tr>`).join('')}</table>`
-    : '<p class="empty">No reports.</p>'}</div>`;
+    : '<p class="empty">No reports.</p>'}</div>` + closeOutTable(of('CloseOutReport').sort((a, b) => b.arg.at.localeCompare(a.arg.at)));
 }
 
 function agentView() {
@@ -366,7 +469,9 @@ const ACTIONS = {
       lenders: [...document.querySelectorAll('.n-lender:checked')].map((x) => CFG.parties[x.value]), deadline: null, terms: {
         cashIssuer: CFG.parties.cashIssuer, cashInstrument: 'USDC', principal: num('#n-cash', 'Cash wanted'),
         collateralIssuer: CFG.parties.bondIssuer, collateralInstrument: val('#n-inst'),
-        collateralQty: num('#n-qty', 'Units'), termDays: num('#n-term', 'Term') } }));
+        collateralQty: num('#n-qty', 'Units'), termDays: num('#n-term', 'Term'),
+        // Blank: no minimum transfer, any shortfall may be called.
+        minTransfer: val('#n-mta')?.trim() ? num('#n-mta', 'Minimum transfer') : null } }));
     return 'Request sent to the panel';
   },
   async bonds() { await faucet('bondIssuer', val('#n-inst'), num('#n-qty', 'Units')); return 'Bonds issued to you'; },
@@ -413,22 +518,27 @@ const ACTIONS = {
     // Percent to a fraction with at most 10 decimals: 1.1 / 100 is 0.011000000000000001 in
     // floating point, which the ledger's Numeric 10 refuses to decode.
     const rate = num(`#r-${k}`, 'Rate'), haircut = (N(num(`#h-${k}`, 'Haircut')) / 100).toFixed(10);
-    const cash = await exact('USDC', t.cashIssuer, t.principal);
-    await act(exercise('RepoRFQ', r.cid, 'SubmitQuote', { lender: me(), rateBps: rate,
-      haircut, cashCid: cash }));
-    return 'Quote sealed to the borrower; cash locked behind it';
+    const cash = await exact('USDC', t.cashIssuer, t.principal), sched = schedule(me());
+    // A lender with a published schedule quotes through it, so the ledger checks the floor.
+    await act(sched ? exercise('HaircutSchedule', sched.cid, 'QuoteWithinSchedule', { rfqCid: r.cid, rateBps: rate, haircut, cashCid: cash })
+      : exercise('RepoRFQ', r.cid, 'SubmitQuote', { lender: me(), rateBps: rate, haircut, cashCid: cash }));
+    return sched ? 'Quote sealed through your haircut schedule; cash locked behind it' : 'Quote sealed to the borrower; cash locked behind it';
   },
   async withdraw(b) { await act(exercise('RepoQuote', b.dataset.cid, 'WithdrawQuote', { contexts: NO_CONTEXTS })); return 'Quote withdrawn, cash returned'; },
   async approve(b) {
-    const s = of('Substitution').find((x) => x.cid === b.dataset.cid).arg;
-    await act(exercise('Substitution', b.dataset.cid, 'Approve', { markCid: mark(s.newInstrument).cid, contexts: NO_CONTEXTS }));
+    const s = of('Substitution').find((x) => x.cid === b.dataset.cid).arg, sched = schedule(me());
+    const markCid = mark(s.newInstrument).cid;
+    await act(sched ? exercise('HaircutSchedule', sched.cid, 'ApproveWithinSchedule', { substitutionCid: b.dataset.cid, markCid, contexts: NO_CONTEXTS })
+      : exercise('Substitution', b.dataset.cid, 'Approve', { markCid, contexts: NO_CONTEXTS }));
     return 'Collateral swapped';
   },
   async decline(b) { await act(exercise('Substitution', b.dataset.cid, 'Decline', { contexts: NO_CONTEXTS })); return 'Substitute returned to the borrower'; },
   async call(b) {
     const t = of('RepoTrade').find((x) => x.cid === b.dataset.cid).arg;
+    // The ledger gives the borrower at least 2 hours; 2 here would land a moment short of it.
+    const hours = N(num(`#mc-h-${b.dataset.cid.slice(0, 12)}`, 'Respond within'));
     await act(exercise('RepoTrade', b.dataset.cid, 'CallMargin', { markCid: mark(t.collateralInstrument).cid,
-      respondBy: new Date(Date.now() + DAY).toISOString() }));
+      respondBy: new Date(Date.now() + hours * HOUR + 60000).toISOString() }));
     return 'Margin called';
   },
   async default(b) { await act(exercise('MarginCall', b.dataset.cid, 'Default', { contexts: NO_CONTEXTS })); return 'Default declared: you keep collateral up to what is owed, the rest goes back to the borrower'; },
@@ -438,6 +548,47 @@ const ACTIONS = {
     await act(create('RollOffer', { tradeCid: b.dataset.cid, borrower: t.borrower, lender: me(),
       newRateBps: num(`#ro-r-${k}`, 'Roll rate'), extraDays: num(`#ro-d-${k}`, 'Extra days'), expiresAt: new Date(Date.now() + 2 * DAY).toISOString() }));
     return 'Roll offered to the borrower';
+  },
+  async refute(b) {
+    const c = of('MarginCall').find((x) => x.cid === b.dataset.cid).arg;
+    await act(exercise('MarginCall', b.dataset.cid, 'RefuteMarginCall', { markCid: mark(c.instrument).cid }));
+    return 'Margin call cancelled: the newer mark shows the pledge covers what is owed';
+  },
+  async 'withdraw-sub'(b) { await act(exercise('Substitution', b.dataset.cid, 'WithdrawSubstitution', { contexts: NO_CONTEXTS })); return 'Substitute withdrawn and unlocked'; },
+  async schedule() {
+    const floors = {};
+    for (const i of document.querySelectorAll('.hs-floor')) {
+      const v = i.value.trim();
+      if (!v) continue;
+      if (!Number.isFinite(N(v))) throw new Error(`${i.dataset.inst}: enter a number`);
+      floors[i.dataset.inst] = (N(v) / 100).toFixed(10);
+    }
+    if (!Object.keys(floors).length) throw new Error('give at least one collateral a minimum haircut');
+    const old = schedule(me()), audience = [CFG.parties.borrower];
+    await act(old ? exercise('HaircutSchedule', old.cid, 'ReviseSchedule', { newFloors: floors, newAudience: audience })
+      : create('HaircutSchedule', { lender: me(), floors, audience }));
+    return old ? 'Haircut schedule revised' : 'Haircut schedule signed and published to the borrower';
+  },
+  async 'drop-schedule'(b) { await act(exercise('HaircutSchedule', b.dataset.cid, 'Archive')); return 'Haircut schedule withdrawn'; },
+  async 'propose-master'() {
+    const other = CFG.parties[val('#ma-cp')], lender = LENDERS.includes(ROLE);
+    await act(create('MasterAgreementProposal', { borrower: lender ? other : me(), lender: lender ? me() : other,
+      regulator: CFG.parties.regulator, form: val('#ma-form')?.trim() || 'GMRA 2011', proposer: me() }));
+    return 'Master agreement offered; it binds once the other side signs';
+  },
+  async 'sign-master'(b) { await act(exercise('MasterAgreementProposal', b.dataset.cid, 'SignMaster')); return 'Master agreement signed by both sides'; },
+  async 'withdraw-master'(b) { await act(exercise('MasterAgreementProposal', b.dataset.cid, 'WithdrawMasterProposal')); return 'Offer withdrawn'; },
+  async 'close-out'(b) {
+    const ma = of('MasterAgreement').find((x) => x.cid === b.dataset.cid).arg, trades = underAgreement(ma);
+    const markCids = trades.map((t) => {
+      const m = mark(t.arg.collateralInstrument);
+      if (!m?.fresh) throw new Error('no fresh mark for ' + t.arg.collateralInstrument + ': ask the agent to publish one');
+      return m.cid;
+    });
+    const tx = await act(exercise('MasterAgreement', b.dataset.cid, 'CloseOut', { tradeCids: trades.map((t) => t.cid), markCids,
+      defaultedCall: defaultEvent(trades).call?.cid ?? null, contexts: NO_CONTEXTS }));
+    const r = createdEvent(tx, 'CloseOutReport')?.createArgument;
+    return r ? `Closed out ${r.reposNetted} repos on ${r.trigger}: owed ${money(r.owed)}, kept ${money(r.valueKept)}, returned ${money(r.valueReturned)}` : 'Closed out';
   },
   async mark() {
     await act(create('Mark', { agent: me(), instrument: val('#m-inst'), price: num('#m-price', 'Price'), asOf: new Date().toISOString(),

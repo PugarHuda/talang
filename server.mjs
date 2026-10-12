@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { join, extname, dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PARTIES, acs, submit } from './lib/ledger.mjs';
+import { PARTIES, acs, deskAcs, submit } from './lib/ledger.mjs';
 import { walletConfig, walletSubmit, receiptsFor, checkWalletSignature } from './api/wallet-verify.mjs';
 
 const WEB = join(dirname(fileURLToPath(import.meta.url)), 'web');
@@ -38,7 +38,7 @@ createServer(async (req, res) => {
     if (req.url === '/api/acs' && req.method === 'POST') {
       const { role } = (await body(req)) ?? {};
       if (!Object.hasOwn(PARTIES, role)) return send(res, 400, { error: 'unknown role' });
-      return send(res, 200, await acs(PARTIES[role]));
+      return send(res, 200, await deskAcs(PARTIES[role]));
     }
     if (req.url === '/api/submit' && req.method === 'POST') {
       if (READ_ONLY) return send(res, 403, { error: 'read-only desk' });
