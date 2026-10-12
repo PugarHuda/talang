@@ -66,6 +66,9 @@ async function exactHolding(contracts, match, qty, what) {
   return N(h.arg.amount) === qty ? h.cid
     : created(await submit(ME, exercise('Holding', h.cid, 'Split', { splitAmount: String(qty) })), 'Holding');
 }
+// Percent to a Daml Decimal (10 places): 1.1 / 100 is 0.011000000000000001 in floating point,
+// which the ledger refuses as a Decimal.
+const pctToDecimal = (p) => (p / 100).toFixed(10);
 const NOTHING = { type: 'object', properties: {} };
 
 const TOOLS = {
@@ -198,7 +201,7 @@ async function run(name, a = {}) {
   if (name === 'publish_haircut_schedule') {
     const entries = Object.entries(a.floorsPct ?? {});
     if (!entries.length) throw new Error('floorsPct needs at least one instrument');
-    const floors = Object.fromEntries(entries.map(([k, v]) => [instrument(k, 'instrument'), String(num(v, `floor for ${k}`, { min: 0, max: 49.99 }) / 100)]));
+    const floors = Object.fromEntries(entries.map(([k, v]) => [instrument(k, 'instrument'), pctToDecimal(num(v, `floor for ${k}`, { min: 0, max: 49.99 }))]));
     const audience = (a.borrowers?.length ? a.borrowers : ['borrower']).map((r) => role(r, 'borrower'));
     const old = (await agreements()).find((c) => c.tpl === 'HaircutSchedule' && c.arg.lender === ME);
     const tx = await submit(ME, old ? exercise('HaircutSchedule', old.cid, 'ReviseSchedule', { newFloors: floors, newAudience: audience })
@@ -261,7 +264,7 @@ async function run(name, a = {}) {
   if (name === 'quote') {
     const r = pick(of('RepoRFQ'), a.request, 'request'), t = r.arg.terms;
     if (rfqProblems(r).length) throw new Error(`not quoting this request: ${rfqProblems(r).join('; ')}`);
-    num(a.rateBps, 'rateBps', { min: 0.01, max: 10000 }); num(a.haircutPct, 'haircutPct', { min: 0, max: 49.99 });
+    const rateBps = num(a.rateBps, 'rateBps', { min: 0.01, max: 10000 }), haircutPct = num(a.haircutPct, 'haircutPct', { min: 0, max: 49.99 });
     const cash = of('Holding').filter((h) => h.arg.owner === ME && h.arg.instrument === t.cashInstrument && h.arg.issuer === t.cashIssuer)
       .sort((x, y) => N(x.arg.amount) - N(y.arg.amount)).find((h) => N(h.arg.amount) >= N(t.principal));
     if (!cash) throw new Error(`no free ${t.cashInstrument} holding of at least ${N(t.principal)} to lock behind the quote`);
@@ -269,7 +272,7 @@ async function run(name, a = {}) {
       : created(await submit(ME, exercise('Holding', cash.cid, 'Split', { splitAmount: t.principal })), 'Holding');
     // A published haircut schedule is the lender's own policy: quote through it so the ledger checks the floor.
     const sched = (await agreements()).find((c) => c.tpl === 'HaircutSchedule' && c.arg.lender === ME);
-    const args = { rateBps: String(a.rateBps), haircut: String(a.haircutPct / 100), cashCid };
+    const args = { rateBps: String(rateBps), haircut: pctToDecimal(haircutPct), cashCid };
     await submit(ME, sched ? exercise('HaircutSchedule', sched.cid, 'QuoteWithinSchedule', { rfqCid: r.cid, ...args })
       : exercise('RepoRFQ', r.cid, 'SubmitQuote', { lender: ME, ...args }));
     return { sealed: true, request: short(r.cid), rateBps: a.rateBps, haircutPct: a.haircutPct, locked: N(t.principal) };
@@ -286,6 +289,8 @@ async function run(name, a = {}) {
 
   if (name === 'review_substitution') {
     const s = pick(of('Substitution'), a.substitution, 'substitution');
+    // Only an explicit "approve" approves: a model's "reject" or "no" must not fall through to approval.
+    if (a.decision !== 'approve' && a.decision !== 'decline') throw new Error(`decision must be "approve" or "decline", got ${a.decision}`);
     if (a.decision === 'decline') { await submit(ME, exercise('Substitution', s.cid, 'Decline', { contexts: NO_CONTEXTS })); return { declined: true }; }
     // Approve values the substitute by instrument NAME (Talang 1.1.0 marks carry no issuer), so a
     // borrower-issued "UST5Y" would pass the contract: only the desk bond issuer's paper is approved.

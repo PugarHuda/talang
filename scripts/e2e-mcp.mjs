@@ -86,8 +86,10 @@ if (awarded) {
   await submit(p.bondIssuer, create('Holding', { issuer: p.bondIssuer, owner: p.borrower, instrument: 'UST10Y', amount: '80' }));
   const s = await BOR.call('propose_substitution', { repo: awarded.opened, instrument: 'UST10Y', qty: 70 });
   const seen = (await L.call('portfolio')).data.find((t) => t.substitution?.id === s.data?.substitution);
+  // A decision other than approve/decline is refused, never read as approval.
+  const odd = seen ? await L.call('review_substitution', { substitution: seen.substitution.id, decision: 'reject' }) : null;
   const d = seen ? await L.call('review_substitution', { substitution: seen.substitution.id, decision: 'decline' }) : null;
-  check(s.data && seen && d?.data?.declined,
+  check(s.data && seen && odd?.error && d?.data?.declined,
     `substitution of 70 UST10Y (would cover ${s.data?.wouldCover?.toFixed(2) ?? s.error}) seen and declined by ${awarded.lender}`);
 }
 
