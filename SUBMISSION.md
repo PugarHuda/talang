@@ -50,7 +50,7 @@ Measured on 9 October: on a Canton 3.4.11 sandbox (`npm run e2e:mcp`, `npm run g
 | Rival quotes visible on any lender node | 0, checked on every run |
 | Requests, quotes or loss notices visible to the regulator | 0 |
 | Repo states seeded through the Ledger API | 6 (sealed, live, substitution pending, margin call, roll, closed with fee) |
-| Daml scripts / MCP end-to-end checks | 22 / 33 |
+| Daml scripts / MCP end-to-end checks | 31 / 41 |
 | Playwright desk checks / read-only API checks | 29 / 45 |
 | Governed mark below threshold | refused by BitSafe's `GovernanceRules` |
 
@@ -84,7 +84,7 @@ repurchase and every roll, so it cannot be skipped. Built and tested.
   execution, margin calls from fresh marks, substitution, rolls, repurchase in desk
   cash or as a standard allocation request, venue fee, default, regulator reports;
   BitSafe-governed marks and lender syndicates.
-- **Tests:** 22 Daml scripts including every refusal, the token rail against a
+- **Tests:** 31 Daml scripts including every refusal, the token rail against a
   registry implementing the Splice interfaces, and BitSafe's own `GovernanceRules`.
 - **Desk** (`web/`, `server.mjs`): one page per role, each reading only its own node.
 - **AI agents** (`mcp/server.mjs`): lender, borrower and regulator desks over MCP.

@@ -16,7 +16,7 @@ than README and docs/evidence show.
 **Elevator pitch (≤2000):**
 Talang is a sealed-bid repo desk on Canton. A fund that holds tokenized Treasuries asks a panel of lenders for cash against them; each lender's rate and haircut is sealed to the borrower alone, because on Canton a quote that names only the lender and the borrower is never sent to anyone else's node. The borrower takes the cheapest quote that covers the loan, and in one atomic transaction the bonds are pledged, the cash is delivered and the losing lenders are refunded, told only their rank. The repo then lives on the ledger: margin calls computed from a signed mark and refused when the repo is still covered, substitution only with the lender's consent, rolls, repurchase with a venue fee that cannot be skipped, and default that returns any excess collateral to the borrower. The regulator observes every lifecycle event and gets best-execution records with no lender names and no losing rates.
 Marks come from a BitSafe valuation committee: a decentralized party hosted on three participants through BitSafe's Decentralization Manager, where one pricer alone is refused and two of three publish; it keeps publishing with one node down. Both legs can be CIP-0056 tokens: on DevNet a repo has run with Canton Coin as cash and CBTC as collateral, each allocated through its registry and settled atomically at repurchase. A wallet's key (CIP-0103) can authorise each desk command, so a borrower can verify which key sealed a quote. MCP agents sit at the lender, borrower and regulator desks, each reading only its own node.
-Live on the NODERS DevNet participant; one-command LocalNet demo for BitSafe; 22 Daml tests, 33 MCP end-to-end checks, 29 Playwright checks.
+Live on the NODERS DevNet participant; one-command LocalNet demo for BitSafe; 31 Daml tests, 41 MCP end-to-end checks, 29 Playwright checks.
 
 **Tech stack:** Daml 3.4, Canton, JSON Ledger API v2, CIP-0056 Token Standard, DA Utility Registry, BitSafe Decentralization Manager (governance-core-v1, governance-action-v1), CIP-0103 dApp SDK, Grofty Wallet, MCP (Model Context Protocol), Node.js, Vercel, Playwright, Docker
 
@@ -197,7 +197,7 @@ No user interviews have happened yet. Ecosystem conversations that changed the b
 ### 4. Tests and results
 
 - **What we tried:** the full flow on the NODERS DevNet participant, a 3-participant DecMan LocalNet, a local sandbox, and automated suites.
-- **What happened:** 22/22 Daml tests; 33/33 MCP end-to-end checks; 29/29 Playwright desk checks; 45/45 read-only API checks; DecMan committee 8/8 steps with 2 expected refusals; node-offline run 6/6; real CBTC repo on DevNet 7/7 steps; Canton Coin cash + CBTC collateral repo on DevNet 12/12 steps.
+- **What happened:** 31/31 Daml tests; 41/41 MCP end-to-end checks; 29/29 Playwright desk checks; 45/45 read-only API checks; DecMan committee 8/8 steps with 2 expected refusals; node-offline run 6/6; real CBTC repo on DevNet 7/7 steps; Canton Coin cash + CBTC collateral repo on DevNet 12/12 steps.
 - **What we changed:** Playwright QA found 10 bugs (a double submit on repaint, an empty haircut sent as 0%, float precision refused by the ledger, …), all fixed; a margin call can no longer give the borrower under 2 hours; default now returns excess collateral (GMRA close-out).
 
 ### 5. Product and on-ledger metrics
@@ -239,7 +239,7 @@ Upload `media/talang-pitch-deck.pdf` (max 10 MB).
 
 ## MVP summary
 
-- **Built and running:** Daml model (RFQ, sealed quotes, award, best execution, loss notices, margin, substitution, roll, repurchase with venue fee, default with excess returned), 22 Daml tests; desk UI per role with a side-by-side privacy view; three MCP agents; hosted desk reading live DevNet data.
+- **Built and running:** Daml model (RFQ, sealed quotes, award, best execution, loss notices, margin, substitution, roll, repurchase with venue fee, default with excess returned), 31 Daml tests; desk UI per role with a side-by-side privacy view; three MCP agents; hosted desk reading live DevNet data.
 - **On DevNet (NODERS):** `talang-repo` 1.0.0 vetted and seeded; a repo with both legs in real tokens — Canton Coin cash and CBTC collateral, allocated through their registries, awarded and repurchased (docs/evidence/token-repo-amulet-cbtc-devnet.json).
 - **BitSafe:** valuation committee onboarded through DecMan on a 3-participant LocalNet, one command (`bash localnet/demo.sh reset`); 1-of-3 refused, 2-of-3 executed, survives one node down; the same flow in DecMan's own UI in `media/decman-demo-captioned.mp4`.
 - **Wallet:** CIP-0103 wallet key authorises desk commands (signed single-use challenges); venue fee payable in USDCx/CC via Grofty.
