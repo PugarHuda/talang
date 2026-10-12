@@ -11,7 +11,7 @@ what happened to each item:
 | 1. Real CBTC on DevNet | Done: [evidence/cbtc-rail-devnet.json](evidence/cbtc-rail-devnet.json), 7 of 7 steps |
 | 2. CIP-0103 primary account | Done: `web/wallet.js` asks for `getPrimaryAccount` |
 | 3. Featured-app activity marker | Not done |
-| 4. Minimum transfer amount, 5. haircut schedule | Done after submission in talang-repo 1.2.0 (`Terms.minTransfer`, `HaircutSchedule`), with desk UI; local sandbox only, not on DevNet |
+| 4. Minimum transfer amount, 5. haircut schedule | Done after submission in talang-repo 1.2.0 (`Terms.minTransfer`, `HaircutSchedule`), with desk UI; vetted on the NODERS DevNet participant 12 October (package `5125df18…a3c366`) |
 | 6. Cross-trade netting | Done after submission in 1.2.0 as `MasterAgreement` / `CloseOut`; local sandbox only |
 | 7. Canton Coin as the cash leg | Done on DevNet through the Scan registry: [evidence/token-repo-amulet-cbtc-devnet.json](evidence/token-repo-amulet-cbtc-devnet.json), 12 of 12 steps |
 | 8. USDCx on DevNet | Still blocked: no DevNet admin party found |
