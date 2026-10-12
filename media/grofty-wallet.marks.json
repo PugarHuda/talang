@@ -1,0 +1,50 @@
+[
+ {
+  "at": 0.69,
+  "label": "Local desk, borrower role bound to a Grofty TestNet wallet: its commands need that wallet's signature"
+ },
+ {
+  "at": 3.25,
+  "label": "Connect: the dapp-sdk picker finds the Grofty extension"
+ },
+ {
+  "at": 7.87,
+  "label": "Grofty asks to connect the desk"
+ },
+ {
+  "at": 13.8,
+  "label": "Connected on canton:da-testnet: the panel names the wallet party and the role it drives"
+ },
+ {
+  "at": 17.64,
+  "label": "Send request: the desk answers with a challenge naming the exact command; Grofty signs it"
+ },
+ {
+  "at": 26.16,
+  "label": "Signature checked (key fingerprint = party namespace), RepoRFQ created, receipt listed"
+ },
+ {
+  "at": 28.83,
+  "label": "Verify signature: the desk re-checks it without trusting the browser"
+ },
+ {
+  "at": 32.31,
+  "label": "Take this quote: the award is a second command, signed again in Grofty"
+ },
+ {
+  "at": 37.87,
+  "label": "Award executed on the desk ledger with the wallet's signature"
+ },
+ {
+  "at": 41.05,
+  "label": "Pay the venue fee: 1 CC on Canton TestNet, prepared by the desk, executed by Grofty"
+ },
+ {
+  "at": 53.61,
+  "label": "Paid on TestNet: the wallet returns the update id"
+ },
+ {
+  "at": 68.74,
+  "label": "Done"
+ }
+]

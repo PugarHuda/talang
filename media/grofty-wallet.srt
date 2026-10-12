@@ -1,0 +1,43 @@
+1
+00:00:00,690 --> 00:00:03,250
+Local desk, borrower role bound to a Grofty TestNet wallet: its commands need that wallet's signature
+
+2
+00:00:03,250 --> 00:00:07,870
+Connect: the dapp-sdk picker finds the Grofty extension
+
+3
+00:00:07,870 --> 00:00:13,800
+Grofty asks to connect the desk
+
+4
+00:00:13,800 --> 00:00:17,640
+Connected on canton:da-testnet: the panel names the wallet party and the role it drives
+
+5
+00:00:17,640 --> 00:00:26,160
+Send request: the desk answers with a challenge naming the exact command; Grofty signs it
+
+6
+00:00:26,160 --> 00:00:28,830
+Signature checked (key fingerprint = party namespace), RepoRFQ created, receipt listed
+
+7
+00:00:28,830 --> 00:00:32,310
+Verify signature: the desk re-checks it without trusting the browser
+
+8
+00:00:32,310 --> 00:00:37,870
+Take this quote: the award is a second command, signed again in Grofty
+
+9
+00:00:37,870 --> 00:00:41,050
+Award executed on the desk ledger with the wallet's signature
+
+10
+00:00:41,050 --> 00:00:53,610
+Pay the venue fee: 1 CC on Canton TestNet, prepared by the desk, executed by Grofty
+
+11
+00:00:53,610 --> 00:01:08,740
+Paid on TestNet: the wallet returns the update id

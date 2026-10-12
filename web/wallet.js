@@ -7,7 +7,7 @@
 //   signMessage signature over each exact command (api/wallet-verify.mjs checks it);
 // - pay with standard tokens (CC, USDCx), which is all Grofty's participant can execute:
 //   it runs the standard Canton / token-standard packages, not third-party DARs.
-// ponytail: SDK loaded from esm.sh on first use; not yet run against a live wallet.
+// ponytail: SDK loaded from esm.sh on first use. Run against the live Grofty extension: scripts/grofty-e2e.mjs.
 const SDK = 'https://esm.sh/@canton-network/dapp-sdk@1.7.1';
 let sdk = null;
 

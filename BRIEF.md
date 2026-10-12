@@ -104,7 +104,8 @@ marks, and wallets for the parties (CIP-0103).
 - Real CBTC on DevNet: allocated through the DA Utility registry as repo collateral and released at repurchase (`docs/evidence/cbtc-rail-devnet.json`, 7 of 7 steps).
 - Both legs in real tokens on DevNet: Canton Coin as cash and CBTC as collateral, each allocated through its registry, awarded and repurchased (`docs/evidence/token-repo-amulet-cbtc-devnet.json`, 12 of 12 steps).
 - The desk in a browser: 29/29 Playwright checks through every role and button (`npm run qa:desk`); the hosted read-only API: 45/45 checks (`npm run test:proxy`).
-- Not yet: USDCx on DevNet, a live Grofty wallet, any pilot user.
+- Live Grofty wallet on TestNet: connect, two desk commands signed in Grofty and accepted, a 1 CC venue fee executed on TestNet (`docs/evidence/grofty-wallet-testnet.json`).
+- Not yet: USDCx on DevNet, a Talang command on TestNet, any pilot user.
 
 ## Validation log
 

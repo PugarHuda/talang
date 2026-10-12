@@ -11,7 +11,7 @@ than README and docs/evidence show.
 
 **Track:** Financial Applications
 
-**Challenges:** BitSafe — Contribution Pool · NODERS (DevNet / NaaS) · Grofty Wallet (only if you run the live wallet flow before submitting) · BitSafe — Gold (only after NODERS + BitSafe confirm late entry)
+**Challenges:** BitSafe — Contribution Pool · NODERS (DevNet / NaaS) · Grofty Wallet (live run on TestNet: docs/evidence/grofty-wallet-testnet.json) · BitSafe — Gold (only after NODERS + BitSafe confirm late entry)
 
 **Elevator pitch (≤2000):**
 Talang is a sealed-bid repo desk on Canton. A fund that holds tokenized Treasuries asks a panel of lenders for cash against them; each lender's rate and haircut is sealed to the borrower alone, because on Canton a quote that names only the lender and the borrower is never sent to anyone else's node. The borrower takes the cheapest quote that covers the loan, and in one atomic transaction the bonds are pledged, the cash is delivered and the losing lenders are refunded, told only their rank. The repo then lives on the ledger: margin calls computed from a signed mark and refused when the repo is still covered, substitution only with the lender's consent, rolls, repurchase with a venue fee that cannot be skipped, and default that returns any excess collateral to the borrower. The regulator observes every lifecycle event and gets best-execution records with no lender names and no losing rates.
@@ -243,7 +243,8 @@ Upload `media/talang-pitch-deck.pdf` (max 10 MB).
 - **On DevNet (NODERS):** `talang-repo` 1.0.0 vetted and seeded; a repo with both legs in real tokens — Canton Coin cash and CBTC collateral, allocated through their registries, awarded and repurchased (docs/evidence/token-repo-amulet-cbtc-devnet.json).
 - **BitSafe:** valuation committee onboarded through DecMan on a 3-participant LocalNet, one command (`bash localnet/demo.sh reset`); 1-of-3 refused, 2-of-3 executed, survives one node down; the same flow in DecMan's own UI in `media/decman-demo-captioned.mp4`.
 - **Wallet:** CIP-0103 wallet key authorises desk commands (signed single-use challenges); venue fee payable in USDCx/CC via Grofty.
-- **Not yet:** USDCx on DevNet, a live Grofty wallet run, user validation.
+- **Live Grofty run (TestNet):** connect, two desk commands signed in Grofty and accepted, 1 CC venue fee executed on TestNet (`docs/evidence/grofty-wallet-testnet.json`, `media/grofty-wallet.mp4`).
+- **Not yet:** USDCx on DevNet, a Talang command on TestNet, user validation.
 
 ---
 

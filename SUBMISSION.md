@@ -97,7 +97,9 @@ Marks come from live sources (US Treasury par yields, three BTC exchanges).
 
 **On DevNet:** `talang-repo` 1.0.0 vetted on the NODERS participant and seeded; the hosted desk reads it (docs/evidence/devnet-run.log). A repo with both legs in real tokens, Canton Coin cash and CBTC collateral, each allocated through its registry, awarded and repurchased, 12 of 12 steps (docs/evidence/token-repo-amulet-cbtc-devnet.json).
 
-**Not yet:** USDCx on DevNet (no registry or faucet documented there); Grofty Wallet on TestNet.
+**Grofty Wallet on TestNet (live extension, no stub):** desk connected, two borrower commands signed in Grofty and accepted by the wallet-signature check (executed on a local ledger, since Grofty's participant cannot host Talang's package), and a 1 CC venue fee executed on TestNet from the desk's panel, update id 1220e6e35fe978a3e8ff2816cbe2312fd99dcaa2a77617eb83c5e187bf83a7b6ccad (docs/evidence/grofty-wallet-testnet.json, media/grofty-wallet.mp4).
+
+**Not yet:** USDCx on DevNet (no registry or faucet documented there); a Talang command executed on TestNet.
 
 **Real CBTC on DevNet:** the BitSafe faucet's CBTC accepted, allocated through the DA Utility registry as repo collateral, and released at repurchase (docs/evidence/cbtc-rail-devnet.json). The first version (0.1.0) was
 uploaded to the NODERS DevNet participant and driven through the desk on 3 October

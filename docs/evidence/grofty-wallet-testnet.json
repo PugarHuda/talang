@@ -1,0 +1,168 @@
+{
+ "run": "scripts/grofty-e2e.mjs, 2026-10-12, Playwright driving the unpacked Grofty TestNet extension (no stubbed provider)",
+ "deskLedger": "local Canton sandbox 3.4.11 with talang-repo 1.2.0 (the signed Talang commands execute here, not on TestNet)",
+ "network": "canton:da-testnet",
+ "wallet": "Grofty (browser extension, Canton TestNet)",
+ "walletParty": "talang-venue::12206e4fb1285cc855ad77efb59dfc878131c5c0e795df60982e08dd77df9bd2c49b",
+ "steps": [
+  {
+   "step": "connect",
+   "at": "2026-10-12T14:24:56.952Z",
+   "result": "Wallet on canton:da-testnet · talang-venue::12206e4fb1285cc855ad77efb59dfc878131c5c0e795df60982e08dd77df9bd2c49b This wallet drives borrower: the desk submits its commands only with this wallet's signature on each exact command. Pay the venue fee from the wallet: a plain token transfer on testnet, n"
+  },
+  {
+   "step": "signed desk command: create RepoRFQ",
+   "at": "2026-10-12T14:25:09.091Z",
+   "role": "borrower",
+   "signer": "talang-venue::12206e4fb1285cc855ad77efb59dfc878131c5c0e795df60982e08dd77df9bd2c49b",
+   "publicKey": "F+y09DdrxCfIKu6sBNJ1UAUmfOPlc+VCM26KrbjshzQ=",
+   "signature": "haUMiUPOFaMrljIIDVuyKjNcOUkHF3AbFjiM+FP6KuYm7BF3r4pdrsL7l8u8YevMCG9EmDAbjARv+UINrMYBAw==",
+   "signedMessage": "Talang desk command, signed by the wallet that drives this role\nrole: borrower (talang-borrower::122043f7ba6af46f2d413876409c8b50a8bedd1574a01dd33213f27195d945ddd7fa)\nsigner: talang-venue::12206e4fb1285cc855ad77efb59dfc878131c5c0e795df60982e08dd77df9bd2c49b\naction: create RepoRFQ\ncommand: {\"CreateCommand\":{\"templateId\":\"#talang-repo:Talang:RepoRFQ\",\"createArguments\":{\"borrower\":\"talang-borrower::122043f7ba6af46f2d413876409c8b50a8bedd1574a01dd33213f27195d945ddd7fa\",\"regulator\":\"talang-regulator::122043f7ba6af46f2d413876409c8b50a8bedd1574a01dd33213f27195d945ddd7fa\",\"agent\":\"talang-agent::122043f7ba6af46f2d413876409c8b50a8bedd1574a01dd33213f27195d945ddd7fa\",\"venue\":{\"operator\":\"talang-venue::122043f7ba6af46f2d413876409c8b50a8bedd1574a01dd33213f27195d945ddd7fa\",\"feeBps\":\"10.0\"},\"lenders\":[\"talang-lenderA::122043f7ba6af46f2d413876409c8b50a8bedd1574a01dd33213f27195d945ddd7fa\",\"talang-lenderB::122043f7ba6af46f2d413876409c8b50a8bedd1574a01dd33213f27195d945ddd7fa\"],\"deadline\":null,\"terms\":{\"cashIssuer\":\"talang-cashIssuer::122043f7ba6af46f2d413876409c8b50a8bedd1574a01dd33213f27195d945ddd7fa\",\"cashInstrument\":\"USDC\",\"principal\":\"4800000\",\"collateralIssuer\":\"talang-bondIssuer::122043f7ba6af46f2d413876409c8b50a8bedd1574a01dd33213f27195d945ddd7fa\",\"collateralInstrument\":\"UST2Y\",\"collateralQty\":\"50\",\"termDays\":\"30\",\"minTransfer\":null}}}}\nnonce: 4ab6d574-ebfc-473f-949a-4ade8c96df07\nissued: 2026-10-12T14:25:00.865Z",
+   "deskLedgerUpdateId": "122041fbb580446c4f517bc807414eabf12f05dde5de022d5842a8ead8d5091f73ed",
+   "deskLedgerOffset": 179,
+   "created": [
+    {
+     "templateId": "5125df187c195b3f020cfe1ca72f029e93648dac7dd88b35d18c9255d3a3c366:Talang:RepoRFQ",
+     "contractId": "006b72a06a1bb5d72a71b759c06360433481d233aac16f28847dd4e9e6a1c83baeca121220a358fc6bf8d12f34c24915b01d1692bbece46aed14e30a11d8c6aaba002c98d8"
+    }
+   ],
+   "hostedWalletVerify": {
+    "ok": true,
+    "signatureValid": true,
+    "keyOwnsParty": true,
+    "fingerprint": "12206e4fb1285cc855ad77efb59dfc878131c5c0e795df60982e08dd77df9bd2c49b"
+   },
+   "hostedWalletVerifyTamperedMessage": {
+    "ok": false,
+    "reason": "the signature does not verify under this public key"
+   }
+  },
+  {
+   "step": "signed desk command: AwardSealed on RepoRFQ 00afcbd09d08ab383d8e94433111bb06cbfd7320b313bd4e9ff51d59c52188e6e2ca121220b435f6da598aa5a3646d669cb6beafe36a8b1231036ab7042a1efa34122dbe43",
+   "at": "2026-10-12T14:25:20.522Z",
+   "role": "borrower",
+   "signer": "talang-venue::12206e4fb1285cc855ad77efb59dfc878131c5c0e795df60982e08dd77df9bd2c49b",
+   "publicKey": "F+y09DdrxCfIKu6sBNJ1UAUmfOPlc+VCM26KrbjshzQ=",
+   "signature": "WldPW+/axZLpuLK6jFsa6Hbz0qriAXB5dQsrb5d4wBSVKeiWSlwlON/3BP3quPQVVfM20y5rHfI/MmwFkazRDA==",
+   "signedMessage": "Talang desk command, signed by the wallet that drives this role\nrole: borrower (talang-borrower::122043f7ba6af46f2d413876409c8b50a8bedd1574a01dd33213f27195d945ddd7fa)\nsigner: talang-venue::12206e4fb1285cc855ad77efb59dfc878131c5c0e795df60982e08dd77df9bd2c49b\naction: AwardSealed on RepoRFQ 00afcbd09d08ab383d8e94433111bb06cbfd7320b313bd4e9ff51d59c52188e6e2ca121220b435f6da598aa5a3646d669cb6beafe36a8b1231036ab7042a1efa34122dbe43\ncommand: {\"ExerciseCommand\":{\"templateId\":\"#talang-repo:Talang:RepoRFQ\",\"contractId\":\"00afcbd09d08ab383d8e94433111bb06cbfd7320b313bd4e9ff51d59c52188e6e2ca121220b435f6da598aa5a3646d669cb6beafe36a8b1231036ab7042a1efa34122dbe43\",\"choice\":\"AwardSealed\",\"choiceArgument\":{\"winner\":\"00e24a88d3ef339bfb60f844ad89e4b8d02c257c4d3ac5937256ca199840c0d795ca12122069b29735c231ea01dded11803c71a3c1c484eda6eaf7ee36accf5e313a73284e\",\"losers\":[\"001b020c7e0648cf8eb4220a09d9b94ec79a6bf3dd1d96cb7b74475d9683165dc3ca1212208279b53c1a94b4def65f4985c702a2754a253a656d3dd8f47ad917547a1ed145\"],\"collateralCid\":\"00f5f74d02c86aeef4ea541bf47068ad8a490261dfe0338c2da80cf2b13ddc72b4ca121220c392806771da7c8f68c3372872ae1fa6f9053c50d4eb0b3811ca035d9ef7457c\",\"markCid\":\"00e23c010b52c27ad85f64f8fad1a048784a9413e43002f5dcefd99b6100ecdee2ca1212201c35c4d0542b3672b487fd5c4165b89bbae43ed6657c2620b9ef968dd6dd03a1\",\"contexts\":[]}}}\nnonce: 588d8df7-fb49-4990-bceb-4f1c7b730c65\nissued: 2026-10-12T14:25:15.593Z",
+   "deskLedgerUpdateId": "1220b09a592fe9957a895d7ed2983f51693f8ef995b7b2e6fae822b30cc443a6c285",
+   "deskLedgerOffset": 182,
+   "created": [
+    {
+     "templateId": "5125df187c195b3f020cfe1ca72f029e93648dac7dd88b35d18c9255d3a3c366:Talang:Escrow",
+     "contractId": "00d798b406f6ce44d9ca8c789926fad1c0de9f91ad63911fd10a433db8469b7a97ca1212205c82255bbfa457fbc38d647718849cfc041867606d5780ac3008242a43d3bb7e"
+    },
+    {
+     "templateId": "5125df187c195b3f020cfe1ca72f029e93648dac7dd88b35d18c9255d3a3c366:Talang:LossNotice",
+     "contractId": "00a821732bb22927b6081474160724b665d9212267cefba442a611bc0cf93cd6e7ca121220f88ada301f84aa7e1f8083fbc282a6537fb5a8627acf5b9ce91b4abc672580f5"
+    },
+    {
+     "templateId": "5125df187c195b3f020cfe1ca72f029e93648dac7dd88b35d18c9255d3a3c366:Talang:BestExecution",
+     "contractId": "008ee10f249fa2bbee4dd1458aefc90d396221517ce631d102828d2b5e7deea4caca121220dea93c24a47206416ac22d01ae46944936394c11fb1dc1b574472785f8d25245"
+    },
+    {
+     "templateId": "5125df187c195b3f020cfe1ca72f029e93648dac7dd88b35d18c9255d3a3c366:Talang:Holding",
+     "contractId": "00b95388d6140158b58a223476ed82b6f0ac7821baf9be0efe5cdfec3d045c3fcbca121220b24c23847e3c180d527319ac874e3ae08bd4f869fd6b91ade2e6417102d5dac2"
+    },
+    {
+     "templateId": "5125df187c195b3f020cfe1ca72f029e93648dac7dd88b35d18c9255d3a3c366:Talang:RepoReport",
+     "contractId": "00ec8e099582c2ea005cdbb94ca329be7fda41fd10319873b29f82d20107f17098ca121220d656fa5840b3b32bb2e3885f74a1778cfb0607b822c255a8b665665cbb74d1b7"
+    },
+    {
+     "templateId": "5125df187c195b3f020cfe1ca72f029e93648dac7dd88b35d18c9255d3a3c366:Talang:RepoTrade",
+     "contractId": "00ee12dfa12d02f314b47286d17e29c047bb7475303cecea075c169dd0d237dea3ca1212209dace0491b3fee32ab9f23afa33c159621f56f01f1d020379172b097983bebca"
+    }
+   ],
+   "hostedWalletVerify": {
+    "ok": true,
+    "signatureValid": true,
+    "keyOwnsParty": true,
+    "fingerprint": "12206e4fb1285cc855ad77efb59dfc878131c5c0e795df60982e08dd77df9bd2c49b"
+   },
+   "hostedWalletVerifyTamperedMessage": {
+    "ok": false,
+    "reason": "the signature does not verify under this public key"
+   }
+  },
+  {
+   "step": "venue fee payment (Grofty prepareExecuteAndWait)",
+   "at": "2026-10-12T14:25:37.175Z",
+   "amount": "1",
+   "token": "CC",
+   "sender": "talang-venue::12206e4fb1285cc855ad77efb59dfc878131c5c0e795df60982e08dd77df9bd2c49b",
+   "receiver": "grofty-qa-testnet::1220e86995a7018535041be5c9fbb70e8fcf2f9bbead2af06e588017822492bfec3f",
+   "deskShows": "Paid on canton:da-testnet: 1 CC to grofty-qa-testnet::1220e86995a7018535041be5c9fbb70e8fcf2f9bbead2af06e588017822492bfec3f, update id 1220e6e35fe978a3e8ff2816cbe2312fd99dcaa2a77617eb83c5e187bf83a7b6ccad",
+   "updateId": "1220e6e35fe978a3e8ff2816cbe2312fd99dcaa2a77617eb83c5e187bf83a7b6ccad",
+   "walletAnswer": {
+    "tx": {
+     "status": "executed",
+     "commandId": "dapp-tx-1791815124348-zoqnhqnspih",
+     "payload": {
+      "updateId": "1220e6e35fe978a3e8ff2816cbe2312fd99dcaa2a77617eb83c5e187bf83a7b6ccad",
+      "completionOffset": 0
+     }
+    }
+   }
+  }
+ ],
+ "videoPopupOffset": -16.788,
+ "walletActivity": "Activity | Transactions | Sent | Today, 07:25 PM | −1 CC | completed | Sent | Today, 06:59 PM | −1 CC | completed | Received | Oct 9, 06:35 PM | +100 CC | completed | Prev | Page 1 / 1 | Next | Home | USDCx | Activity",
+ "video": "media/grofty-wallet.mp4",
+ "marks": [
+  {
+   "at": 0.69,
+   "label": "Local desk, borrower role bound to a Grofty TestNet wallet: its commands need that wallet's signature"
+  },
+  {
+   "at": 3.25,
+   "label": "Connect: the dapp-sdk picker finds the Grofty extension"
+  },
+  {
+   "at": 7.87,
+   "label": "Grofty asks to connect the desk"
+  },
+  {
+   "at": 13.8,
+   "label": "Connected on canton:da-testnet: the panel names the wallet party and the role it drives"
+  },
+  {
+   "at": 17.64,
+   "label": "Send request: the desk answers with a challenge naming the exact command; Grofty signs it"
+  },
+  {
+   "at": 26.16,
+   "label": "Signature checked (key fingerprint = party namespace), RepoRFQ created, receipt listed"
+  },
+  {
+   "at": 28.83,
+   "label": "Verify signature: the desk re-checks it without trusting the browser"
+  },
+  {
+   "at": 32.31,
+   "label": "Take this quote: the award is a second command, signed again in Grofty"
+  },
+  {
+   "at": 37.87,
+   "label": "Award executed on the desk ledger with the wallet's signature"
+  },
+  {
+   "at": 41.05,
+   "label": "Pay the venue fee: 1 CC on Canton TestNet, prepared by the desk, executed by Grofty"
+  },
+  {
+   "at": 53.61,
+   "label": "Paid on TestNet: the wallet returns the update id"
+  },
+  {
+   "at": 68.74,
+   "label": "Done"
+  }
+ ],
+ "notes": [
+  "Signed commands: the desk answered 401 with a challenge naming the exact command; Grofty showed it in its Signature Request and returned an Ed25519 signature; the desk checked nonce, signer, signature and that the key fingerprint equals the party namespace before submitting. hostedWalletVerify is https://talang-desk.vercel.app/api/wallet-verify re-checking each receipt; the tampered check appends one space to the message.",
+  "Payment recipient: grofty-qa-testnet is the party that funded this wallet with 100 CC (memo \"bansos\", 2026-10-09); it stands in for a venue party. The wallet itself could not be the recipient: an earlier attempt in this session to pay talang-venue from talang-venue was refused by Grofty with \"-32603 Sender and receiver cannot be the same party\". A second wallet in the same Grofty account was refused on 2026-10-09: \"Creating or importing another wallet is blocked for this email\".",
+  "An exploratory payment earlier in the same session, same flow and recipient, also executed on TestNet: 1 CC, update id 122005be86fdff5048795958ea2eae9876d2c41a48603ba22c695b58caa6c60753eb (the \"Sent 06:59 PM\" line in walletActivity).",
+  "TestNet Scan (scan.sv-1.test..., scan.sv-2.test...) answered 403 / RBAC denied from this machine, so the TestNet update ids are as returned by the wallet (status \"executed\") and shown in its activity list; no public explorer link.",
+  "Times in walletActivity are the machine local time (UTC+7)."
+ ]
+}
