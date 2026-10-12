@@ -125,6 +125,33 @@ version changes template shapes in ways a smart-contract upgrade may not.
 The hosted copy is read-only: `api/` exposes reads only, scoped to this desk's
 parties, and has no submit endpoint.
 
+### CBTC default on DevNet (two phases)
+
+`scripts/cbtc-default.mjs` runs inside a Vercel build of the `talang` project (the DevNet
+credentials live there), from a checkout whose `vercel.json` has
+`"buildCommand": "node scripts/devnet-ci.mjs"` and with `devnet/*.dar` present:
+
+```sh
+# Phase 1: RFQ, award on CBTC collateral, stress mark, margin call (respondBy = now + 2 h 2 min)
+vercel deploy --prod --yes --build-env TALANG_DEVNET_CI=1 --build-env DEVNET_STEPS=cbtc-default --build-env PHASE=open
+curl -s https://talang-desk.vercel.app/evidence/cbtc-default-devnet.json > docs/evidence/cbtc-default-devnet.json
+git add docs/evidence/cbtc-default-devnet.json && git commit -m "cbtc-default phase 1 on DevNet" && git push
+
+# Phase 2, from a commit with that evidence file: lender A defaults, CBTC executed to lender A
+vercel deploy --prod --yes --build-env TALANG_DEVNET_CI=1 --build-env DEVNET_STEPS=cbtc-default --build-env PHASE=default
+curl -s https://talang-desk.vercel.app/evidence/cbtc-default-devnet.json > docs/evidence/cbtc-default-devnet.json
+```
+
+Timing: phase 2 must run **after** respondBy (else it exits 3 and names the minutes
+left) and, once talang-repo 1.2.0 is vetted, **within 24 h of respondBy** (`defaultWindow`;
+1.1.0 has no such limit). Missed it: run phase 1 again; phase 2 takes the newest due call.
+The CBTC allocation's `settleBefore` is 6 days after phase 1, so it outlives the window.
+Phase 2 reads every id from the ledger (the call, its trade, the allocation), not from
+the evidence file. Lender A is no stakeholder of the registry's `DvpLegAllocation`, so
+phase 2 passes it as a disclosed contract fetched as the borrower; without that the
+submit fails with `CONTRACT_NOT_FOUND` (the 12 October run). Offline check of phase 2:
+`node scripts/test-cbtc-default.mjs`.
+
 ## AI desk agents (MCP)
 
 `mcp/server.mjs` puts Claude at one desk. It reads only that party's node, so it is

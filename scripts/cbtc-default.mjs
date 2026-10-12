@@ -13,6 +13,11 @@
 //   PHASE=default  once respondBy has passed: lender A exercises MarginCall Default with
 //                  the CBTC allocation's execute-transfer context; checks that lender A
 //                  now holds the CBTC (HoldingV1) and the allocation is gone.
+//                  Window: after respondBy and, under talang-repo 1.2.0, within a day of
+//                  it (defaultWindow). The allocation (settleBefore = now + 6 days at open)
+//                  outlives that window. Lender A is no stakeholder of the registry's
+//                  allocation, so it is passed as a disclosed contract fetched live as the
+//                  borrower; every id phase 2 uses comes from the ledger, not the file.
 //
 // Each Vercel build starts from the uploaded files, so PHASE=default works from the
 // ledger alone: it finds lender A's open MarginCall on CBTC whose trade carries this
@@ -54,7 +59,7 @@ if (!covers(MARK) || covers(STRESS_MARK)) {
 }
 
 // PHASE=open starts a fresh file; PHASE=default appends to the open phase's, if present.
-const ev = PHASE === 'default' && existsSync(FILE) ? JSON.parse(readFileSync(FILE, 'utf8')) : null;
+let ev = PHASE === 'default' && existsSync(FILE) ? JSON.parse(readFileSync(FILE, 'utf8')) : null;
 const log = ev?.steps ?? [];
 const step = (label, tx, extra = {}) => {
   const e = { phase: PHASE, step: label, updateId: tx?.transaction?.updateId, offset: tx?.transaction?.offset, ...extra };
@@ -71,14 +76,17 @@ const save = (fields) => {
 
 // ponytail: views/active copied from cbtc-rail.mjs and token-repo.mjs (both top-level scripts);
 // move them into lib/ if a fourth script needs them.
-async function views(party, interfaceId) {
+// blob=true also returns each contract as a disclosed contract (for a submitter that is no stakeholder).
+async function views(party, interfaceId, blob = false) {
   const off = (await api('/v2/state/ledger-end')).data?.offset;
   const r = await api('/v2/state/active-contracts', { method: 'POST', json: {
     eventFormat: { verbose: true, filtersByParty: { [party]: { cumulative: [{ identifierFilter: { InterfaceFilter: { value: {
-      interfaceId, includeInterfaceView: true, includeCreatedEventBlob: false } } } }] } } }, activeAtOffset: off } });
+      interfaceId, includeInterfaceView: true, includeCreatedEventBlob: blob } } } }] } } }, activeAtOffset: off } });
   if (!Array.isArray(r.data)) throw new Error(`active-contracts ${interfaceId}: ${JSON.stringify(r.data).slice(0, 1500)}`);
-  return r.data.map((x) => x.contractEntry?.JsActiveContract?.createdEvent).filter(Boolean)
-    .map((e) => ({ cid: e.contractId, templateId: e.templateId, view: e.interfaceViews?.find((v) => v.viewValue)?.viewValue }));
+  return r.data.map((x) => x.contractEntry?.JsActiveContract).filter((a) => a?.createdEvent)
+    .map(({ createdEvent: e, synchronizerId }) => ({ cid: e.contractId, templateId: e.templateId,
+      view: e.interfaceViews?.find((v) => v.viewValue)?.viewValue,
+      disclosed: blob ? { templateId: e.templateId, contractId: e.contractId, createdEventBlob: e.createdEventBlob, synchronizerId } : undefined }));
 }
 // Active Talang contracts of one template that `party` sees, with their arguments.
 async function active(party, tpl) {
@@ -195,20 +203,42 @@ try {
       console.error(`✗ refused: the borrower still has time to respond. respondBy ${next}, ${Math.ceil((Date.parse(next) - Date.now()) / MIN)} min from now; run PHASE=default after that.`);
       process.exit(3);
     }
-    const call = due.find((c) => c.cid === ev?.marginCall) ?? due[0], alloc = call.allocs[0];
-    if (Date.now() - Date.parse(call.arg.respondBy) > D)
-      console.log(`  note: more than a day past respondBy; talang-repo 1.2.0 refuses that (defaultWindow), 1.1.0 does not`);
+    // The newest due call, not the evidence file's: an older call left open by an earlier
+    // run may be past 1.2.0's defaultWindow while a fresh PHASE=open made a new one.
+    const call = due[0], alloc = call.allocs[0];
+    if (ev && ev.marginCall !== call.cid) {
+      console.log(`  note: ${FILE} names call ${ev.marginCall?.slice(0, 16)}…, the ledger's newest due call is ${call.cid.slice(0, 16)}…; that file's open-phase steps are dropped`);
+      log.length = 0; ev = null;
+    }
+    const late = Date.now() - Date.parse(call.arg.respondBy) > D;
+    if (late) console.log(`  note: more than a day past respondBy ${call.arg.respondBy}; talang-repo 1.2.0 refuses that (defaultWindow), 1.1.0 does not`);
+
+    // The pledged CBTC allocations as the borrower (their sender) sees them. Lender A is no
+    // stakeholder of the registry's DvpLegAllocation, so its submit cannot look them up
+    // (CONTRACT_NOT_FOUND, 2026-10-12): they go in as disclosed contracts, live, from here.
+    const pledged = (await views(p.borrower, ALLOCATION, true)).filter((a) => call.allocs.includes(a.cid));
+    const gone = call.allocs.filter((a) => !pledged.some((x) => x.cid === a));
+    if (gone.length) throw new Error(`the trade's CBTC allocation ${gone.map((a) => a.slice(0, 16) + '…').join(', ')} is no longer active (withdrawn or cancelled outside this script): this call cannot default; run PHASE=open for a fresh one`);
+    for (const a of pledged) {
+      const by = a.view?.allocation?.settlement?.settleBefore;
+      if (by && Date.parse(by) <= Date.now()) throw new Error(`CBTC allocation ${a.cid.slice(0, 16)}… expired (settleBefore ${by}): the registry refuses execute-transfer; run PHASE=open for a fresh one`);
+      if (!a.disclosed.createdEventBlob) throw new Error(`no created-event blob for CBTC allocation ${a.cid.slice(0, 16)}…`);
+    }
     step(`open margin call found on the ledger: respondBy ${call.arg.respondBy} has passed`, null,
       { marginCall: call.cid, trade: call.arg.tradeCid, allocationCid: alloc, unitsDue: call.arg.unitsDue, price: call.arg.price });
 
     // 2. Default with the registry's execute-transfer context for every CBTC allocation pledged.
     const lenderBefore = sum(await cbtcOf(p.lenderA));
     const ctx = await Promise.all(call.allocs.map(async (a) => [a, await allocationContext(ADMIN, a, 'execute-transfer')]));
-    const seen = new Map();
+    const seen = new Map(pledged.map((a) => [a.cid, a.disclosed]));
     for (const [, c] of ctx) for (const d of disclosed(c.disclosedContracts)) seen.set(d.contractId, d);
     const defTx = await submit(p.lenderA, exercise('MarginCall', call.cid, 'Default',
       { contexts: ctx.map(([a, c]) => ({ _1: a, _2: { context: c.choiceContextData, meta } })) }),
-    [], { disclosedContracts: [...seen.values()] });
+    [], { disclosedContracts: [...seen.values()] }).catch((e) => {
+      if (/more than a day past its deadline/.test(e.message)) throw new Error(`talang-repo 1.2.0 refused: respondBy ${call.arg.respondBy} is more than a day ago (defaultWindow). Run PHASE=open again and PHASE=default within 24 h of the new respondBy. ${e.message.slice(0, 300)}`);
+      if (/CONTRACT_NOT_FOUND/.test(e.message)) throw new Error(`a contract the default needs is not visible to lender A or was archived since the lookup (margin call ${call.cid.slice(0, 16)}…, allocations ${call.allocs.map((a) => a.slice(0, 16) + '…').join(', ')}): ${e.message.slice(0, 600)}`);
+      throw e;
+    });
 
     // 3. Lender A holds the CBTC; the allocation is gone.
     const lenderAfter = sum(await cbtcOf(p.lenderA));
