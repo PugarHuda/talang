@@ -5,6 +5,7 @@
 //   PORT=8092 ENV_FILE=.env.local node server.mjs
 //   READ_ONLY=1 PORT=8093 ENV_FILE=.env.local node server.mjs     (read-only checks)
 //   node scripts/qa-desk.mjs        (QA_URL, QA_RO_URL to point elsewhere)
+//   node scripts/qa-desk.mjs close-out   (2 hours later: close-out netting on the call the run leaves)
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { request as httpRequest } from 'node:http';
@@ -19,7 +20,10 @@ const DAY = 864e5;
 
 // ---- tiny harness ----
 const results = [];
+// `node scripts/qa-desk.mjs close-out` runs only the checks named so.
+const ONLY = process.argv[2];
 async function check(name, fn) {
+  if (ONLY && !name.startsWith(ONLY)) return;
   try { await fn(); results.push([true, name]); console.log('  ok  ', name); }
   catch (e) { results.push([false, name, e.message]); console.log('  FAIL', name, '\n       ', e.message.split('\n')[0]); }
 }
@@ -302,7 +306,9 @@ await check('repurchase: cash faucet, repo closes, venue paid, regulator gets CL
 });
 
 // ---------- default (call with a short window, made through the API) ----------
-await check('default: after the response window the lender declares default and keeps the collateral', async () => {
+// The ledger gives a borrower at least 2 hours to answer a call, so a successful default cannot happen
+// inside this run; TalangTest.defaultOnUnmetCall covers it, and `close-out` below shows the overdue path.
+await check('default: a call under 2 hours is refused; before the deadline default is disabled and refused by the ledger', async () => {
   const rfq = createdCid(await submit('borrower', create('RepoRFQ', { borrower: P.borrower, regulator: P.regulator, agent: P.agent,
     venue: null, lenders: [P.lenderA], deadline: null, terms: { cashIssuer: P.cashIssuer, cashInstrument: 'USDC', principal: '900000',
       collateralIssuer: P.bondIssuer, collateralInstrument: IC, collateralQty: '10000', termDays: '30' } })), 'RepoRFQ');
@@ -312,15 +318,15 @@ await check('default: after the response window the lender declares default and 
   const m1 = createdCid(await markApi(IC, 100), 'Mark');
   const t = createdCid(await submit('borrower', exercise('RepoRFQ', rfq, 'AwardSealed', { winner: q, losers: [], collateralCid: col, markCid: m1, contexts: [] })), 'RepoTrade');
   const m2 = createdCid(await markApi(IC, 80), 'Mark');
-  await submit('lenderA', exercise('RepoTrade', t, 'CallMargin', { markCid: m2, respondBy: new Date(Date.now() + 4000).toISOString() }));
-  await sleep(5000);
+  const short = await postJ(BASE, '/api/submit', { role: 'lenderA', command: exercise('RepoTrade', t, 'CallMargin', { markCid: m2, respondBy: new Date(Date.now() + 4000).toISOString() }) });
+  assert.notEqual(short.status, 200); assert.match(JSON.stringify(short.json), /at least 2 hours/);
+  await submit('lenderA', exercise('RepoTrade', t, 'CallMargin', { markCid: m2, respondBy: new Date(Date.now() + 2 * 36e5 + 6e4).toISOString() }));
   await open('lenderA');
   const c = card('called from').filter({ hasText: IC });
-  assert.ok(await c.locator('[data-act="default"]').isEnabled());
-  await actOk(c.locator('[data-act="default"]'));
-  assert.equal((await of('lenderA', 'RepoTrade', (a) => a.collateralInstrument === IC)).length, 0);
-  assert.equal((await of('regulator', 'RepoReport', (a) => a.event === 'DEFAULT' && a.collateralInstrument === IC)).length, 1);
-  assert.equal(sum(await of('lenderA', 'Holding', (a) => a.instrument === IC && a.owner === P.lenderA)), 10000);
+  assert.ok(await c.locator('[data-act="default"]').isDisabled());
+  const [mc] = await of('lenderA', 'MarginCall', (a) => a.instrument === IC);
+  const early = await postJ(BASE, '/api/submit', { role: 'lenderA', command: exercise('MarginCall', mc.cid, 'Default', { contexts: [] }) });
+  assert.notEqual(early.status, 200); assert.match(JSON.stringify(early.json), /still has time/);
 });
 
 // ---------- claim: needs a matured repo, which a wall-clock ledger cannot produce in a test ----------
@@ -362,6 +368,163 @@ await check('race: a slow request cannot be sent twice (click + repaint)', async
   await page.unroute('**/api/submit');
   for (const r of rs) await submit('borrower', exercise('RepoRFQ', r.cid, 'CancelRFQ'));
   assert.equal(rs.length, 1, `${rs.length} requests created`);
+});
+
+// ---------- 1.2.0: haircut schedule, minimum transfer, margin refutation, substitution withdraw, master agreement ----------
+// Lender B's schedule, a repo with a minimum transfer, and B's master agreement with the borrower.
+// The last check leaves a margin call with a 2-hour deadline; `node scripts/qa-desk.mjs close-out`
+// run after that deadline closes out every repo between the two under the agreement.
+const ID = `QA${RUN}D`, IE = `QA${RUN}E`, IF = `QA${RUN}F`;
+let tradeD;
+const cardD = () => card(`USDC against 10,000 ${ID}`);
+const tradeCardB = () => cardD().filter({ hasText: 'Funded by' });
+await check('1.2.0 schedule: lender B signs a haircut schedule in the desk; the borrower sees it, the regulator does not', async () => {
+  await markApi(ID, 100); await markApi(IE, 100);
+  await open('lenderB');
+  const old = (await of('lenderB', 'HaircutSchedule', (a) => a.lender === P.lenderB))[0];
+  if (old) await actOk(page.locator('[data-act="drop-schedule"]'));
+  await page.locator(`.hs-floor[data-inst="${ID}"]`).fill('3');
+  await page.locator(`.hs-floor[data-inst="${IE}"]`).fill('3');
+  await actOk(page.locator('[data-act="schedule"]'));
+  const [s] = await of('borrower', 'HaircutSchedule', (a) => a.lender === P.lenderB);
+  assert.equal(Number(s.arg.floors[ID]), 0.03);
+  assert.equal((await of('regulator', 'HaircutSchedule')).length, 0);
+  await open('borrower');
+  assert.match(await page.locator('#view').textContent(), new RegExp(`${ID} 3\\.00%`));
+});
+await check('1.2.0 minimum transfer: borrower asks lender B with a 50,000 minimum transfer; terms carry it', async () => {
+  await open('borrower');
+  await page.selectOption('#n-inst', ID); await page.fill('#n-qty', '10000');
+  await actOk(page.locator('[data-act="bonds"]'));
+  await page.selectOption('#n-inst', ID); await page.fill('#n-qty', '10000'); // the faucet repainted the form
+  await page.fill('#n-cash', '900000'); await page.fill('#n-term', '30'); await page.fill('#n-mta', '50000');
+  for (const l of ['lenderA', 'lenderC']) await page.uncheck(`.n-lender[value="${l}"]`);
+  await page.check('.n-lender[value="lenderB"]');
+  await actOk(page.locator('[data-act="request"]'));
+  const [r] = await of('borrower', 'RepoRFQ', (a) => a.terms.collateralInstrument === ID);
+  assert.equal(Number(r.arg.terms.minTransfer), 50000);
+  assert.match(await cardD().textContent(), /Lender B schedule\s*min 3\.00%/);
+});
+await check('1.2.0 schedule: B\'s 2% quote is refused by the ledger, 3% goes through QuoteWithinSchedule', async () => {
+  await open('lenderB');
+  const c = cardD();
+  assert.equal(await c.locator('input[id^="h-"]').inputValue(), '3', 'haircut defaults to the floor');
+  await actOk(c.locator('[data-act="cash-for"]'));
+  await cardD().locator('input[id^="r-"]').fill('500'); await cardD().locator('input[id^="h-"]').fill('2');
+  await actErr(cardD().locator('[data-act="quote"]'), /below the lender's schedule/);
+  await cardD().locator('input[id^="h-"]').fill('3');
+  assert.match(await actOk(cardD().locator('[data-act="quote"]')), /through your haircut schedule/);
+  const [q] = await of('borrower', 'RepoQuote', (a) => a.lender === P.lenderB && Number(a.haircut) === 0.03);
+  assert.ok(q, 'quote at 3%');
+});
+await check('1.2.0 award: AwardSealed opens the repo; terms keep the minimum transfer; regulator gets a band', async () => {
+  await open('borrower');
+  await actOk(cardD().locator('[data-act="award"]'));
+  [tradeD] = await of('borrower', 'RepoTrade', (a) => a.collateralInstrument === ID);
+  assert.ok(tradeD); assert.equal(Number(tradeD.arg.terms.minTransfer), 50000);
+  const b = (await of('regulator', 'BestExecution')).sort((x, y) => y.arg.at.localeCompare(x.arg.at))[0];
+  assert.equal(b.arg.spreadBucket, '0');
+  await open('regulator');
+  assert.match(await page.locator('#view').textContent(), /Over best rate \(band\)/);
+});
+// Leaves lender B without a schedule, so the next run's quotes on fresh instruments go out unchecked.
+await check('1.2.0 schedule: lender B withdraws its schedule from the desk; the borrower no longer sees it', async () => {
+  await open('lenderB');
+  await actOk(page.locator('[data-act="drop-schedule"]'));
+  assert.equal((await of('borrower', 'HaircutSchedule', (a) => a.lender === P.lenderB)).length, 0);
+});
+await check('1.2.0 minimum transfer: a 20k shortfall shows the pill and the ledger refuses the call', async () => {
+  await markApi(ID, 90.7);
+  await open('lenderB');
+  assert.match(await tradeCardB().textContent(), /Min transfer\s*50,000/);
+  assert.equal(await tradeCardB().locator('.pill', { hasText: 'minimum transfer' }).count(), 1);
+  await actErr(tradeCardB().locator('[data-act="call"]'), /minimum transfer/);
+  assert.equal((await of('lenderB', 'MarginCall', (a) => a.instrument === ID)).length, 0);
+});
+await check('1.2.0 refutation: a 75k shortfall is called; a newer covering mark lets the borrower refute it', async () => {
+  await markApi(ID, 85);
+  await open('lenderB');
+  assert.equal(await tradeCardB().locator('.pill', { hasText: 'minimum transfer' }).count(), 0);
+  await actOk(tradeCardB().locator('[data-act="call"]'));
+  const [mc] = await of('borrower', 'MarginCall', (a) => a.instrument === ID);
+  assert.ok(mc?.arg.markAsOf, 'call records its mark time');
+  await markApi(ID, 100);
+  await open('borrower');
+  const c = card('calls').filter({ hasText: ID });
+  assert.match(await c.textContent(), /covers/);
+  await actOk(c.locator('[data-act="refute"]'));
+  assert.equal((await of('lenderB', 'MarginCall', (a) => a.instrument === ID)).length, 0);
+});
+await check('1.2.0 substitution: only same-issuer holdings are offered; the borrower withdraws an unanswered offer', async () => {
+  await mint('cashIssuer', 'borrower', IF, 5);
+  await open('borrower');
+  await page.selectOption('#n-inst', IE); await page.fill('#n-qty', '1');
+  await actOk(page.locator('[data-act="bonds"]'));
+  const sel = tradeCardB().locator('select[id^="sub-"]');
+  assert.equal(await sel.locator('option', { hasText: IF }).count(), 0, 'other-issuer holding offered');
+  await sel.selectOption(await sel.locator('option', { hasText: `1 ${IE}` }).first().getAttribute('value'));
+  await actOk(tradeCardB().locator('[data-act="substitute"]'));
+  assert.equal((await of('lenderB', 'Substitution', (a) => a.newInstrument === IE)).length, 1);
+  await open('borrower');
+  await actOk(tradeCardB().locator('[data-act="withdraw-sub"]'));
+  assert.equal((await of('lenderB', 'Substitution', (a) => a.newInstrument === IE)).length, 0);
+  assert.equal(sum(await of('borrower', 'Holding', (a) => a.instrument === IE && a.owner === P.borrower)), 1);
+});
+await check('1.2.0 master agreement: borrower offers, cannot sign its own, lender B signs; both see it, the regulator does not', async () => {
+  await open('borrower');
+  if (!(await of('borrower', 'MasterAgreement', (a) => a.lender === P.lenderB)).length) {
+    await page.selectOption('#ma-cp', 'lenderB');
+    await actOk(page.locator('[data-act="propose-master"]'));
+    await open('borrower');
+    const offer = card('offered by').filter({ hasText: 'Lender B' });
+    assert.equal(await offer.locator('[data-act="sign-master"]').count(), 0);
+    await open('lenderB');
+    await actOk(card('offered by').filter({ hasText: 'Borrower' }).locator('[data-act="sign-master"]'));
+  }
+  assert.equal((await of('borrower', 'MasterAgreement', (a) => a.lender === P.lenderB)).length, 1);
+  assert.equal((await of('lenderB', 'MasterAgreement', (a) => a.borrower === P.borrower)).length, 1);
+  assert.equal((await of('regulator', 'MasterAgreement')).length + (await of('lenderA', 'MasterAgreement', (a) => a.lender === P.lenderB)).length, 0);
+});
+await check('1.2.0 close-out: refused by the ledger without an event of default; a 2-hour call is left for the close-out run', async () => {
+  await open('lenderB');
+  const ma = card('signed by both').filter({ hasText: 'Lender B' });
+  assert.match(await ma.textContent(), /Event of default\s*none/);
+  await actErr(ma.locator('[data-act="close-out"]'), /no event of default/);
+  await markApi(ID, 85);
+  await open('lenderB');
+  await tradeCardB().locator('input[id^="mc-h-"]').fill('2');
+  await actOk(tradeCardB().locator('[data-act="call"]'));
+  const [mc] = await of('lenderB', 'MarginCall', (a) => a.instrument === ID);
+  const left = Date.parse(mc.arg.respondBy) - Date.now();
+  assert.ok(left > 2 * 36e5 - 6e4 && left < 2 * 36e5 + 3e5, `deadline in ${Math.round(left / 6e4)} min`);
+  console.log(`        close-out possible after ${new Date(mc.arg.respondBy).toLocaleString()}: node scripts/qa-desk.mjs close-out`);
+});
+// Run on its own once the call above is past its deadline.
+if (ONLY === 'close-out') await check('close-out: lender B nets every repo with the borrower in one command; all three sides see the report', async () => {
+  const ma = (await of('lenderB', 'MasterAgreement', (a) => a.borrower === P.borrower))[0];
+  assert.ok(ma, 'master agreement with the borrower');
+  const trades = await of('lenderB', 'RepoTrade', (a) => a.borrower === P.borrower && a.lender === P.lenderB);
+  for (const i of new Set(trades.map((t) => t.arg.collateralInstrument))) {
+    const m = (await of('lenderB', 'Mark', (a) => a.instrument === i && a.agent === P.agent)).sort((x, y) => y.arg.asOf.localeCompare(x.arg.asOf))[0];
+    if (Date.now() - Date.parse(m.arg.asOf) > DAY / 2) await markApi(i, m.arg.price); // keep each mark fresh for the close-out
+  }
+  const before = (await of('regulator', 'CloseOutReport')).length;
+  await open('lenderB');
+  const c = card('signed by both').filter({ hasText: 'Lender B' });
+  assert.match(await c.textContent(), /margin call past its deadline/);
+  const t = await actOk(c.locator('[data-act="close-out"]'));
+  assert.match(t, new RegExp(`Closed out ${trades.length} repos on MARGIN_CALL`));
+  assert.equal((await of('lenderB', 'RepoTrade', (a) => a.borrower === P.borrower)).length, 0);
+  const [r] = (await of('regulator', 'CloseOutReport')).sort((x, y) => y.arg.at.localeCompare(x.arg.at));
+  assert.equal((await of('regulator', 'CloseOutReport')).length, before + 1);
+  assert.equal(Number(r.arg.reposNetted), trades.length);
+  assert.ok(Math.abs(Number(r.arg.valueKept) + Number(r.arg.valueReturned) - Number(r.arg.collateralValue)) < 0.01);
+  for (const role of ['borrower', 'lenderB', 'regulator']) {
+    await open(role);
+    assert.match(await page.locator('#view').textContent(), /MARGIN_CALL/, role);
+  }
+  assert.equal((await of('lenderA', 'CloseOutReport', (a) => a.lender === P.lenderB)).length, 0, 'lender A sees B\'s close-out');
+  console.log(`        ${trades.length} repos netted: owed ${r.arg.owed}, collateral ${r.arg.collateralValue}, kept ${r.arg.valueKept}, returned ${r.arg.valueReturned}`);
 });
 
 // ---------- deep links, side by side ----------

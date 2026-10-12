@@ -29,7 +29,7 @@ async function publishMarks(prices) {
 }
 
 async function liveMarks() {
-  const live = await livePrices();
+  const live = await livePrices({ btcSource: null });
   for (const i of BONDS) console.log(`  ${i} ${live[i].price}  (${live[i].source})`);
   const prices = Object.fromEntries(BONDS.map((i) => [i, live[i].price]));
   await publishMarks(prices);
