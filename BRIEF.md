@@ -36,12 +36,14 @@ no use for the losing quotes.
 | Asking leaks to every dealer | Each quote is signed by lender and borrower only; rivals and the regulator never receive it |
 | Quotes that cannot be funded | The lender locks the full principal behind its quote |
 | Settlement risk at open | Bonds pledged and cash delivered in one atomic transaction; losing lenders refunded in the same one |
-| Disputed margin calls | Units due computed from a valuation agent's signed mark, refused when the repo is still covered |
+| Disputed margin calls | Units due computed from a valuation agent's signed mark under an hour old, refused when the repo is still covered or the shortfall is below the agreed minimum transfer; the borrower can refute a call with a newer mark that shows cover |
 | Substitution by email | Swap only with the lender's consent and only if the new collateral covers at a fresh mark |
 | Default handling | After an unanswered call or past maturity the pledge goes to the lender, by contract |
 | After-the-fact reporting | The regulator is an observer of every lifecycle event as it happens |
 | Best execution is unprovable without leaking | The regulator gets quotes weighed, the winner's rank and the gap to the best rate; losers get their rank; nobody gets a losing rate or a name |
 | One operator's price decides a margin call | Marks can come from a BitSafe decentralized committee: k of n pricers must confirm |
+| Each lender's haircut policy re-argued per trade | A lender signs a haircut schedule; quotes and substitution approvals below its floor are refused |
+| One default, many trades | Under a signed master agreement the lender closes out every repo with that borrower in one transaction, netting excess on one against a shortfall on another |
 | Rolling means closing and reopening | A lender offers a new rate; on acceptance interest so far is paid and the repo continues |
 | Token legs settled by hand | Cash (USDCx, Canton Coin) and collateral (CBTC) as CIP-0056 allocations: the repo decides, atomically, whether each settles or unwinds |
 
@@ -100,11 +102,13 @@ marks, and wallets for the parties (CIP-0103).
 - The valuation committee onboarded through BitSafe DecMan and hosted on three
   participants: it publishes with one node down and cannot with two (`docs/evidence/`);
   a mark confirmed 2 of 3 in DecMan's own UI is recorded in `media/decman-demo-captioned.mp4`.
-- `talang-repo` 1.0.0 is vetted on the NODERS DevNet participant and seeded there; the hosted desk reads it.
+- `talang-repo` 1.0.0 is vetted on the NODERS DevNet participant and seeded there; the hosted desk reads it. The 1.1.0 and 1.2.0 upgrades (minimum transfer, haircut schedules, master agreements with close-out netting, sealed award and other fixes) are vetted there too, uploaded through the NODERS console on 9 and 12 October.
+- The BitSafe committee flow on the NODERS DevNet participant: 1 of 3 refused, 2 of 3 executed, a repo and a margin call on the committee mark (`docs/evidence/bitsafe-governed-marks-devnet.json`, 8 of 8 steps; all parties on one node).
 - Real CBTC on DevNet: allocated through the DA Utility registry as repo collateral and released at repurchase (`docs/evidence/cbtc-rail-devnet.json`, 7 of 7 steps).
+- A CBTC default on DevNet: a margin call left unanswered, then lender A's default executed 0.001 CBTC to it through the DA Utility registry (`docs/evidence/cbtc-default-devnet.json`, 9 of 9 steps, 9 and 12 October).
 - Both legs in real tokens on DevNet: Canton Coin as cash and CBTC as collateral, each allocated through its registry, awarded and repurchased (`docs/evidence/token-repo-amulet-cbtc-devnet.json`, 12 of 12 steps).
-- The desk in a browser: 29/29 Playwright checks through every role and button (`npm run qa:desk`); the hosted read-only API: 45/45 checks (`npm run test:proxy`).
-- Live Grofty wallet on TestNet: connect, two desk commands signed in Grofty and accepted, a 1 CC venue fee executed on TestNet (`docs/evidence/grofty-wallet-testnet.json`).
+- The desk in a browser: 29/29 Playwright checks through every role and button (`npm run qa:desk`, 9 October; the 1.2.0 flows were added to it on 12 October); the hosted read-only API: 45/45 checks (`npm run test:proxy`).
+- Live Grofty wallet on TestNet: connect, two desk commands signed in Grofty and accepted (executed on a local sandbox), a 1 CC venue fee executed on TestNet to Grofty's QA party as a stand-in venue (`docs/evidence/grofty-wallet-testnet.json`, `media/grofty-wallet.mp4`).
 - Not yet: USDCx on DevNet, a Talang command on TestNet, any pilot user.
 
 ## Validation log

@@ -1,10 +1,10 @@
 # Talang · HackCanton Season 3 submission
 
 **Track:** Financial Applications / DeFi
-**Sponsor challenges:** BitSafe Decentralization Manager (Contribution Pool); NODERS DevNet; CIP-0056 token settlement (Canton Coin, CBTC; USDCx not yet)
+**Sponsor challenges:** BitSafe Decentralization Manager (Contribution Pool); NODERS DevNet; Grofty Wallet (CIP-0103); CIP-0056 token settlement (Canton Coin, CBTC; USDCx not yet)
 **Repo:** https://github.com/PugarHuda/talang
 **Live desk:** https://talang-desk.vercel.app/desk (read-only, NODERS DevNet)
-**Videos:** pitch `media/talang-pitch.mp4` (subtitled); desk walkthrough `media/talang-desk-captioned.mp4` (73 s, captioned, recorded against a seeded local ledger by `scripts/record-desk.mjs`); BitSafe DecMan demo `media/decman-demo-captioned.mp4` (79 s, DecMan's own UI on the three-participant LocalNet)
+**Videos:** pitch `media/talang-pitch.mp4` (subtitled); Grofty wallet run `media/grofty-wallet.mp4` (captioned, live extension on TestNet); desk walkthrough `media/talang-desk-captioned.mp4` (73 s, captioned, recorded against a seeded local ledger by `scripts/record-desk.mjs`); BitSafe DecMan demo `media/decman-demo-captioned.mp4` (79 s, DecMan's own UI on the three-participant LocalNet)
 **Verify in 2 minutes:** README.md, section "Verify in 2 minutes".
 
 ## One line
@@ -43,7 +43,7 @@ no single operator can move it.
 
 ## Metrics
 
-Measured on 9 October: on a Canton 3.4.11 sandbox (`npm run e2e:mcp`, `npm run governance`, `npm run qa:desk`, CI), and with fetch stubbed for the hosted API (`npm run test:proxy`):
+Measured on a Canton 3.4.11 sandbox (`npm run e2e:mcp`, `npm run governance` and the Daml scripts in CI run 38272515745 on 12 October; `npm run qa:desk` on 9 October), and with fetch stubbed for the hosted API (`npm run test:proxy`, 13 October):
 
 | Metric | Value |
 |---|---|
@@ -51,7 +51,7 @@ Measured on 9 October: on a Canton 3.4.11 sandbox (`npm run e2e:mcp`, `npm run g
 | Requests, quotes or loss notices visible to the regulator | 0 |
 | Repo states seeded through the Ledger API | 6 (sealed, live, substitution pending, margin call, roll, closed with fee) |
 | Daml scripts / MCP end-to-end checks | 31 / 41 |
-| Playwright desk checks / read-only API checks | 29 / 45 |
+| Playwright desk checks (9 October, before the 1.2.0 flows were added) / read-only API checks | 29 / 45 |
 | Governed mark below threshold | refused by BitSafe's `GovernanceRules` |
 
 Targets for the pilot (BRIEF.md):
@@ -83,7 +83,11 @@ repurchase and every roll, so it cannot be skipped. Built and tested.
   quotes in desk cash or a CIP-0056 allocation, atomic award, loss notices, best
   execution, margin calls from fresh marks, substitution, rolls, repurchase in desk
   cash or as a standard allocation request, venue fee, default, regulator reports;
-  BitSafe-governed marks and lender syndicates.
+  BitSafe-governed marks and lender syndicates. talang-repo 1.2.0 (`daml/TalangAgreements.daml`)
+  adds a minimum transfer amount on margin calls, lender-signed haircut schedules, and master
+  agreements with close-out netting, plus fixes: sealed award (losing lenders are not
+  informees), substitute issuer check, substitution withdraw, one-hour marks for calls with
+  margin refutation, a one-day default window, the best-execution gap as a band.
 - **Tests:** 31 Daml scripts including every refusal, the token rail against a
   registry implementing the Splice interfaces, and BitSafe's own `GovernanceRules`.
 - **Desk** (`web/`, `server.mjs`): one page per role, each reading only its own node.
@@ -95,11 +99,11 @@ repurchase and every roll, so it cannot be skipped. Built and tested.
 three-participant LocalNet; it publishes with one node down and cannot with two.
 Marks come from live sources (US Treasury par yields, three BTC exchanges).
 
-**On DevNet:** `talang-repo` 1.0.0 vetted on the NODERS participant and seeded; the hosted desk reads it (docs/evidence/devnet-run.log). A repo with both legs in real tokens, Canton Coin cash and CBTC collateral, each allocated through its registry, awarded and repurchased, 12 of 12 steps (docs/evidence/token-repo-amulet-cbtc-devnet.json).
+**On DevNet:** `talang-repo` 1.0.0 vetted on the NODERS participant and seeded; the hosted desk reads it (docs/evidence/devnet-run.log). The 1.1.0 and 1.2.0 upgrades are vetted there too (uploaded through the NODERS console on 9 and 12 October). The BitSafe committee flow ran there, 8 of 8 steps (docs/evidence/bitsafe-governed-marks-devnet.json). A CBTC-collateral repo ran to default: margin call on 9 October, lender A's default on 12 October executed 0.001 CBTC to it through the DA Utility registry, offset 3209860 (docs/evidence/cbtc-default-devnet.json). A repo with both legs in real tokens, Canton Coin cash and CBTC collateral, each allocated through its registry, awarded and repurchased, 12 of 12 steps (docs/evidence/token-repo-amulet-cbtc-devnet.json).
 
 **Grofty Wallet on TestNet (live extension, no stub):** desk connected, two borrower commands signed in Grofty and accepted by the wallet-signature check (executed on a local ledger, since Grofty's participant cannot host Talang's package), and a 1 CC venue fee executed on TestNet from the desk's panel, update id 1220e6e35fe978a3e8ff2816cbe2312fd99dcaa2a77617eb83c5e187bf83a7b6ccad (docs/evidence/grofty-wallet-testnet.json, media/grofty-wallet.mp4).
 
-**Not yet:** USDCx on DevNet (no registry or faucet documented there); a Talang command executed on TestNet.
+**Not yet:** USDCx on DevNet (no registry or faucet documented there); a Talang command executed on TestNet; the 1.2.0 close-out run on DevNet (local sandbox only).
 
 **Real CBTC on DevNet:** the BitSafe faucet's CBTC accepted, allocated through the DA Utility registry as repo collateral, and released at repurchase (docs/evidence/cbtc-rail-devnet.json). The first version (0.1.0) was
 uploaded to the NODERS DevNet participant and driven through the desk on 3 October
@@ -113,7 +117,7 @@ uploaded to the NODERS DevNet participant and driven through the desk on 3 Octob
    Run `privacy_check` from Lender B's MCP agent: 0 rival quotes.
 3. **(1:00) Award and best execution.** The cheapest rate's haircut does not cover, so
    the borrower takes rank 2. Switch to Lender A: "rank 3 of 3", nothing else. Switch
-   to the regulator: 3 quotes weighed, winner rank 2, 10 bp over best, no names.
+   to the regulator: 3 quotes weighed, winner rank 2, gap to best in the 6-25 bp band, no names.
 4. **(1:45) The price.** `npm run governance`: one pricer's mark is refused by BitSafe's
    GovernanceRules; two of three publish. A rogue single-pricer mark cannot drive a
    margin call; the governed markdown can.
