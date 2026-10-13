@@ -16,7 +16,7 @@ than README and docs/evidence show.
 **Elevator pitch (≤2000):**
 Talang is a sealed-bid repo desk on Canton. A fund that holds tokenized Treasuries asks a panel of lenders for cash against them; each lender's rate and haircut is sealed to the borrower alone, because on Canton a quote that names only the lender and the borrower is never sent to anyone else's node. The borrower takes the cheapest quote that covers the loan, and in one atomic transaction the bonds are pledged, the cash is delivered and the losing lenders are refunded, told only their rank. The repo then lives on the ledger: margin calls computed from a signed mark and refused when the repo is still covered, substitution only with the lender's consent, rolls, repurchase with a venue fee that cannot be skipped, and default that returns any excess collateral to the borrower. The regulator observes every lifecycle event and gets best-execution records with no lender names and no losing rates.
 Marks come from a BitSafe valuation committee: a decentralized party hosted on three participants through BitSafe's Decentralization Manager, where one pricer alone is refused and two of three publish; it keeps publishing with one node down. Both legs can be CIP-0056 tokens: on DevNet a repo has run with Canton Coin as cash and CBTC as collateral, each allocated through its registry and settled atomically at repurchase. A wallet's key (CIP-0103) can authorise each desk command, so a borrower can verify which key sealed a quote. MCP agents sit at the lender, borrower and regulator desks, each reading only its own node.
-Live on the NODERS DevNet participant; one-command LocalNet demo for BitSafe; 31 Daml tests, 41 MCP end-to-end checks, 29 Playwright checks.
+Live on the NODERS DevNet participant (talang-repo 1.2.0 vetted there), where a CBTC-collateral repo has also run to default with the CBTC executed to the lender through the registry; one-command LocalNet demo for BitSafe; 31 Daml tests, 41 MCP end-to-end checks, 29 Playwright checks.
 
 **Tech stack:** Daml 3.4, Canton, JSON Ledger API v2, CIP-0056 Token Standard, DA Utility Registry, BitSafe Decentralization Manager (governance-core-v1, governance-action-v1), CIP-0103 dApp SDK, Grofty Wallet, MCP (Model Context Protocol), Node.js, Vercel, Playwright, Docker
 
@@ -105,7 +105,7 @@ Live on the NODERS DevNet participant; one-command LocalNet demo for BitSafe; 31
 | --- | --- | --- |
 | Borrowers get better rates when quotes are sealed from rivals | Shadow book on DevNet: quotes per request, spread to best rate | Not yet tested with users |
 | At least two lenders quote on most requests | Pilot: count quotes per request | Not yet |
-| A committee-signed mark removes margin disputes | Pilot: margin calls issued vs. disputed | Mechanism built and run (LocalNet, sandbox); no users yet |
+| A committee-signed mark removes margin disputes | Pilot: margin calls issued vs. disputed | Mechanism built and run (DevNet, LocalNet, sandbox); no users yet |
 | Regulators accept best-execution records without names | Show to a compliance officer | Not yet |
 
 No user interviews have happened yet; the validation log in BRIEF.md is deliberately empty.
@@ -197,8 +197,8 @@ No user interviews have happened yet. Ecosystem conversations that changed the b
 ### 4. Tests and results
 
 - **What we tried:** the full flow on the NODERS DevNet participant, a 3-participant DecMan LocalNet, a local sandbox, and automated suites.
-- **What happened:** 31/31 Daml tests; 41/41 MCP end-to-end checks; 29/29 Playwright desk checks; 45/45 read-only API checks; DecMan committee 8/8 steps with 2 expected refusals; node-offline run 6/6; real CBTC repo on DevNet 7/7 steps; Canton Coin cash + CBTC collateral repo on DevNet 12/12 steps.
-- **What we changed:** Playwright QA found 10 bugs (a double submit on repaint, an empty haircut sent as 0%, float precision refused by the ledger, …), all fixed; a margin call can no longer give the borrower under 2 hours; default now returns excess collateral (GMRA close-out).
+- **What happened:** 31/31 Daml tests; 41/41 MCP end-to-end checks; 29/29 Playwright desk checks; 45/45 read-only API checks; DecMan committee 8/8 steps with 2 expected refusals; node-offline run 6/6; committee on DevNet 8/8; real CBTC repo on DevNet 7/7 steps; Canton Coin cash + CBTC collateral repo on DevNet 12/12 steps; CBTC default on DevNet 9/9 steps; live Grofty wallet on TestNet (connect, two signed desk commands, 1 CC fee executed).
+- **What we changed:** Playwright QA found 10 bugs (a double submit on repaint, an empty haircut sent as 0%, float precision refused by the ledger, …), all fixed; a margin call can no longer give the borrower under 2 hours; default now returns excess collateral (GMRA close-out). In 1.2.0: the award no longer shows itself to losing lenders, a substitute must come from the repo's collateral issuer, a call needs a mark under an hour old and can be refuted, default is limited to a day after the deadline, best execution reports the gap as a band; minimum transfer, haircut schedules and master-agreement close-out netting added. A QA pass after that: the MCP `review_substitution` approves only on "approve", percent inputs go as 10-place decimals, the hosted API no longer echoes ledger errors, the desk reads marks only from the trusted agent or committee. The first CBTC default attempt failed because lender A could not see the CBTC allocation; it is now passed as a disclosed contract.
 
 ### 5. Product and on-ledger metrics
 
@@ -207,7 +207,7 @@ No user interviews have happened yet. Ecosystem conversations that changed the b
 | Users who tried the demo | Not tracked | 0 external | — |
 | Users who completed the core flow | Not tracked | 0 external | — |
 | Transactions on DevNet | Live `talang-repo` contracts read from the NODERS participant through the hosted API (9 October, evening) | 13 open repos, 25 lifecycle reports, 16 best-execution records, 6 margin calls, 14 loss notices; 1 CBTC-collateral repo and 1 repo with Canton Coin cash and CBTC collateral, both opened and repurchased | same |
-| Active parties | Desk parties with act-as on DevNet | 7 (borrower, 2 lenders, regulator, cash issuer, bond issuer, valuation agent) | 12 once NODERS grants lender C and the committee |
+| Active parties | Desk parties with act-as on DevNet | 12: borrower, 3 lenders, regulator, cash issuer, bond issuer, valuation agent, and the valuation committee with its 3 pricers (lender C and the committee granted by NODERS) | same |
 
 ### 6. Success criteria after the hackathon
 
@@ -239,11 +239,11 @@ Upload `media/talang-pitch-deck.pdf` (max 10 MB).
 
 ## MVP summary
 
-- **Built and running:** Daml model (RFQ, sealed quotes, award, best execution, loss notices, margin, substitution, roll, repurchase with venue fee, default with excess returned), 31 Daml tests; desk UI per role with a side-by-side privacy view; three MCP agents; hosted desk reading live DevNet data.
-- **On DevNet (NODERS):** `talang-repo` 1.0.0 vetted and seeded; a repo with both legs in real tokens — Canton Coin cash and CBTC collateral, allocated through their registries, awarded and repurchased (docs/evidence/token-repo-amulet-cbtc-devnet.json).
+- **Built and running:** Daml model (RFQ, sealed quotes, award, best execution, loss notices, margin, substitution, roll, repurchase with venue fee, default with excess returned; 1.2.0: minimum transfer, haircut schedules, master agreements with close-out netting), 31 Daml tests; desk UI per role with a side-by-side privacy view; three MCP agents; hosted desk reading live DevNet data.
+- **On DevNet (NODERS):** `talang-repo` 1.0.0 vetted and seeded, its 1.1.0 and 1.2.0 upgrades vetted (9 and 12 October); BitSafe committee flow 8/8; a CBTC-collateral repo defaulted with 0.001 CBTC executed to the lender through the registry (docs/evidence/cbtc-default-devnet.json); a repo with both legs in real tokens — Canton Coin cash and CBTC collateral, allocated through their registries, awarded and repurchased (docs/evidence/token-repo-amulet-cbtc-devnet.json).
 - **BitSafe:** valuation committee onboarded through DecMan on a 3-participant LocalNet, one command (`bash localnet/demo.sh reset`); 1-of-3 refused, 2-of-3 executed, survives one node down; the same flow in DecMan's own UI in `media/decman-demo-captioned.mp4`.
 - **Wallet:** CIP-0103 wallet key authorises desk commands (signed single-use challenges); venue fee payable in USDCx/CC via Grofty.
-- **Live Grofty run (TestNet):** connect, two desk commands signed in Grofty and accepted, 1 CC venue fee executed on TestNet (`docs/evidence/grofty-wallet-testnet.json`, `media/grofty-wallet.mp4`).
+- **Live Grofty run (TestNet):** connect, two desk commands signed in Grofty and accepted (executed on a local sandbox, not TestNet), 1 CC venue fee executed on TestNet to Grofty's QA party as a stand-in venue (`docs/evidence/grofty-wallet-testnet.json`, `media/grofty-wallet.mp4`).
 - **Not yet:** USDCx on DevNet, a Talang command on TestNet, user validation.
 
 ---

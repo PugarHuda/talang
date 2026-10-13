@@ -143,7 +143,7 @@
       <li class="glass"><span class="n">01</span><h3>Request</h3><p class="who">Borrower</p><p>Only the invited lenders see it, and it carries no rate.</p></li>
       <li class="glass"><span class="n">02</span><h3>Sealed quotes</h3><p class="who">Each lender</p><p>Full principal locked behind the quote. Rivals and the regulator never receive it.</p></li>
       <li class="glass"><span class="n">03</span><h3>Award</h3><p class="who">Borrower</p><p>Atomic opening leg: collateral pledged, cash delivered, losers refunded unrevealed.</p></li>
-      <li class="glass"><span class="n">04</span><h3>Margin · Substitution · Roll</h3><p class="who">Lender and borrower</p><p>Calls priced from a fresh mark and refused while covered. Swaps and rolls re-check coverage.</p></li>
+      <li class="glass"><span class="n">04</span><h3>Margin · Substitution · Roll</h3><p class="who">Lender and borrower</p><p>Calls priced from a mark under an hour old, refused while covered or below the minimum transfer. Swaps and rolls re-check coverage.</p></li>
       <li class="glass"><span class="n">05</span><h3>Repurchase or Default</h3><p class="who">Borrower · Lender</p><p>Principal plus ACT/360 interest home, fee to the venue. An unanswered call or past maturity hands the pledge to the lender.</p></li>
     </ol>
   </section>
@@ -181,7 +181,7 @@
         <dl class="kv">
           <div><dt>Quotes weighed</dt><dd>3</dd></div>
           <div><dt>Winner's rank on rate</dt><dd>2</dd></div>
-          <div><dt>Gap to best rate</dt><dd>10 bp</dd></div>
+          <div><dt>Gap to best rate</dt><dd>6-25 bp band</dd></div>
           <div><dt>Lenders named</dt><dd class="muted">none</dd></div>
         </dl>
       </article>
@@ -212,6 +212,7 @@
         <li>Uses BitSafe's released <code>governance-action-v1</code> and <code>governance-core-v1</code> DARs unchanged.</li>
         <li>Threshold refusal and execution proven in Daml scripts and on a Canton participant.</li>
         <li>Run on a three-participant DecMan LocalNet: it still publishes with one node down, not with two.</li>
+        <li>Run on the NODERS DevNet participant too: 1 of 3 refused, 2 of 3 executed, 8 of 8 steps.</li>
       </ul>
     </div>
   </section>
@@ -224,7 +225,7 @@
       <ul class="facts">
         <li>Repurchase appears in any CIP-0056 wallet as a standard allocation request.</li>
         <li>Built and tested on the <code>Allocation</code> / <code>AllocationRequest</code> interfaces, against a registry implementing them.</li>
-        <li>CBTC and Canton Coin run through their live registries on DevNet.</li>
+        <li>CBTC and Canton Coin run through their live registries on DevNet; in a CBTC default there, the pledged CBTC was executed to the lender through the registry.</li>
         <li class="muted">USDCx not yet: DevNet has no USDCx registry.</li>
       </ul>
     </div>

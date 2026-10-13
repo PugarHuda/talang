@@ -12,7 +12,7 @@ what happened to each item:
 | 2. CIP-0103 primary account | Done: `web/wallet.js` asks for `getPrimaryAccount` |
 | 3. Featured-app activity marker | Not done |
 | 4. Minimum transfer amount, 5. haircut schedule | Done after submission in talang-repo 1.2.0 (`Terms.minTransfer`, `HaircutSchedule`), with desk UI; vetted on the NODERS DevNet participant 12 October (package `5125df18…a3c366`) |
-| 6. Cross-trade netting | Done after submission in 1.2.0 as `MasterAgreement` / `CloseOut`; local sandbox only |
+| 6. Cross-trade netting | Done after submission in 1.2.0 as `MasterAgreement` / `CloseOut`; the package is vetted on DevNet (12 October), the close-out itself run on the local sandbox only |
 | 7. Canton Coin as the cash leg | Done on DevNet through the Scan registry: [evidence/token-repo-amulet-cbtc-devnet.json](evidence/token-repo-amulet-cbtc-devnet.json), 12 of 12 steps |
 | 8. USDCx on DevNet | Still blocked: no DevNet admin party found |
 
@@ -61,7 +61,7 @@ Sketch:
   `NO_CONTEXTS` slot in `lib/ledger.mjs`) for `Award…`, `Default`, `Repurchase`.
 - Requires `splice-api-token-allocation-instruction-v1` DAR on the client side only
   for the template id string; no Daml change.
-- Evidence: write `docs/evidence/cbtc-devnet.json` with update ids.
+- Evidence: write `docs/evidence/cbtc-devnet.json` with update ids (written as `docs/evidence/cbtc-rail-devnet.json`).
 
 ### 2. CIP-0103 wallet: use the primary account (S)
 
