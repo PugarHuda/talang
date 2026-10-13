@@ -300,15 +300,28 @@ function lenderView() {
 }
 
 // 1.2.0: the lender's own haircut floors per collateral instrument, published to the borrower.
+// Only collateral that touches this lender gets a field: what it already floors, holds, was asked
+// to quote against, funded, or is offered as a substitute. Any other marked instrument is one
+// "Add" away (SCHED_ADDED, kept for this page's life so the 5 s repaint does not drop it).
+const SCHED_ADDED = new Set();
 function scheduleSection() {
-  const s = schedule(me());
-  const insts = [...new Set([...of('Mark').map((m) => m.arg.instrument), ...Object.keys(s?.arg.floors ?? {})])].sort();
+  const s = schedule(me()), lender = me();
+  const insts = [...new Set([...Object.keys(s?.arg.floors ?? {}),
+    ...of('Holding').filter((c) => c.arg.owner === lender).map((c) => c.arg.instrument),
+    ...of('RepoRFQ').map((c) => c.arg.terms.collateralInstrument),
+    ...of('RepoTrade').filter((c) => c.arg.lender === lender).map((c) => c.arg.collateralInstrument),
+    ...of('Substitution').map((c) => c.arg.newInstrument), ...SCHED_ADDED])].filter((i) => i !== 'USDC').sort();
+  const more = [...new Set(of('Mark').map((m) => m.arg.instrument))].filter((i) => !insts.includes(i) && i !== 'USDC').sort();
   return `<h2>Your haircut schedule</h2><div class="card">
     <p class="empty" style="margin:0 0 10px">${s ? 'Published to the borrower. Your quotes and substitution approvals go through it: the ledger refuses a haircut under the floor and collateral left blank.'
       : 'None published: quotes go out unchecked. Set a minimum haircut per collateral; leave one blank to refuse it.'}</p>
-    <div class="form">${insts.map((i) => `<label>${esc(i)} min haircut (%)<input class="hs-floor" data-inst="${esc(i)}" type="number" step="0.5" min="0" max="49.99"
-      value="${s && i in s.arg.floors ? +(N(s.arg.floors[i]) * 100).toFixed(4) : ''}" placeholder="not eligible" /></label>`).join('')}
-    ${canAct() ? `<button data-act="schedule">${s ? 'Revise schedule' : 'Sign and publish schedule'}</button>
+    <div class="form">${insts.length ? insts.map((i) => `<label>${esc(i)} min haircut (%)<input class="hs-floor" data-inst="${esc(i)}" type="number" step="0.5" min="0" max="49.99"
+      value="${s && i in s.arg.floors ? +(N(s.arg.floors[i]) * 100).toFixed(4) : ''}" placeholder="not eligible" /></label>`).join('')
+      : '<p class="empty" style="margin:0">No collateral has come your way yet: add an instrument to floor it.</p>'}
+    ${canAct() ? `${more.length ? `<label>Add collateral<select class="in" id="hs-add" aria-label="Instrument to add to your schedule">
+        ${more.map((i) => `<option value="${esc(i)}">${esc(i)}</option>`).join('')}</select></label>
+      <button class="ghost" data-act="schedule-add">Add instrument</button>` : ''}
+      <button data-act="schedule">${s ? 'Revise schedule' : 'Sign and publish schedule'}</button>
       ${s ? `<button class="ghost" data-act="drop-schedule" data-cid="${s.cid}">Withdraw schedule</button>` : ''}` : ''}</div></div>`;
 }
 
@@ -601,6 +614,13 @@ const ACTIONS = {
       : create('HaircutSchedule', { lender: me(), floors, audience }));
     return old ? 'Haircut schedule revised' : 'Haircut schedule signed and published to the borrower';
   },
+  // Page-only: a field for one more marked instrument; nothing reaches the ledger until "Revise".
+  async 'schedule-add'() {
+    const i = val('#hs-add');
+    if (!i) throw new Error('pick an instrument to add');
+    SCHED_ADDED.add(i); focusNext = `.hs-floor[data-inst="${CSS.escape(i)}"]`;
+    return `${i} added: give it a minimum haircut, then revise the schedule`;
+  },
   async 'drop-schedule'(b) { await act(exercise('HaircutSchedule', b.dataset.cid, 'Archive')); return 'Haircut schedule withdrawn'; },
   async 'propose-master'() {
     const other = CFG.parties[val('#ma-cp')], lender = LENDERS.includes(ROLE);
@@ -661,7 +681,7 @@ async function read(role) {
   const same = !!prev && JSON.stringify(r.contracts) === JSON.stringify(prev.contracts);
   return (LAST[role] = { offset: r.offset, contracts: r.contracts, same });
 }
-let painted = 0;
+let painted = 0, focusNext = null; // focusNext: a selector to focus after the next repaint
 // The 5 s repaint must not undo what the person typed or picked and has not sent yet: a
 // form reset to its defaults would send 4,800,000 when they typed 900,000. Fields they
 // changed are carried over to the new page by id (or class and instrument).
@@ -678,6 +698,7 @@ function repaint(html) {
     if (e.type === 'checkbox') e.checked = kept.get(k);
     else if (e.tagName !== 'SELECT' || [...e.options].some((o) => o.value === kept.get(k))) e.value = kept.get(k);
   }
+  if (focusNext) { $('#view').querySelector(focusNext)?.focus(); focusNext = null; }
 }
 async function refresh(force) {
   // Never repaint under a field being typed in.
