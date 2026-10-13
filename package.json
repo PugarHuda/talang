@@ -17,6 +17,7 @@
     "token-rail": "node scripts/token-rail.mjs",
     "oracle": "node scripts/oracle.mjs",
     "test:proxy": "node scripts/test-readonly-proxy.mjs",
+    "test:offline": "node scripts/test-offline.mjs",
     "qa:desk": "node scripts/qa-desk.mjs"
   },
   "dependencies": {

@@ -54,11 +54,14 @@ function syncReadOnly() {
 }
 
 // ---- money arithmetic, mirrored from the contract so the page can show it ----
-function mark(instrument) {
+function mark(instrument, agent) {
   // Only marks from the desk's agent or its valuation committee, as mcp/server.mjs: anyone may
   // publish a "Mark" to a party, and the contract would refuse one from another agent anyway.
+  // With `agent` (the repo's or request's), only that agent's: the contract takes no other.
+  // A mark dated in the future is refused by the contract, so it is never the latest here.
   const trusted = [CFG.parties.agent, CFG.parties.committee].filter(Boolean);
-  const m = of('Mark').filter((c) => c.arg.instrument === instrument && trusted.includes(c.arg.agent)).sort((a, b) => b.arg.asOf.localeCompare(a.arg.asOf))[0];
+  const m = of('Mark').filter((c) => c.arg.instrument === instrument && trusted.includes(c.arg.agent) && (!agent || c.arg.agent === agent)
+    && Date.parse(c.arg.asOf) <= Date.now()).sort((a, b) => Date.parse(b.arg.asOf) - Date.parse(a.arg.asOf))[0];
   const age = m && Date.now() - Date.parse(m.arg.asOf);
   // A margin call needs a mark under an hour old (1.2.0), anything else one under a day.
   return m && { cid: m.cid, price: N(m.arg.price), asOf: m.arg.asOf, fresh: age < DAY, callable: age < HOUR };
@@ -120,7 +123,7 @@ function holdingsCard() {
 }
 
 function tradeCard(t, actions) {
-  const a = t.arg, m = mark(a.collateralInstrument), o = owed(a);
+  const a = t.arg, m = mark(a.collateralInstrument, a.agent), o = owed(a);
   const cover = m ? lendable(N(a.haircut), N(a.collateralQty), m.price) / o : null;
   const pill = cover == null ? '<span class="pill mute">no mark</span>'
     : cover >= 1 ? `<span class="pill ok">covered ${pct(cover)}</span>` : `<span class="pill bad">short ${pct(cover)}</span>`;
@@ -157,7 +160,7 @@ function borrowerView() {
 
   h += `<h2>Requests and sealed quotes</h2>`;
   h += rfqs.length ? rfqs.map((r) => {
-    const t = r.arg.terms, m = mark(t.collateralInstrument);
+    const t = r.arg.terms, m = mark(t.collateralInstrument, r.arg.agent);
     const qs = quotes.filter((q) => q.arg.rfqId === r.cid)
       .sort((x, y) => N(x.arg.rateBps) - N(y.arg.rateBps) || N(x.arg.haircut) - N(y.arg.haircut));
     return `<div class="card"><h3>${money(t.principal)} USDC against ${units(t.collateralQty)} ${esc(t.collateralInstrument)}, ${esc(t.termDays)} days</h3>
@@ -180,7 +183,7 @@ function borrowerView() {
 
   h += `<h2>Margin calls</h2>` + (calls.length ? calls.map((c) => {
     // 1.2.0: a fresh mark newer than the call's that shows cover cancels the call.
-    const t = trades.find((x) => x.cid === c.arg.tradeCid), m = mark(c.arg.instrument);
+    const t = trades.find((x) => x.cid === c.arg.tradeCid), m = mark(c.arg.instrument, t?.arg.agent);
     const newer = m?.fresh && (!c.arg.markAsOf || Date.parse(m.asOf) > Date.parse(c.arg.markAsOf));
     const cover = t && newer ? lendable(N(t.arg.haircut), N(t.arg.collateralQty), m.price) / owed(t.arg) : null;
     return `<div class="card"><h3>${name(c.arg.lender)} calls ${units(c.arg.unitsDue)} ${esc(c.arg.instrument)}</h3>
@@ -231,7 +234,7 @@ function lenderView() {
     ${rivals === 0 ? 'all of them your own. Rival quotes never reached you.' : `<span class="pill bad">${rivals} from rivals</span>`}</div>`;
 
   h += `<h2>Requests you were asked to quote</h2>` + (rfqs.length ? rfqs.map((r) => {
-    const t = r.arg.terms, m = mark(t.collateralInstrument);
+    const t = r.arg.terms, m = mark(t.collateralInstrument, r.arg.agent);
     const mineQ = quotes.find((q) => q.arg.rfqId === r.cid);
     const sched = schedule(me()), floor = floorOf(me(), t.collateralInstrument);
     return `<div class="card"><h3>${name(r.arg.borrower)} wants ${money(t.principal)} USDC against ${units(t.collateralQty)} ${esc(t.collateralInstrument)}, ${esc(t.termDays)} days</h3>
@@ -254,7 +257,7 @@ function lenderView() {
     : '<p class="empty">None.</p>');
 
   h += `<h2>Substitutions to approve</h2>` + (subs.length ? subs.map((s) => {
-    const t = trades.find((x) => x.cid === s.arg.tradeCid), m = mark(s.arg.newInstrument);
+    const t = trades.find((x) => x.cid === s.arg.tradeCid), m = mark(s.arg.newInstrument, t?.arg.agent);
     const cover = t && m ? lendable(N(t.arg.haircut), N(s.arg.newQty), m.price) / owed(t.arg) : null;
     const issuerOk = !t || s.arg.newIssuer === t.arg.collateralIssuer, floor = floorOf(me(), s.arg.newInstrument);
     const schedOk = !schedule(me()) || (floor != null && t && N(t.arg.haircut) >= floor);
@@ -277,7 +280,7 @@ function lenderView() {
   }).join('') : '<p class="empty">None.</p>');
 
   h += `<h2>Repos you funded</h2>` + (trades.length ? trades.map((t) => {
-    const m = mark(t.arg.collateralInstrument);
+    const m = mark(t.arg.collateralInstrument, t.arg.agent);
     const gap = m ? owed(t.arg) - lendable(N(t.arg.haircut), N(t.arg.collateralQty), m.price) : 0, short = gap > 0;
     const called = calls.some((c) => c.arg.tradeCid === t.cid && Date.now() <= Date.parse(c.arg.respondBy) + DAY);
     const mta = t.arg.terms.minTransfer != null ? N(t.arg.terms.minTransfer) : null;
@@ -481,7 +484,7 @@ const ACTIONS = {
   async award(b) {
     const rfq = of('RepoRFQ').find((r) => r.cid === b.dataset.rfq), t = rfq.arg.terms;
     const losers = of('RepoQuote').filter((q) => q.arg.rfqId === rfq.cid && q.cid !== b.dataset.cid).map((q) => q.cid);
-    const m = mark(t.collateralInstrument);
+    const m = mark(t.collateralInstrument, rfq.arg.agent);
     if (!m?.fresh) throw new Error('no fresh mark for ' + t.collateralInstrument + ': ask the agent to publish one');
     const col = await exact(t.collateralInstrument, t.collateralIssuer, t.collateralQty);
     await act(exercise('RepoRFQ', rfq.cid, 'AwardSealed', { winner: b.dataset.cid, losers, collateralCid: col, markCid: m.cid, contexts: NO_CONTEXTS }));
@@ -490,7 +493,10 @@ const ACTIONS = {
   async cancel(b) { await act(exercise('RepoRFQ', b.dataset.cid, 'CancelRFQ')); return 'Request cancelled'; },
   async post(b) {
     const c = of('MarginCall').find((x) => x.cid === b.dataset.cid).arg;
-    const cid = await merged(c.instrument, c.issuer);
+    // The contract pledges the whole holding posted: post exactly the units called when one holding
+    // has them, and merge everything only when none does (the button says how many units go).
+    const cid = mine(c.instrument, c.issuer).some((h) => N(h.arg.amount) >= N(c.unitsDue))
+      ? await exact(c.instrument, c.issuer, c.unitsDue) : await merged(c.instrument, c.issuer);
     await act(exercise('MarginCall', b.dataset.cid, 'PostMargin', { holdingCid: cid }));
     return 'Margin posted';
   },
@@ -503,7 +509,7 @@ const ACTIONS = {
   async roll(b) {
     const o = of('RollOffer').find((x) => x.cid === b.dataset.cid).arg;
     const t = of('RepoTrade').find((x) => x.cid === o.tradeCid).arg;
-    const m = mark(t.collateralInstrument);
+    const m = mark(t.collateralInstrument, t.agent);
     if (!m?.fresh) throw new Error('no fresh mark for ' + t.collateralInstrument);
     const cid = await merged(t.terms.cashInstrument, t.terms.cashIssuer);
     await act(exercise('RollOffer', b.dataset.cid, 'AcceptRoll', { cashCid: cid, markCid: m.cid }));
@@ -527,7 +533,7 @@ const ACTIONS = {
   async withdraw(b) { await act(exercise('RepoQuote', b.dataset.cid, 'WithdrawQuote', { contexts: NO_CONTEXTS })); return 'Quote withdrawn, cash returned'; },
   async approve(b) {
     const s = of('Substitution').find((x) => x.cid === b.dataset.cid).arg, sched = schedule(me());
-    const markCid = mark(s.newInstrument).cid;
+    const markCid = mark(s.newInstrument, of('RepoTrade').find((x) => x.cid === s.tradeCid)?.arg.agent).cid;
     await act(sched ? exercise('HaircutSchedule', sched.cid, 'ApproveWithinSchedule', { substitutionCid: b.dataset.cid, markCid, contexts: NO_CONTEXTS })
       : exercise('Substitution', b.dataset.cid, 'Approve', { markCid, contexts: NO_CONTEXTS }));
     return 'Collateral swapped';
@@ -537,7 +543,7 @@ const ACTIONS = {
     const t = of('RepoTrade').find((x) => x.cid === b.dataset.cid).arg;
     // The ledger gives the borrower at least 2 hours; 2 here would land a moment short of it.
     const hours = N(num(`#mc-h-${b.dataset.cid.slice(0, 12)}`, 'Respond within'));
-    await act(exercise('RepoTrade', b.dataset.cid, 'CallMargin', { markCid: mark(t.collateralInstrument).cid,
+    await act(exercise('RepoTrade', b.dataset.cid, 'CallMargin', { markCid: mark(t.collateralInstrument, t.agent).cid,
       respondBy: new Date(Date.now() + hours * HOUR + 60000).toISOString() }));
     return 'Margin called';
   },
@@ -551,7 +557,7 @@ const ACTIONS = {
   },
   async refute(b) {
     const c = of('MarginCall').find((x) => x.cid === b.dataset.cid).arg;
-    await act(exercise('MarginCall', b.dataset.cid, 'RefuteMarginCall', { markCid: mark(c.instrument).cid }));
+    await act(exercise('MarginCall', b.dataset.cid, 'RefuteMarginCall', { markCid: mark(c.instrument, of('RepoTrade').find((x) => x.cid === c.tradeCid)?.arg.agent).cid }));
     return 'Margin call cancelled: the newer mark shows the pledge covers what is owed';
   },
   async 'withdraw-sub'(b) { await act(exercise('Substitution', b.dataset.cid, 'WithdrawSubstitution', { contexts: NO_CONTEXTS })); return 'Substitute withdrawn and unlocked'; },
@@ -581,7 +587,7 @@ const ACTIONS = {
   async 'close-out'(b) {
     const ma = of('MasterAgreement').find((x) => x.cid === b.dataset.cid).arg, trades = underAgreement(ma);
     const markCids = trades.map((t) => {
-      const m = mark(t.arg.collateralInstrument);
+      const m = mark(t.arg.collateralInstrument, t.arg.agent);
       if (!m?.fresh) throw new Error('no fresh mark for ' + t.arg.collateralInstrument + ': ask the agent to publish one');
       return m.cid;
     });

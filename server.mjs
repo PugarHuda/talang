@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { join, extname, dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PARTIES, acs, deskAcs, submit } from './lib/ledger.mjs';
+import { PARTIES, deskAcs, submit } from './lib/ledger.mjs';
 import { walletConfig, walletSubmit, receiptsFor, checkWalletSignature } from './api/wallet-verify.mjs';
 
 const WEB = join(dirname(fileURLToPath(import.meta.url)), 'web');
@@ -18,6 +18,7 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 const MAX_BODY = 1 << 20;
 const body = (req) => new Promise((res, rej) => {
   let s = '';
+  req.setEncoding('utf8'); // a character split across two chunks stays whole
   req.on('data', (d) => { s += d; if (s.length > MAX_BODY) { req.destroy(); rej(Object.assign(new Error('body too large'), { status: 413 })); } });
   req.on('end', () => { try { res(s ? JSON.parse(s) : {}); } catch { res(null); } });
 });
@@ -51,7 +52,7 @@ createServer(async (req, res) => {
     if (req.url === '/api/wallet-receipts' && req.method === 'POST') {
       const { role } = (await body(req)) ?? {};
       if (!Object.hasOwn(PARTIES, role)) return send(res, 400, { error: 'unknown role' });
-      return send(res, 200, receiptsFor(role, (await acs(PARTIES[role])).contracts));
+      return send(res, 200, receiptsFor(role, (await deskAcs(PARTIES[role])).contracts));
     }
     const bare = req.url.split('?')[0];
     const path = bare === '/' ? '/index.html' : bare === '/desk' ? '/desk.html' : bare;

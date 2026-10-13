@@ -9,7 +9,7 @@ DecMan LocalNet). Parties come from `parties.json` / `parties.local.json` / `par
 - End to end: `e2e-mcp.mjs` (every MCP desk, 41 checks), `governance.mjs` (BitSafe 2-of-3 marks), `oracle.mjs` (one pricer per exchange), `token-rail.mjs` (CIP-0056 legs vs `MockRegistry`), `localnet-offline.mjs` (committee with nodes stopped)
 - Real tokens on DevNet: `cbtc-rail.mjs`, `token-repo.mjs` (legs by env, see `docs/token-legs.md`), `cbtc-default.mjs` (`PHASE=open`, then `PHASE=default` after respondBy)
 - DevNet runner: `devnet-ci.mjs` runs inside a Vercel build (credentials live there); `DEVNET_STEPS=rights,seed,...` picks steps; output is published under `/evidence/` and copied into `docs/evidence/`
-- Checks without a ledger: `test-readonly-proxy.mjs` (`npm run test:proxy`, 45), `test-cbtc-default.mjs` (fake ledger and registry), `sec-wallet.mjs`
+- Checks without a ledger: `test-readonly-proxy.mjs` (`npm run test:proxy`, 45), `test-offline.mjs` (`npm run test:offline`, 15: mark choice, interest, 1.2.0 read fallback, MCP tools against a fake ledger), `test-cbtc-default.mjs` (fake ledger and registry), `sec-wallet.mjs`
 - Browser: `qa-desk.mjs` (Playwright through every role; needs `server.mjs` on 8092 and a read-only one on 8093), `qa-hosted.mjs` (the public deployment, read-only), `grofty-e2e.mjs` (real Grofty extension on TestNet)
 - Security regressions on a local sandbox: `sec-daml.mjs`, `sec-mcp.mjs`, `sec-server.mjs`
 - Media: `record-desk.mjs`, `record-decman.mjs`, `make-logo.mjs`, `make-social.mjs`

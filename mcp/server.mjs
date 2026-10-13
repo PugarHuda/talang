@@ -37,8 +37,10 @@ const rfqProblems = ({ arg: r }) => [
 // Text in a tool result was written by other parties (instrument names, party hints): it reaches
 // the model as data. Anything beyond a short plain token is withheld rather than passed on.
 const SAFE = /^[\w .,:+\-\/@#%()]{0,80}$/;
+// Keys too: a haircut schedule's instruments are a TextMap the lender wrote, and reach the model as keys.
 const clean = (v) => typeof v === 'string' ? (SAFE.test(v) ? v : '[withheld: untrusted text]')
-  : Array.isArray(v) ? v.map(clean) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, clean(x)])) : v;
+  : Array.isArray(v) ? v.map(clean) : v && typeof v === 'object'
+    ? Object.fromEntries(Object.entries(v).map(([k, x], i) => [SAFE.test(k) ? k : `[withheld: untrusted key ${i}]`, clean(x)])) : v;
 const INSTRUMENT = /^[A-Za-z0-9._-]{1,32}$/;
 const instrument = (v, what) => { if (typeof v !== 'string' || !INSTRUMENT.test(v)) throw new Error(`${what} must be a plain instrument code`); return v; };
 
@@ -50,6 +52,9 @@ const pick = (list, id, what) => {
   return hits[0];
 };
 const short = (cid) => cid.slice(0, 16);
+const byTime = (x, y) => Date.parse(x.arg.at) - Date.parse(y.arg.at);
+// A model may send one role as a bare string where a list is asked for.
+const list = (v) => v == null ? [] : [].concat(v);
 // Arguments reach the ledger as Daml Decimals and Ints: refuse anything that is
 // not a finite number in range before it becomes "NaN" in a command.
 const num = (v, what, { min = -Infinity, max = Infinity, int = false } = {}) => {
@@ -199,10 +204,12 @@ async function run(name, a = {}) {
   }
 
   if (name === 'publish_haircut_schedule') {
+    if (a.floorsPct != null && (typeof a.floorsPct !== 'object' || Array.isArray(a.floorsPct)))
+      throw new Error('floorsPct must be an object of instrument -> percent, e.g. {"UST10Y": 2}');
     const entries = Object.entries(a.floorsPct ?? {});
     if (!entries.length) throw new Error('floorsPct needs at least one instrument');
     const floors = Object.fromEntries(entries.map(([k, v]) => [instrument(k, 'instrument'), pctToDecimal(num(v, `floor for ${k}`, { min: 0, max: 49.99 }))]));
-    const audience = (a.borrowers?.length ? a.borrowers : ['borrower']).map((r) => role(r, 'borrower'));
+    const audience = (list(a.borrowers).length ? list(a.borrowers) : ['borrower']).map((r) => role(r, 'borrower'));
     const old = (await agreements()).find((c) => c.tpl === 'HaircutSchedule' && c.arg.lender === ME);
     const tx = await submit(ME, old ? exercise('HaircutSchedule', old.cid, 'ReviseSchedule', { newFloors: floors, newAudience: audience })
       : create('HaircutSchedule', { lender: ME, floors, audience }));
@@ -217,7 +224,7 @@ async function run(name, a = {}) {
     const trades = of('RepoTrade').filter((t) => t.arg.lender === ME && t.arg.borrower === borrower && t.arg.regulator === ma.arg.regulator);
     if (!trades.length) throw new Error(`no open repo with ${roleOf(borrower)}`);
     const marks = trades.map((t) => {
-      const m = latestMark(contracts, t.arg.collateralInstrument);
+      const m = latestMark(contracts, t.arg.collateralInstrument, t.arg.agent);
       if (!m?.fresh) throw new Error(`no fresh mark for ${t.arg.collateralInstrument}`);
       return m;
     });
@@ -242,7 +249,7 @@ async function run(name, a = {}) {
       marginCall: calls.filter((c) => c.arg.tradeCid === t.cid).map((c) => ({ id: short(c.cid), unitsDue: N(c.arg.unitsDue), respondBy: c.arg.respondBy, overdue: Date.now() > Date.parse(c.arg.respondBy) }))[0] ?? null,
       rollOffer: rolls.filter((r) => r.arg.tradeCid === t.cid).map((r) => ({ id: short(r.cid), newRateBps: N(r.arg.newRateBps), extraDays: N(r.arg.extraDays) }))[0] ?? null,
       substitution: subs.filter((s) => s.arg.tradeCid === t.cid).map((s) => {
-        const m = latestMark(contracts, s.arg.newInstrument);
+        const m = latestMark(contracts, s.arg.newInstrument, t.arg.agent);
         return { id: short(s.cid), issuer: roleOf(s.arg.newIssuer), issuerTrusted: s.arg.newIssuer === PARTIES.bondIssuer, offered: `${N(s.arg.newQty)} ${s.arg.newInstrument}`, mark: m?.price ?? null, markFresh: m?.fresh ?? false,
           wouldCover: m ? lendable(N(t.arg.haircut), N(s.arg.newQty), m.price) / assess(t, contracts).owed : null };
       })[0] ?? null }));
@@ -251,12 +258,12 @@ async function run(name, a = {}) {
   if (name === 'open_requests') {
     const mine = of('RepoQuote');
     return of('RepoRFQ').map((r) => {
-      const t = r.arg.terms, m = latestMark(contracts, t.collateralInstrument), q = mine.find((x) => x.arg.rfqId === r.cid);
+      const t = r.arg.terms, m = latestMark(contracts, t.collateralInstrument, r.arg.agent), q = mine.find((x) => x.arg.rfqId === r.cid);
       return { request: short(r.cid), borrower: roleOf(r.arg.borrower), principal: N(t.principal), cash: t.cashInstrument,
         collateral: `${N(t.collateralQty)} ${t.collateralInstrument}`, termDays: N(t.termDays),
         collateralValue: m ? N(t.collateralQty) * m.price : null, mark: m?.price ?? null,
         maxHaircutThatCovers: m ? 1 - N(t.principal) / (N(t.collateralQty) * m.price) : null, invitedLenders: r.arg.lenders.length,
-        venueFeeBps: r.arg.venue ? N(r.arg.venue.feeBps) : 0, warnings: rfqProblems(r),
+        venueFeeBps: r.arg.venue ? N(r.arg.venue.feeBps) : 0, minTransfer: t.minTransfer != null ? N(t.minTransfer) : null, warnings: rfqProblems(r),
         myQuote: q ? { id: short(q.cid), rateBps: N(q.arg.rateBps), haircut: N(q.arg.haircut) } : null };
     });
   }
@@ -275,11 +282,11 @@ async function run(name, a = {}) {
     const args = { rateBps: String(rateBps), haircut: pctToDecimal(haircutPct), cashCid };
     await submit(ME, sched ? exercise('HaircutSchedule', sched.cid, 'QuoteWithinSchedule', { rfqCid: r.cid, ...args })
       : exercise('RepoRFQ', r.cid, 'SubmitQuote', { lender: ME, ...args }));
-    return { sealed: true, request: short(r.cid), rateBps: a.rateBps, haircutPct: a.haircutPct, locked: N(t.principal) };
+    return { sealed: true, request: short(r.cid), rateBps, haircutPct, locked: N(t.principal) };
   }
 
   if (name === 'call_margin') {
-    const t = pick(of('RepoTrade'), a.repo, 'repo'), m = latestMark(contracts, t.arg.collateralInstrument);
+    const t = pick(of('RepoTrade'), a.repo, 'repo'), m = latestMark(contracts, t.arg.collateralInstrument, t.arg.agent);
     if (!m) throw new Error('no mark for ' + t.arg.collateralInstrument);
     // The contract (1.1.0) refuses a deadline under 2 hours; a minute of slack covers clock skew.
     const respondBy = new Date(Date.now() + num(a.hoursToRespond ?? 24, 'hoursToRespond', { min: 2 }) * 36e5 + 6e4).toISOString();
@@ -295,7 +302,7 @@ async function run(name, a = {}) {
     // Approve values the substitute by instrument NAME (Talang 1.1.0 marks carry no issuer), so a
     // borrower-issued "UST5Y" would pass the contract: only the desk bond issuer's paper is approved.
     if (s.arg.newIssuer !== PARTIES.bondIssuer) throw new Error(`substitute issued by ${roleOf(s.arg.newIssuer)}, not the desk bond issuer: decline it`);
-    const m = latestMark(contracts, s.arg.newInstrument);
+    const m = latestMark(contracts, s.arg.newInstrument, of('RepoTrade').find((x) => x.cid === s.arg.tradeCid)?.arg.agent);
     if (!m) throw new Error('no mark for ' + s.arg.newInstrument);
     const sched = (await agreements()).find((c) => c.tpl === 'HaircutSchedule' && c.arg.lender === ME);
     await submit(ME, sched ? exercise('HaircutSchedule', sched.cid, 'ApproveWithinSchedule', { substitutionCid: s.cid, markCid: m.cid, contexts: NO_CONTEXTS })
@@ -305,11 +312,12 @@ async function run(name, a = {}) {
 
   if (name === 'offer_roll') {
     const t = pick(of('RepoTrade'), a.repo, 'repo');
-    num(a.newRateBps, 'newRateBps', { min: 0.01, max: 10000 }); num(a.extraDays, 'extraDays', { min: 1, int: true });
+    // The validated numbers go to the ledger, not the model's raw text ("14.0" is no Daml Int).
+    const newRateBps = num(a.newRateBps, 'newRateBps', { min: 0.01, max: 10000 }), extraDays = num(a.extraDays, 'extraDays', { min: 1, int: true });
     const expiresAt = new Date(Date.now() + num(a.hoursValid ?? 48, 'hoursValid', { min: 0.1, max: 24 * 365 }) * 36e5).toISOString();
     const tx = await submit(ME, create('RollOffer', {
-      tradeCid: t.cid, borrower: t.arg.borrower, lender: ME, newRateBps: String(a.newRateBps), extraDays: String(a.extraDays), expiresAt }));
-    return { offered: true, offer: short(created(tx, 'RollOffer') ?? ''), newRateBps: a.newRateBps, extraDays: a.extraDays, expiresAt };
+      tradeCid: t.cid, borrower: t.arg.borrower, lender: ME, newRateBps: String(newRateBps), extraDays: String(extraDays), expiresAt }));
+    return { offered: true, offer: short(created(tx, 'RollOffer') ?? ''), newRateBps, extraDays, expiresAt };
   }
 
   if (name === 'withdraw_quote') {
@@ -349,7 +357,7 @@ async function run(name, a = {}) {
   if (name === 'quotes') {
     const quotes = of('RepoQuote');
     return of('RepoRFQ').map((r) => {
-      const t = r.arg.terms, m = latestMark(contracts, t.collateralInstrument);
+      const t = r.arg.terms, m = latestMark(contracts, t.collateralInstrument, r.arg.agent);
       const qs = quotes.filter((q) => q.arg.rfqId === r.cid).map((q) => {
         const lends = m ? lendable(N(q.arg.haircut), N(t.collateralQty), m.price) : null;
         return { quote: short(q.cid), lender: roleOf(q.arg.lender), rateBps: N(q.arg.rateBps), haircut: N(q.arg.haircut),
@@ -363,18 +371,18 @@ async function run(name, a = {}) {
 
   if (name === 'award') {
     const r = pick(of('RepoRFQ'), a.request, 'request'), t = r.arg.terms;
-    const m = latestMark(contracts, t.collateralInstrument);
+    const m = latestMark(contracts, t.collateralInstrument, r.arg.agent);
     if (!m?.fresh) throw new Error(`no fresh mark for ${t.collateralInstrument}`);
     const qs = of('RepoQuote').filter((q) => q.arg.rfqId === r.cid);
     const covered = qs.filter((q) => lendable(N(q.arg.haircut), N(t.collateralQty), m.price) >= N(t.principal))
       .sort((x, y) => N(x.arg.rateBps) - N(y.arg.rateBps) || N(x.arg.haircut) - N(y.arg.haircut));
     const win = a.quote === 'best' ? covered[0] : pick(qs, a.quote, 'quote');
     if (!win) throw new Error('no quote covers the cash at the latest mark');
-    const col = of('Holding').find((h) => h.arg.owner === ME && h.arg.instrument === t.collateralInstrument
-      && h.arg.issuer === t.collateralIssuer && N(h.arg.amount) === N(t.collateralQty));
-    if (!col) throw new Error(`no holding of exactly ${N(t.collateralQty)} ${t.collateralInstrument} to pledge`);
+    // request_repo only checks the borrower holds enough in all; pledge exactly the units asked, splitting one holding.
+    const col = await exactHolding(contracts, (h) => h.instrument === t.collateralInstrument && h.issuer === t.collateralIssuer,
+      N(t.collateralQty), t.collateralInstrument);
     const tx = await submit(ME, exercise('RepoRFQ', r.cid, 'AwardSealed', { winner: win.cid, losers: qs.filter((q) => q.cid !== win.cid).map((q) => q.cid),
-      collateralCid: col.cid, markCid: m.cid, contexts: NO_CONTEXTS }));
+      collateralCid: col, markCid: m.cid, contexts: NO_CONTEXTS }));
     return { opened: short(created(tx, 'RepoTrade') ?? ''), lender: roleOf(win.arg.lender), rateBps: N(win.arg.rateBps),
       haircut: N(win.arg.haircut), refunded: qs.length - 1 };
   }
@@ -394,8 +402,8 @@ async function run(name, a = {}) {
     const principal = num(a.principal, 'principal', { min: 0.01 }), qty = num(a.collateralQty, 'collateralQty', { min: 0.0001 });
     const termDays = num(a.termDays, 'termDays', { min: 1, max: 3650, int: true });
     instrument(a.collateralInstrument, 'collateralInstrument'); if (a.cashInstrument != null) instrument(a.cashInstrument, 'cashInstrument');
-    const roles = a.lenders?.length ? a.lenders : Object.keys(PARTIES).filter((r) => r.startsWith('lender'));
-    const lenders = roles.map((r) => { if (!r.startsWith('lender') || !PARTIES[r]) throw new Error(`unknown lender ${r}`); return PARTIES[r]; });
+    const roles = list(a.lenders).length ? list(a.lenders) : Object.keys(PARTIES).filter((r) => r.startsWith('lender'));
+    const lenders = roles.map((r) => { if (typeof r !== 'string' || !r.startsWith('lender') || !PARTIES[r]) throw new Error(`unknown lender ${r}`); return PARTIES[r]; });
     for (const r of ['cashIssuer', 'bondIssuer', 'agent', 'regulator']) if (!PARTIES[r]) throw new Error(`the parties file has no ${r}`);
     const held = of('Holding').filter((h) => h.arg.owner === ME && h.arg.issuer === PARTIES.bondIssuer && h.arg.instrument === a.collateralInstrument)
       .reduce((s, h) => s + N(h.arg.amount), 0);
@@ -428,9 +436,10 @@ async function run(name, a = {}) {
 
   if (name === 'propose_substitution') {
     const t = pick(of('RepoTrade'), a.repo, 'repo'), qty = num(a.qty, 'qty', { min: 0.0001 }); instrument(a.instrument, 'instrument');
-    const cid = await exactHolding(contracts, (h) => h.instrument === a.instrument, qty, a.instrument);
+    // 1.2.0 approves a substitute only from the repo's collateral issuer: never lock another issuer's paper.
+    const cid = await exactHolding(contracts, (h) => h.instrument === a.instrument && h.issuer === t.arg.collateralIssuer, qty, a.instrument);
     const tx = await submit(ME, exercise('RepoTrade', t.cid, 'ProposeSubstitution', { holdingCid: cid }));
-    const m = latestMark(contracts, a.instrument);
+    const m = latestMark(contracts, a.instrument, t.arg.agent);
     return { substitution: short(created(tx, 'Substitution') ?? ''), offered: `${qty} ${a.instrument}`, mark: m?.price ?? null,
       markFresh: m?.fresh ?? false, wouldCover: m ? lendable(N(t.arg.haircut), qty, m.price) / owed(t.arg) : null };
   }
@@ -455,7 +464,7 @@ async function run(name, a = {}) {
     const o = pick(of('RollOffer'), a.offer, 'roll offer');
     const t = of('RepoTrade').find((x) => x.cid === o.arg.tradeCid);
     if (!t) throw new Error('the repo this offer was for has changed; ask the lender for a new offer');
-    const m = latestMark(contracts, t.arg.collateralInstrument);
+    const m = latestMark(contracts, t.arg.collateralInstrument, t.arg.agent);
     if (!m?.fresh) throw new Error(`no fresh mark for ${t.arg.collateralInstrument}`);
     const due = Math.round((owed(t.arg) - N(t.arg.terms.principal) + venueFee(t.arg)) * 100) / 100;
     const cash = of('Holding').filter((h) => h.arg.owner === ME && h.arg.instrument === t.arg.terms.cashInstrument
@@ -467,7 +476,7 @@ async function run(name, a = {}) {
 
   // ---- regulator ----
   if (name === 'lifecycle') {
-    return of('RepoReport').sort((x, y) => x.arg.at.localeCompare(y.arg.at)).map((r) => ({ at: r.arg.at, event: r.arg.event,
+    return of('RepoReport').sort(byTime).map((r) => ({ at: r.arg.at, event: r.arg.event,
       borrower: roleOf(r.arg.borrower), lender: roleOf(r.arg.lender), principal: N(r.arg.terms.principal), rateBps: N(r.arg.rateBps),
       collateral: `${N(r.arg.collateralQty)} ${r.arg.collateralInstrument}`, cashMoved: N(r.arg.cashMoved), venueFee: N(r.arg.feePaid) }));
   }
@@ -476,8 +485,19 @@ async function run(name, a = {}) {
     // Reports carry no repo id, so a repo is keyed by (borrower, lender, original
     // terms). Identical live twins share a key and a principal, so totals hold.
     // ponytail: twins report the latest row's collateral; a repo id on RepoReport fixes that.
-    const reports = of('RepoReport').sort((x, y) => x.arg.at.localeCompare(y.arg.at)), repos = new Map();
-    for (const r of reports) {
+    // A 1.2.0 close-out archives its repos with no CLOSE or DEFAULT report, only one CloseOutReport for
+    // the pair: it ends that many live repos of the pair, or they would count as open for ever.
+    const reports = of('RepoReport').sort(byTime), repos = new Map();
+    const closeOuts = (await agreements().catch(() => [])).filter((c) => c.tpl === 'CloseOutReport');
+    for (const r of [...reports, ...closeOuts].sort(byTime)) {
+      if (r.tpl === 'CloseOutReport') {
+        let n = N(r.arg.reposNetted);
+        for (const e of repos.values()) {
+          if (n <= 0 || e.live <= 0 || e.last.borrower !== r.arg.borrower || e.last.lender !== r.arg.lender) continue;
+          const d = Math.min(n, e.live); e.live -= d; n -= d;
+        }
+        continue;
+      }
       const k = JSON.stringify([r.arg.borrower, r.arg.lender, r.arg.terms]);
       const e = repos.get(k) ?? { live: 0, last: null };
       if (r.arg.event === 'OPEN') e.live++;
@@ -496,7 +516,7 @@ async function run(name, a = {}) {
     return { openRepos: open.reduce((s, e) => s + e.live, 0), openPrincipal: total,
       byLender: by((r) => roleOf(r.lender)), byBorrower: by((r) => roleOf(r.borrower)), byCollateral: by((r) => r.collateralInstrument),
       events: { open: count('OPEN'), marginCall: count('MARGIN_CALL'), marginPosted: count('MARGIN_POSTED'), substitution: count('SUBSTITUTION'),
-        roll: count('ROLL'), close: count('CLOSE'), default: count('DEFAULT') } };
+        roll: count('ROLL'), close: count('CLOSE'), default: count('DEFAULT'), closeOut: closeOuts.length } };
   }
 
   if (name === 'best_execution') {
