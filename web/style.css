@@ -137,6 +137,8 @@ p.empty:only-child, h2 + p.empty { padding: 16px 18px; border-radius: 16px; bord
 @media (max-width: 1080px) {
   .roles { display: none; }
   .role-select { display: block; margin-left: auto; }
+  /* Wide tables (regulator lifecycle, 10 columns) scroll inside their card, not off the page. */
+  .card { overflow-x: auto; }
 }
 @media (max-width: 700px) {
   .top { top: 8px; margin: 8px 8px 0; flex-wrap: wrap; gap: 10px; }
@@ -144,7 +146,7 @@ p.empty:only-child, h2 + p.empty { padding: 16px 18px; border-radius: 16px; bord
   main { padding: 24px 16px; }
   .sbs-head { flex-direction: column; align-items: flex-start; gap: 14px; }
   .who { flex-direction: column; align-items: flex-start; gap: 14px; }
-  .card { padding: 16px; overflow-x: auto; }
+  .card { padding: 16px; }
   .proof { padding-left: 60px; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
