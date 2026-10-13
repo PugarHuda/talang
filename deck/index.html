@@ -178,11 +178,11 @@ ul.list{ margin:0; padding-left:1.4rem } ul.list li{ font-size:1.3rem; line-heig
     <div class="card step"><h3>Request</h3><p>Borrower invites a panel. Only invited lenders see it, and it carries no rate.</p></div>
     <div class="card step"><h3>Sealed quote</h3><p>Lender locks the full principal: desk escrow or a CIP-0056 allocation. Rivals and the regulator never receive it.</p></div>
     <div class="card step"><h3>Award</h3><p>Opening leg atomic: collateral pledged, cash delivered, losing quotes refunded unrevealed.</p></div>
-    <div class="card dark step"><h3>Loss notice · best execution</h3><p>Each loser gets its rank and nothing else. The regulator gets quotes weighed, winner's rank, gap to best in bp. No lender named.</p></div>
+    <div class="card dark step"><h3>Loss notice · best execution</h3><p>Each loser gets its rank and nothing else. The regulator gets quotes weighed, winner's rank, gap to best as a band (0, 1-5, 6-25, &gt;25 bp). No lender named.</p></div>
   </div>
   <div class="grid g2" style="margin-top:1.8rem; grid-template-columns:1.1fr 1fr; align-items:center">
     <div class="shot" style="height:13rem"><img src="../docs/img/desk-regulator.png" alt="Regulator desk: best execution table with quotes weighed, winner's rank, rate taken, haircut and gap over best rate; no lender names." style="object-position:0 23.5%" /></div>
-    <p style="font-size:1.25rem">The demo case on the seeded ledger: the cheapest rate's haircut does not cover, so the borrower takes rank 2. Regulator: <b>3 quotes weighed, winner rank 2, 10 bp over best</b>. The losing lender: <b>rank 3 of 3</b>. Neither learns a losing rate or a name.</p>
+    <p style="font-size:1.25rem">The demo case on the seeded ledger: the cheapest rate's haircut does not cover, so the borrower takes rank 2. Regulator: <b>3 quotes weighed, winner rank 2, gap to best in the 6-25 bp band</b>. The losing lender: <b>rank 3 of 3</b>. Neither learns a losing rate or a name.</p>
   </div>
 </section>
 
@@ -228,7 +228,7 @@ ul.list{ margin:0; padding-left:1.4rem } ul.list li{ font-size:1.3rem; line-heig
       </ul>
     </div>
   </div>
-  <p class="small" style="margin-top:1.4rem">One command: <code>bash localnet/demo.sh reset</code>. In DecMan's own UI: <code>media/decman-demo-captioned.mp4</code>. Governance on DevNet: <span class="notyet">not yet</span> waiting on act-as rights for the committee's parties from NODERS (grant refused 403).</p>
+  <p class="small" style="margin-top:1.4rem">One command: <code>bash localnet/demo.sh reset</code>. In DecMan's own UI: <code>media/decman-demo-captioned.mp4</code>. On the NODERS DevNet participant: <span class="ok">ran</span> 1 of 3 refused, 2 of 3 executed, repo and margin call on the committee mark, 8 / 8 steps, 9 October (all parties on one node: shared control, not distributed hosting).</p>
 </section>
 
 <!-- 7 · CBTC ON DEVNET -->
@@ -250,6 +250,7 @@ ul.list{ margin:0; padding-left:1.4rem } ul.list li{ font-size:1.3rem; line-heig
     <div>
       <p style="font-size:1.3rem">Choice context and disclosed contracts come from the registry's off-ledger API (<code>lib/registry.mjs</code>). Borrower holds 1 CBTC again after repurchase. 7 of 7 steps, 9 October.</p>
       <p style="font-size:1.3rem">Cash leg here is desk USDC. <b>Both legs in real tokens</b>, same participant: Canton Coin cash (DevNet tap, quote funded by an Amulet allocation through the Scan registry) and CBTC collateral; award, repurchase, CBTC home. 12 of 12 steps, <code>token-repo-amulet-cbtc-devnet.json</code>.</p>
+      <p style="font-size:1.3rem"><b>Default in real CBTC</b>: margin call left unanswered, lender A defaults, 0.001 CBTC executed to it through the registry, offset 3209860 (9 and 12 October, <code>cbtc-default-devnet.json</code>).</p>
       <p style="font-size:1.3rem">USDCx on DevNet: <span class="notyet">not yet</span> no DevNet USDCx registry or faucet documented.</p>
     </div>
   </div>
@@ -265,7 +266,7 @@ ul.list{ margin:0; padding-left:1.4rem } ul.list li{ font-size:1.3rem; line-heig
     <div class="card step"><h3>Verify</h3><p><code>api/wallet-verify.mjs</code> checks nonce, signer, Ed25519 / P-256 signature, and that the key's fingerprint is the party's namespace. Then submits.</p></div>
     <div class="card step"><h3>Receipt</h3><p>The borrower can verify which wallet key sealed a lender's quote; rival lenders see nothing. Venue fee payable in USDCx or CC on TestNet / MainNet.</p></div>
   </div>
-  <p class="small" style="margin-top:1.8rem">Verified with a stub wallet holding a real Ed25519 key against the local ledger. With a live Grofty wallet: <span class="notyet">not yet</span></p>
+  <p class="small" style="margin-top:1.8rem"><span class="ok">ran</span> With the live Grofty extension on TestNet, 12 October: connect; two borrower commands signed in Grofty and verified (executed on a local sandbox: Grofty's participant cannot host Talang's package); 1 CC venue fee executed on TestNet, update <code>1220e6e3…ccad</code>, to Grofty's QA party as a stand-in venue.</p>
 </section>
 
 <!-- 9 · MCP -->
@@ -278,7 +279,7 @@ ul.list{ margin:0; padding-left:1.4rem } ul.list li{ font-size:1.3rem; line-heig
     <div class="card"><span class="pill p-y">borrower</span><p style="margin-top:1rem" class="mono">quotes (ranked, with coverage) · award ("best" = cheapest covered) · book · accept_roll · privacy_check</p></div>
     <div class="card"><span class="pill p-l">regulator</span><p style="margin-top:1rem" class="mono">lifecycle · best_execution · privacy_check</p></div>
   </div>
-  <p class="small" style="margin-top:1.8rem"><code>npm run e2e:mcp</code>: 33 of 33 checks on a Canton participant, every desk end to end, privacy read from each node. Also in CI.</p>
+  <p class="small" style="margin-top:1.8rem"><code>npm run e2e:mcp</code>: 41 of 41 checks on a Canton participant, every desk end to end, privacy read from each node. Also in CI.</p>
 </section>
 
 <!-- 10 · BUSINESS MODEL -->
@@ -307,22 +308,23 @@ ul.list{ margin:0; padding-left:1.4rem } ul.list li{ font-size:1.3rem; line-heig
   <div class="meta"><span>10 · Traction is evidence</span><span>11 / 14</span></div>
   <h2>What ran, <em>and where</em></h2>
   <div class="grid g4" style="margin-bottom:1.6rem">
-    <div class="card"><p class="num">22 / 22</p><p>Daml scripts: lifecycle, refusals, tokens, BitSafe</p></div>
-    <div class="card"><p class="num">33 / 33</p><p>MCP end-to-end checks, local sandbox and CI</p></div>
+    <div class="card"><p class="num">31 / 31</p><p>Daml scripts: lifecycle, refusals, tokens, BitSafe, 1.2.0</p></div>
+    <div class="card"><p class="num">41 / 41</p><p>MCP end-to-end checks, local sandbox and CI</p></div>
     <div class="card"><p class="num">29 / 29</p><p>Playwright desk QA, every role and button</p></div>
     <div class="card"><p class="num">45 / 45</p><p>Read-only proxy checks: no secret, no submit</p></div>
   </div>
   <div class="card tw">
     <table>
       <tr><th>Run</th><th>Where</th><th>Result</th></tr>
-      <tr><td><code>talang-repo</code> 1.0.0 vetted and seeded</td><td>NODERS DevNet <code>hackcanton-devnet-3</code></td><td>Hosted desk reads it live</td></tr>
-      <tr><td>CBTC rail</td><td>NODERS DevNet, DA Utility registry</td><td>7 / 7 steps, update ids recorded</td></tr>
+      <tr><td><code>talang-repo</code> 1.0.0 seeded; 1.1.0, 1.2.0 vetted</td><td>NODERS DevNet <code>hackcanton-devnet-3</code></td><td>Hosted desk reads it live</td></tr>
+      <tr><td>CBTC rail · CBTC default</td><td>NODERS DevNet, DA Utility registry</td><td>7 / 7 · 9 / 9 steps, update ids recorded</td></tr>
 <tr><td>Canton Coin cash + CBTC collateral</td><td>NODERS DevNet, Scan + DA Utility registries</td><td>12 / 12 steps, update ids recorded</td></tr>
-      <tr><td>BitSafe 2-of-3 marks · node offline</td><td>DecMan LocalNet, 3 participants</td><td>8 / 8 · 6 / 6 steps</td></tr>
+      <tr><td>BitSafe 2-of-3 marks · node offline</td><td>DecMan LocalNet, 3 participants; marks also on DevNet</td><td>8 / 8 · 6 / 6 steps; DevNet 8 / 8</td></tr>
       <tr><td>CIP-0056 token rail · price oracle</td><td>Local Canton 3.4.11 participant</td><td>8 / 8 · 4 / 4 steps</td></tr>
+      <tr><td>Grofty wallet, live extension</td><td>Canton TestNet (fee) + local sandbox (commands)</td><td>2 commands signed, 1 CC fee executed</td></tr>
     </table>
   </div>
-  <p class="small" style="margin-top:1rem">CI: GitHub Actions run 37917378702, commit 045f9f7. Evidence JSON in <code>docs/evidence/</code>. Users or pilots: none yet.</p>
+  <p class="small" style="margin-top:1rem">CI: GitHub Actions run 38272515745, commit f9e539b. Evidence JSON in <code>docs/evidence/</code>. Users or pilots: none yet.</p>
 </section>
 
 <!-- 12 · WHY CANTON -->
@@ -350,7 +352,7 @@ ul.list{ margin:0; padding-left:1.4rem } ul.list li{ font-size:1.3rem; line-heig
     <div class="card"><span class="pill p-m">then</span><h3 style="margin-top:1rem">Independent marks, regulator node</h3><p>Committee run by independent price providers as a BitSafe decentralized party; an auditor runs an observer node.</p></div>
   </div>
   <div class="card dark" style="margin-top:1.6rem; padding:1.3rem 2rem">
-    <p style="margin:0; font-size:1.25rem"><span class="notyet">not yet</span> &nbsp; Governance committee on DevNet · 1.1.0 on DevNet · USDCx on DevNet · live Grofty wallet on TestNet · any pilot user. Pilot success: award in under 10 minutes, two or more lenders quoting, zero rival quotes on any lender node.</p>
+    <p style="margin:0; font-size:1.25rem"><span class="notyet">not yet</span> &nbsp; USDCx on DevNet · a Talang command executed on TestNet · any pilot user. Pilot success: award in under 10 minutes, two or more lenders quoting, zero rival quotes on any lender node.</p>
   </div>
 </section>
 
@@ -365,10 +367,10 @@ ul.list{ margin:0; padding-left:1.4rem } ul.list li{ font-size:1.3rem; line-heig
       <p style="margin-top:1rem" class="mono">github.com/PugarHuda</p>
     </div>
     <div class="grid" style="gap:1rem">
-      <div class="card" style="padding:1.2rem 1.6rem"><p><span class="pill p-d">NODERS</span> &nbsp;act-as rights for the committee's parties, to run governance on DevNet</p></div>
+      <div class="card" style="padding:1.2rem 1.6rem"><p><span class="pill p-d">NODERS</span> &nbsp;intros to two tenants for a shadow book</p></div>
       <div class="card" style="padding:1.2rem 1.6rem"><p><span class="pill p-c">Pilot</span> &nbsp;one borrower and two lenders for a two-week shadow book</p></div>
       <div class="card" style="padding:1.2rem 1.6rem"><p><span class="pill p-y">Registries</span> &nbsp;a USDCx registry on DevNet, a tokenized-bond or T-bill registry</p></div>
-      <div class="card" style="padding:1.2rem 1.6rem"><p><span class="pill p-l">Prices · wallet</span> &nbsp;a price provider to sit on the committee; a Grofty TestNet session</p></div>
+      <div class="card" style="padding:1.2rem 1.6rem"><p><span class="pill p-l">Prices · wallet</span> &nbsp;a price provider to sit on the committee; a TestNet participant that hosts Talang's package</p></div>
     </div>
   </div>
   <div class="foot"><span>talang-desk.vercel.app · /desk</span><span>github.com/PugarHuda/talang</span></div>
