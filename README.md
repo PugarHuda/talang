@@ -1,7 +1,7 @@
 # Talang
 
 **Live desk:** https://talang-desk.vercel.app/desk (read-only, live DevNet data) · **Landing:** https://talang-desk.vercel.app
-**Pitch video:** [media/talang-pitch.mp4](media/talang-pitch.mp4) (subtitled) · **Desk walkthrough:** [media/talang-desk-captioned.mp4](media/talang-desk-captioned.mp4) · **BitSafe DecMan demo:** [media/decman-demo-captioned.mp4](media/decman-demo-captioned.mp4) · **Deck:** [media/talang-pitch-deck.pdf](media/talang-pitch-deck.pdf)
+**Pitch video:** [YouTube](https://youtu.be/gQIWB3Taq6g) · [media/talang-pitch.mp4](media/talang-pitch.mp4) (subtitled) · **Desk walkthrough:** [media/talang-desk-captioned.mp4](media/talang-desk-captioned.mp4) · **BitSafe DecMan demo:** [media/decman-demo-captioned.mp4](media/decman-demo-captioned.mp4) · **Deck:** [media/talang-pitch-deck.pdf](media/talang-pitch-deck.pdf)
 
 | Sponsor | What runs, and where the proof is |
 |---|---|
