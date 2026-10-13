@@ -25,6 +25,11 @@ const A = await agent('lenderA'), B = await agent('lenderB'), C = HAS_C ? await 
 const BOR = await agent('borrower'), REG = await agent('regulator');
 const LENDERS = { lenderA: A, lenderB: B, ...(HAS_C ? { lenderC: C } : {}) };
 if (!HAS_C) skip('lender C agent and its checks: no lenderC in the parties file');
+// Start from no haircut schedules: one left by a desk QA run (or an aborted run) would route
+// this run's quotes through a floor that does not list their instruments.
+for (const l of Object.keys(LENDERS))
+  for (const c of (await acs(p[l], undefined, AGREEMENTS)).contracts.filter((x) => x.tpl === 'HaircutSchedule' && x.arg.lender === p[l]))
+    await submit(p[l], exercise('HaircutSchedule', c.cid, 'Archive'));
 
 check(['portfolio', 'open_requests', 'quote', 'call_margin', 'review_substitution', 'offer_roll', 'withdraw_quote', 'withdraw_roll',
   'declare_default', 'claim_collateral', 'loss_history', 'privacy_check'].every((t) => A.tools.includes(t)), `lender agent: ${A.tools.length} tools`);

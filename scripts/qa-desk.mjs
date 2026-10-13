@@ -88,10 +88,23 @@ async function act(locator) {
   await sleep(400);
   return [!err, text];
 }
+// The schedule form lists only collateral that touches the lender; a fresh instrument is
+// added through "Add collateral" first (page-only, nothing reaches the ledger).
+async function floorField(inst) {
+  const f = page.locator(`.hs-floor[data-inst="${inst}"]`);
+  if (!(await f.count())) { await page.selectOption('#hs-add', inst); await actOk(page.locator('[data-act="schedule-add"]')); }
+  return f;
+}
 async function actOk(locator) { const [ok, t] = await act(locator); assert.ok(ok, 'expected success, got: ' + t); return t; }
 async function actErr(locator, re) { const [ok, t] = await act(locator); assert.ok(!ok, 'expected a refusal, got: ' + t); if (re) assert.match(t, re); return t; }
 
 console.log(`QA run ${RUN} against ${BASE}`);
+// Start from no haircut schedules: one left by another suite (e2e-mcp, qa-real-user) or an
+// aborted run would send this run's quotes on fresh instruments through a floor that does
+// not list them. The close-out phase only closes out, so it keeps what is there.
+if (!ONLY) for (const l of ['lenderA', 'lenderB', 'lenderC'])
+  for (const s of await of(l, 'HaircutSchedule', (a) => a.lender === P[l]))
+    await submit(l, { ExerciseCommand: { templateId: '#talang-repo:TalangAgreements:HaircutSchedule', contractId: s.cid, choice: 'Archive', choiceArgument: {} } });
 let trade, rfqA;
 
 // ---------- agent: marks ----------
@@ -385,8 +398,8 @@ await check('1.2.0 schedule: lender B signs a haircut schedule in the desk; the 
   await open('lenderB');
   const old = (await of('lenderB', 'HaircutSchedule', (a) => a.lender === P.lenderB))[0];
   if (old) await actOk(page.locator('[data-act="drop-schedule"]'));
-  await page.locator(`.hs-floor[data-inst="${ID}"]`).fill('3');
-  await page.locator(`.hs-floor[data-inst="${IE}"]`).fill('3');
+  await (await floorField(ID)).fill('3');
+  await (await floorField(IE)).fill('3');
   await actOk(page.locator('[data-act="schedule"]'));
   const [s] = await of('borrower', 'HaircutSchedule', (a) => a.lender === P.lenderB);
   assert.equal(Number(s.arg.floors[ID]), 0.03);

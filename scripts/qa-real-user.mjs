@@ -423,8 +423,11 @@ if (!LATE) {
   await check('schedule: lender C publishes CO1 5% (others blank); borrower sees it; regulator does not', async () => {
     await as('lenderC');
     for (const i of await page.locator('.hs-floor').all()) await type(i, '');
-    await type(page.locator(`.hs-floor[data-inst="${I.CO1}"]`), '5');
-    await type(page.locator(`.hs-floor[data-inst="${I.CO2}"]`), '5');
+    // The form lists collateral that touches this lender; others come in through "Add collateral".
+    for (const i of [I.CO1, I.CO2]) {
+      if (!(await page.locator(`.hs-floor[data-inst="${i}"]`).count())) { await page.selectOption('#hs-add', i); await ok(page.locator('[data-act="schedule-add"]')); }
+      await type(page.locator(`.hs-floor[data-inst="${i}"]`), '5');
+    }
     await ok(page.locator('[data-act="schedule"]'));
     await as('borrower');
     assert.ok((await page.locator('#view').textContent()).includes(`${I.CO1} 5.00%`));
