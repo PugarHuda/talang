@@ -1,6 +1,6 @@
 sdk-version: 3.4.11
 name: talang-repo
-version: 1.2.1
+version: 1.2.2
 source: daml
 dependencies:
   - daml-prim

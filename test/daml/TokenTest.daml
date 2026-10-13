@@ -10,6 +10,7 @@ import DA.Time (addRelTime, days)
 import Daml.Script
 
 import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 import Splice.Api.Token.HoldingV1 (InstrumentId(..))
 import Splice.Api.Token.AllocationV1
 import Splice.Api.Token.AllocationRequestV1
@@ -54,14 +55,19 @@ mint registry tag owner amount = submit registry do
 
 -- What a wallet does when asked to fund a leg: lock it in a registry allocation.
 allocate : Party -> ContractId MockHolding -> Party -> Party -> Party -> Text -> Decimal -> Time -> Script (ContractId Allocation)
-allocate registry holding sender receiver executor tag amount settleBefore = do
+allocate = allocateFor None
+
+-- 1.2.2: collateral names the settlement it is pledged to in settlementRef.cid
+-- (the RFQ, the margin call or the repo), so it can back one repo only.
+allocateFor : Optional MetadataV1.AnyContractId -> Party -> ContractId MockHolding -> Party -> Party -> Party -> Text -> Decimal -> Time -> Script (ContractId Allocation)
+allocateFor ref registry holding sender receiver executor tag amount settleBefore = do
   now <- getTime
   a <- submit sender do
     exerciseCmd holding MockAllocate with
       spec = AllocationSpecification with
         settlement = SettlementInfo with
           executor
-          settlementRef = Reference with id = "talang"; cid = None
+          settlementRef = Reference with id = "talang"; cid = ref
           requestedAt = now; allocateBefore = settleBefore; settleBefore
           meta = emptyMetadata
         transferLegId = "leg"
@@ -112,7 +118,7 @@ tokenOpened = do
   (isNone <$> queryContractId t.regulator qA) >>= assert
 
   btc <- mint t.cbtc "CBTC" t.borrower 1.0
-  pledge <- allocate t.cbtc btc t.borrower t.lenderA t.borrower "CBTC" 1.0 (addRelTime now (days 40))
+  pledge <- allocateFor (Some (coerceContractId rfq)) t.cbtc btc t.borrower t.lenderA t.borrower "CBTC" 1.0 (addRelTime now (days 40))
   m <- markT t 62000.0
   trade <- submit t.borrower do
     exerciseCmd rfq AwardSealedWithTokenCollateral with
@@ -146,7 +152,9 @@ tokenLifecycle = do
   allocPI <- allocate t.usdcx payPI t.borrower t.lenderA t.borrower "USDCx" 50125.0 (addRelTime now (days 1))
   allocFee <- allocate t.usdcx payFee t.borrower t.operator t.borrower "USDCx" 2.08 (addRelTime now (days 1))
   va <- submit t.operator do
-    createCmd VenueAgreement with operator = t.operator; borrower = t.borrower; feeBps = 10.0
+    createCmd VenueAgreement with
+      operator = t.operator; borrower = t.borrower; feeBps = 10.0
+      feeInstrument = Some (InstrumentId with admin = t.usdcx; id = "USDCx")
 
   -- The fee leg cannot be skipped.
   submitMustFail t.borrower do
@@ -193,13 +201,14 @@ tokenMargin = do
   mc.unitsDue === 0.0294
   more <- mint t.cbtc "CBTC" t.borrower 0.0294
   short <- mint t.cbtc "CBTC" t.borrower 0.02
-  tooLittle <- allocate t.cbtc short t.borrower t.lenderA t.borrower "CBTC" 0.02 (addRelTime now (days 60))
+  let forCall = allocateFor (Some (coerceContractId call))
+  tooLittle <- forCall t.cbtc short t.borrower t.lenderA t.borrower "CBTC" 0.02 (addRelTime now (days 60))
   submitMustFail t.borrower do exerciseCmd call PostTokenMargin with allocCid = tooLittle
   -- An allocation that would lapse before the claim window is refused too.
-  early <- allocate t.cbtc more t.borrower t.lenderA t.borrower "CBTC" 0.0294 (addRelTime now (days 5))
+  early <- forCall t.cbtc more t.borrower t.lenderA t.borrower "CBTC" 0.0294 (addRelTime now (days 5))
   submitMustFail t.borrower do exerciseCmd call PostTokenMargin with allocCid = early
   more2 <- mint t.cbtc "CBTC" t.borrower 0.0294
-  good <- allocate t.cbtc more2 t.borrower t.lenderA t.borrower "CBTC" 0.0294 (addRelTime now (days 60))
+  good <- forCall t.cbtc more2 t.borrower t.lenderA t.borrower "CBTC" 0.0294 (addRelTime now (days 60))
   t2 <- submit t.borrower do exerciseCmd call PostTokenMargin with allocCid = good
   Some topped <- queryContractId t.borrower t2
   topped.collateralQty === 1.0294
@@ -210,9 +219,12 @@ tokenDefault : Script ()
 tokenDefault = do
   (t, trade) <- tokenOpened
   passTime (days 29)
-  submitMustFail t.lenderA do exerciseCmd trade ClaimAfterMaturity with contexts = []
+  m <- markT t 62000.0
+  submitMustFail t.lenderA do exerciseCmd trade ClaimAfterMaturity with contexts = []; markCid = Some m
   passTime (days 2)
-  submit t.lenderA do exerciseCmd trade ClaimAfterMaturity with contexts = []
+  m2 <- markT t 62000.0
+  -- An allocation cannot be split, so the whole CBTC goes to the lender.
+  submit t.lenderA do exerciseCmd trade ClaimAfterMaturity with contexts = []; markCid = Some m2
   owns t.cbtc t.lenderA "CBTC" >>= (=== 1.0)
   owns t.cbtc t.borrower "CBTC" >>= (=== 0.0)
 
@@ -254,14 +266,14 @@ tokenRefusals = do
   q <- submit t.lenderA do
     exerciseCmd rfq SubmitTokenQuote with lender = t.lenderA; rateBps = 600.0; haircut = 0.1; allocCid = a5
   btc <- mint t.cbtc "CBTC" t.borrower 1.0
-  wrong <- allocate t.cbtc btc t.borrower t.lenderB t.borrower "CBTC" 1.0 (addRelTime now (days 40))
+  wrong <- allocateFor (Some (coerceContractId rfq)) t.cbtc btc t.borrower t.lenderB t.borrower "CBTC" 1.0 (addRelTime now (days 40))
   m <- markT t 62000.0
   submitMustFail t.borrower do
     exerciseCmd rfq AwardSealedWithTokenCollateral with
       winner = q; losers = []; collateralAlloc = wrong; markCid = m; contexts = []
   -- A pledge that lapses at maturity, before the claim window, is refused.
   btc2 <- mint t.cbtc "CBTC" t.borrower 1.0
-  lapsing <- allocate t.cbtc btc2 t.borrower t.lenderA t.borrower "CBTC" 1.0 (addRelTime now (days 30))
+  lapsing <- allocateFor (Some (coerceContractId rfq)) t.cbtc btc2 t.borrower t.lenderA t.borrower "CBTC" 1.0 (addRelTime now (days 30))
   submitMustFail t.borrower do
     exerciseCmd rfq AwardSealedWithTokenCollateral with
       winner = q; losers = []; collateralAlloc = lapsing; markCid = m; contexts = []

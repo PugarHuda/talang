@@ -19,6 +19,7 @@ import DA.Action (void)
 import DA.Foldable (forA_, minimum)
 import DA.List (dedup, sortOn)
 import DA.Optional (fromOptional)
+import DA.Text qualified as T
 import DA.TextMap qualified as TextMap
 import DA.Time (RelTime, addRelTime, convertRelTimeToMicroseconds, days, hours, subTime)
 
@@ -126,7 +127,11 @@ payOut cid ((to, amt) :: rest)
   | otherwise = do
       h <- fetch cid
       if h.amount == amt
-        then void $ exercise cid Transfer with newOwner = to
+        then do
+          -- 1.2.2: the holding is used up on this leg, so any later leg would
+          -- silently go unpaid; refuse instead of skipping it.
+          assertMsg "not enough cash for every leg" (all (\(_, a) -> a <= 0.0) rest)
+          void $ exercise cid Transfer with newOwner = to
         else do
           (part, change) <- exercise cid Split with splitAmount = amt
           _ <- exercise part Transfer with newOwner = to
@@ -147,7 +152,8 @@ template Mark
   where
     signatory agent
     observer audience
-    ensure price > 0.0
+    -- 1.2.2: a mark for a blank instrument prices nothing and is refused.
+    ensure price > 0.0 && T.isNotEmpty (T.trim instrument)
 
 -- ---------------------------------------------------------------------------
 -- Locked value: a desk escrow or a CIP-0056 allocation
@@ -227,6 +233,20 @@ enterRepo lender (Escrowed e) = do
   h <- exercise e Release with recipient = x.owner
   Escrowed <$> exercise h Lock with counterparty = lender; purpose = "talang: pledged under an open repo"
 enterRepo _ l = pure l
+
+-- 1.2.2: a CIP-0056 allocation enters a repo only when its settlementRef.cid
+-- names the settlement it was made for: the RFQ for the opening pledge, the
+-- margin call for margin, the repo for a substitute. The desk cannot re-lock an
+-- allocation as it does an escrow, and without this one allocation could back
+-- two repos with the same lender, who would fund twice against one pledge. Each
+-- of those contracts is consumed by the step that takes the pledge (Open now
+-- archives its RFQ), so an allocation enters at most one repo.
+boundTo : AnyContractId -> Locked -> Update ()
+boundTo ref (Allocated a) = do
+  v <- view <$> fetch a
+  assertMsg "allocation not made for this settlement: its settlementRef.cid must name the RFQ, margin call or repo it pledges to"
+    (v.allocation.settlement.settlementRef.cid == Some ref)
+boundTo _ _ = pure ()
 
 -- ---------------------------------------------------------------------------
 -- Money arithmetic
@@ -311,6 +331,7 @@ template VenueAgreement
     operator : Party
     borrower : Party
     feeBps : Decimal
+    feeInstrument : Optional InstrumentId   -- 1.2.2: the instrument the fee is paid in
   where
     signatory operator
     observer borrower
@@ -323,6 +344,8 @@ template VenueAgreement
         extraArgs : ExtraArgs
       controller borrower
       do a <- view <$> fetch allocCid
+         -- 1.2.2: the fee is paid in the instrument the operator named, if it named one.
+         forA_ feeInstrument \i -> assertMsg "fee allocation in the wrong instrument" (a.allocation.transferLeg.instrumentId == i)
          assertMsg "fee allocation not to the operator" (a.allocation.transferLeg.receiver == operator)
          assertMsg "fee allocation not from the borrower" (a.allocation.transferLeg.sender == borrower)
          assertMsg "fee allocation for the wrong amount" (a.allocation.transferLeg.amount == amount)
@@ -408,7 +431,7 @@ template RepoRFQ
     -- the borrower pays the rate it takes, and may weigh a lower haircut against
     -- a higher rate. Each loser learns its rank and nothing else; the regulator
     -- gets a best-execution record with no lender and no losing rate in it.
-    -- The choice is nonconsuming and archives the request at the end: every
+    -- The choice is nonconsuming and the request is archived by Open: every
     -- invited lender observes the request, and a consuming choice would show
     -- each of them the whole award (winner, rate, rivals' notices). This way a
     -- lender sees only the archive, its own quote's fate and its own notice.
@@ -423,9 +446,7 @@ template RepoRFQ
       do q <- fetch winner
          pledge <- exercise collateralCid Lock with
            counterparty = q.lender; purpose = offeredPledge
-         t <- award this self winner losers contexts (Escrowed pledge) markCid
-         archive self
-         pure t
+         award this self winner losers contexts (Escrowed pledge) markCid
 
     -- The same award with collateral in a real CIP-0056 asset (CBTC, say): the
     -- borrower's registry holds it in an allocation to the lender, executable
@@ -438,9 +459,7 @@ template RepoRFQ
         markCid : ContractId Mark
         contexts : Contexts
       controller borrower
-      do t <- award this self winner losers contexts (Allocated collateralAlloc) markCid
-         archive self
-         pure t
+      do award this self winner losers contexts (Allocated collateralAlloc) markCid
 
     -- 1.0.0/1.1.0 awards, consuming, so they divulged the award to every
     -- invited lender. Kept for the upgrade, refused since 1.2.0.
@@ -555,6 +574,9 @@ template RepoQuote
 
     -- Opening leg, atomic: the borrower's collateral pledged to the lender and
     -- the lender's cash to the borrower, or neither. Reached through an award.
+    -- 1.2.2: Open archives the RFQ, so one RFQ opens one repo: a borrower who
+    -- calls Open directly closes its request (every invited lender sees it
+    -- close and can withdraw), and cannot open a second quote or award later.
     choice Open : ContractId RepoTrade
       with
         pledge : Locked
@@ -565,6 +587,8 @@ template RepoQuote
          let maturity = addRelTime now (days terms.termDays)
          qty <- pledgeQty borrower lender terms.collateralIssuer terms.collateralInstrument
                   (addRelTime maturity claimWindow) pledge
+         boundTo (coerceContractId rfqId) pledge
+         archive rfqId
          assertMsg "wrong collateral quantity" (qty == terms.collateralQty)
          m <- freshMark agent terms.collateralInstrument markCid
          assertMsg "collateral does not cover the cash after the haircut"
@@ -735,17 +759,29 @@ template RepoTrade
         newInstrument : Text
       controller borrower
       do newQty <- pledgeQty borrower lender newIssuer newInstrument (addRelTime maturity claimWindow) (Allocated allocCid)
+         boundTo (coerceContractId self) (Allocated allocCid)
          create Substitution with
            tradeCid = self; borrower; lender
            newCollateral = Allocated allocCid; newIssuer; newInstrument; newQty
 
-    -- Past maturity and not repurchased: the lender keeps the collateral.
+    -- Past maturity and not repurchased: the lender keeps collateral worth what
+    -- it is owed today at a fresh mark, with no haircut, and the rest goes back
+    -- to the borrower, as on a defaulted margin call and a close-out (1.2.2;
+    -- before, the lender kept every unit). A token allocation goes whole.
     choice ClaimAfterMaturity : ()
-      with contexts : Contexts
+      with
+        contexts : Contexts
+        markCid : Optional (ContractId Mark)   -- 1.2.2: required
       controller lender
       do now <- getTime
          assertMsg "the repo has not matured" (now > maturity)
-         seize this contexts now
+         case markCid of
+           None -> abort "claim at a fresh mark (markCid), so the borrower gets back what is not owed"
+           Some mk -> do
+             m <- freshMark agent collateralInstrument mk
+             let owed = terms.principal + interest terms.principal rateBps openedAt now
+             kept <- waterfall contexts lender borrower (ceil4 (owed / m.price)) collateral
+             report (this with collateralQty = kept) "DEFAULT" 0.0 0.0 now
 
     choice TopUp : ContractId RepoTrade
       with
@@ -1000,6 +1036,7 @@ template MarginCall
       with allocCid : ContractId Allocation
       controller borrower
       do qty <- pledgeQty borrower lender issuer instrument (addRelTime maturity claimWindow) (Allocated allocCid)
+         boundTo (coerceContractId self) (Allocated allocCid)
          assertMsg "margin below what was called" (qty >= unitsDue)
          exercise tradeCid TopUp with extra = Allocated allocCid; qty
 

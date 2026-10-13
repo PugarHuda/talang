@@ -12,6 +12,8 @@ import DA.TextMap qualified as TextMap
 import DA.Time (addRelTime, days, hours, minutes, seconds)
 import Daml.Script
 
+import Splice.Api.Token.HoldingV1 (InstrumentId(..))
+
 import Talang
 import TalangAgreements
 import TalangTest
@@ -85,10 +87,11 @@ authorization = do
   pay <- cash p p.lenderA 10000000.0
   submitMustFail p.lenderA do exerciseCmd t Repurchase with cashCid = pay; contexts = []
   passTime (days 90)
-  submitMustFail p.borrower do exerciseCmd t ClaimAfterMaturity with contexts = []
-  submitMustFail outsider do exerciseCmd t ClaimAfterMaturity with contexts = []
+  cm <- markFor p [p.borrower, p.lenderA, outsider] "UST10Y" 98000.0
+  submitMustFail p.borrower do exerciseCmd t ClaimAfterMaturity with contexts = []; markCid = Some cm
+  submitMustFail outsider do exerciseCmd t ClaimAfterMaturity with contexts = []; markCid = Some cm
   submitMustFail p.borrower do exerciseCmd t Seize with contexts = []
-  _ <- submit p.lenderA do exerciseCmd t ClaimAfterMaturity with contexts = []
+  _ <- submit p.lenderA do exerciseCmd t ClaimAfterMaturity with contexts = []; markCid = Some cm
   pure ()
 
 -- A substitution is answered by the repo's lender only, and a schedule speaks
@@ -249,9 +252,9 @@ strictEdges = do
   m <- mark p2 "UST10Y" 98000.0
   pay <- cash p2 p2.borrower 200000.0
   submitMustFail p2.borrower do exerciseCmd offer AcceptRoll with cashCid = pay; markCid = m
-  submitMustFail p2.lenderA do exerciseCmd t ClaimAfterMaturity with contexts = []
+  submitMustFail p2.lenderA do exerciseCmd t ClaimAfterMaturity with contexts = []; markCid = Some m
   passTime (seconds 1)
-  _ <- submit p2.lenderA do exerciseCmd t ClaimAfterMaturity with contexts = []
+  _ <- submit p2.lenderA do exerciseCmd t ClaimAfterMaturity with contexts = []; markCid = Some m
   pure ()
 
 -- 1.2.0's default window holds on the master agreement too: a margin call more
@@ -348,7 +351,8 @@ rfqShape = do
   mk [p.lenderA] (t with termDays = 0) None
   mk [p.lenderA] t (Some Venue with operator = p.agent; feeBps = 1000.0)
   mk [p.lenderA] t (Some Venue with operator = p.agent; feeBps = -1.0)
-  submitMustFail p.agent do createCmd VenueAgreement with operator = p.agent; borrower = p.borrower; feeBps = 1000.0
+  submitMustFail p.agent do
+    createCmd VenueAgreement with operator = p.agent; borrower = p.borrower; feeBps = 1000.0; feeInstrument = None
   submitMustFail p.lenderA do
     createCmd HaircutSchedule with lender = p.lenderA; audience = []; floors = TextMap.fromList [("UST10Y", 0.5)]
 
@@ -443,7 +447,8 @@ closedStaysClosed = do
   pay <- cash p p.borrower 100000.0
   submitMustFail p.borrower do exerciseCmd offer AcceptRoll with cashCid = pay; markCid = m
   passTime (days 90)
-  submitMustFail p.lenderA do exerciseCmd t ClaimAfterMaturity with contexts = []
+  m90 <- mark p "UST10Y" 98000.0
+  submitMustFail p.lenderA do exerciseCmd t ClaimAfterMaturity with contexts = []; markCid = Some m90
 
   (p2, t2) <- opened
   passTime (days 10)
@@ -530,10 +535,10 @@ tokenDoubleCount = do
   m <- markT t 54000.0
   call <- submit t.lenderA do exerciseCmd trade CallMargin with markCid = m; respondBy = addRelTime now (days 1)
   submitMustFail t.borrower do exerciseCmd call PostTokenMargin with allocCid = pledged
-  sub <- submit t.borrower do
+  -- 1.2.2: refused at the proposal already (the pledge is bound to the RFQ, not
+  -- to this repo); 1.2.1 refused it at Approve.
+  submitMustFail t.borrower do
     exerciseCmd trade ProposeTokenSubstitution with allocCid = pledged; newIssuer = t.cbtc; newInstrument = "CBTC"
-  up <- markT t 62000.0
-  submitMustFail t.lenderA do exerciseCmd sub Approve with markCid = up; contexts = []
   owns t.cbtc t.borrower "CBTC" >>= (=== 0.0)
 
 -- A roll moves maturity out; a pledged allocation that lapses before the new
@@ -578,7 +583,7 @@ upgradeData = do
   q <- submit t.lenderA do
     exerciseCmd rfq2 SubmitTokenQuote with lender = t.lenderA; rateBps = 600.0; haircut = 0.10; allocCid = allocA
   btc <- mint t.cbtc "CBTC" t.borrower 1.0
-  pledge <- allocate t.cbtc btc t.borrower t.lenderA t.borrower "CBTC" 1.0 (addRelTime now (days 40))
+  pledge <- allocateFor (Some (coerceContractId rfq2)) t.cbtc btc t.borrower t.lenderA t.borrower "CBTC" 1.0 (addRelTime now (days 40))
   m <- markT t 62000.0
   submitMustFail t.borrower do
     exerciseCmd rfq2 AwardWithTokenCollateral with
@@ -600,3 +605,177 @@ upgradeData = do
   passTime (hours 3)
   _ <- submit p.lenderA do exerciseCmd c2 Default with contexts = []
   held p.lenderA "UST10Y" >>= \x -> assert (x > 0.0)
+
+-- ---------------------------------------------------------------------------
+-- 1.2.2 fixes
+-- ---------------------------------------------------------------------------
+
+-- A mark for a blank instrument prices nothing: refused at creation.
+markBlankInstrument : Script ()
+markBlankInstrument = do
+  p <- setup
+  now <- getTime
+  forA_ ["", "   "] \i -> submitMustFail p.agent do
+    createCmd Mark with agent = p.agent; instrument = i; price = 98000.0; asOf = now; audience = [p.borrower]
+
+-- Was the open HIGH issue: one CBTC allocation backing two repos with the same
+-- lender, who would fund twice against one pledge. An allocation now names the
+-- settlement it pledges to (settlementRef.cid): the RFQ for an opening pledge,
+-- the margin call for margin, the repo for a substitute.
+tokenPledgeOneRepo : Script ()
+tokenPledgeOneRepo = do
+  t <- setupT
+  now <- getTime
+  let mkRfq = submit t.borrower do
+        createCmd RepoRFQ with
+          borrower = t.borrower; regulator = t.regulator; agent = t.agent
+          lenders = [t.lenderA]; terms = termsT t; deadline = None; venue = None
+      deskQuote r = do
+        c <- submit t.usdcx do createCmd Holding with issuer = t.usdcx; owner = t.lenderA; instrument = "USDCx"; amount = loan
+        submit t.lenderA do exerciseCmd r SubmitQuote with lender = t.lenderA; rateBps = 600.0; haircut = 0.10; cashCid = c
+      award r q a m = exerciseCmd r AwardSealedWithTokenCollateral with
+        winner = q; losers = []; collateralAlloc = a; markCid = m; contexts = []
+      cbtcTo ref = do
+        h <- mint t.cbtc "CBTC" t.borrower 1.0
+        allocateFor ref t.cbtc h t.borrower t.lenderA t.borrower "CBTC" 1.0 (addRelTime now (days 40))
+  r1 <- mkRfq
+  r2 <- mkRfq
+  q1 <- deskQuote r1
+  q2 <- deskQuote r2
+  m <- markT t 62000.0
+  -- An allocation that names no settlement is refused.
+  loose <- cbtcTo None
+  submitMustFail t.borrower do award r1 q1 loose m
+  -- Bound to r1: refused by r2, taken by r1, then refused by r2 again, by
+  -- award or by a direct Open.
+  pledge <- cbtcTo (Some (coerceContractId r1))
+  submitMustFail t.borrower do award r2 q2 pledge m
+  trade1 <- submit t.borrower do award r1 q1 pledge m
+  submitMustFail t.borrower do award r2 q2 pledge m
+  submitMustFail t.borrower do exerciseCmd q2 Open with pledge = Allocated pledge; markCid = m; contexts = []
+  held t.borrower "USDCx" >>= (=== loan)
+  -- r2 opens on its own pledge.
+  pledge2 <- cbtcTo (Some (coerceContractId r2))
+  trade2 <- submit t.borrower do award r2 q2 pledge2 m
+  held t.borrower "USDCx" >>= (=== 2.0 * loan)
+
+  -- Margin: both repos are called. Repo 1's pledge, or margin made for repo
+  -- 1's call, cannot answer repo 2's call.
+  passTime (days 3)
+  now2 <- getTime
+  low <- markT t 54000.0
+  call1 <- submit t.lenderA do exerciseCmd trade1 CallMargin with markCid = low; respondBy = addRelTime now2 (days 1)
+  call2 <- submit t.lenderA do exerciseCmd trade2 CallMargin with markCid = low; respondBy = addRelTime now2 (days 1)
+  submitMustFail t.borrower do exerciseCmd call2 PostTokenMargin with allocCid = pledge
+  extra <- mint t.cbtc "CBTC" t.borrower 0.1
+  forCall1 <- allocateFor (Some (coerceContractId call1)) t.cbtc extra t.borrower t.lenderA t.borrower "CBTC" 0.1 (addRelTime now (days 60))
+  submitMustFail t.borrower do exerciseCmd call2 PostTokenMargin with allocCid = forCall1
+  trade1b <- submit t.borrower do exerciseCmd call1 PostTokenMargin with allocCid = forCall1
+  -- Substitution: an allocation pledged to repo 1 cannot be offered to repo 2;
+  -- one made for repo 2 is refused by repo 1 and taken by repo 2.
+  submitMustFail t.borrower do
+    exerciseCmd trade2 ProposeTokenSubstitution with allocCid = forCall1; newIssuer = t.cbtc; newInstrument = "CBTC"
+  sub <- mint t.cbtc "CBTC" t.borrower 1.2
+  forTrade2 <- allocateFor (Some (coerceContractId trade2)) t.cbtc sub t.borrower t.lenderA t.borrower "CBTC" 1.2 (addRelTime now (days 60))
+  submitMustFail t.borrower do
+    exerciseCmd trade1b ProposeTokenSubstitution with allocCid = forTrade2; newIssuer = t.cbtc; newInstrument = "CBTC"
+  _ <- submit t.borrower do
+    exerciseCmd trade2 ProposeTokenSubstitution with allocCid = forTrade2; newIssuer = t.cbtc; newInstrument = "CBTC"
+  pure ()
+
+-- Was medium: Open called directly skipped the award and left the RFQ open, so
+-- the borrower could open a second quote, or award later. Open now closes the
+-- request: one RFQ opens one repo, and the other lenders take their cash back.
+directOpenClosesRfq : Script ()
+directOpenClosesRfq = do
+  p <- setup
+  r <- rfq p
+  qA <- quote p r p.lenderA 530.0 0.02
+  qA2 <- quote p r p.lenderA 520.0 0.02
+  qB <- quote p r p.lenderB 545.0 0.03
+  m <- mark p "UST10Y" 98000.0
+  let offer = do
+        b <- bond p "UST10Y" 100.0
+        submit p.borrower do exerciseCmd b Lock with counterparty = p.lenderA; purpose = offeredPledge
+  e1 <- offer
+  _ <- submit p.borrower do exerciseCmd qA Open with pledge = Escrowed e1; markCid = m; contexts = []
+  -- Every invited lender sees the request close.
+  isNone <$> queryContractId p.lenderB r >>= assert
+  isNone <$> queryContractId p.lenderA r >>= assert
+  e2 <- offer
+  submitMustFail p.borrower do exerciseCmd qA2 Open with pledge = Escrowed e2; markCid = m; contexts = []
+  col <- bond p "UST10Y" 100.0
+  submitMustFail p.borrower do
+    exerciseCmd r AwardSealed with winner = qB; losers = []; collateralCid = col; markCid = m; contexts = []
+  submit p.lenderB do exerciseCmd qB WithdrawQuote with contexts = []
+  submit p.lenderA do exerciseCmd qA2 WithdrawQuote with contexts = []
+  held p.borrower "USDC" >>= (=== loanAmount)
+  held p.lenderB "USDC" >>= (=== loanAmount)
+  held p.lenderA "USDC" >>= (=== loanAmount)
+  -- The award path still works and still archives its request.
+  (p2, t2) <- opened
+  isSome <$> queryContractId p2.lenderA t2 >>= assert
+  (length <$> query @RepoRFQ p2.lenderB) >>= (=== 0)
+
+-- Was a design inconsistency: a claim after maturity gave the lender every
+-- unit, while a defaulted call and a close-out return the excess. Now it nets
+-- at a fresh mark of the repo's own instrument (TalangTest.claimAfterMaturity
+-- checks the excess coming back); with the mark below what is owed, every unit
+-- goes and the report says so.
+claimAtMark : Script ()
+claimAtMark = do
+  (p, t) <- opened
+  passTime (days 91)
+  bund <- mark p "BUND10" 98000.0
+  submitMustFail p.lenderA do exerciseCmd t ClaimAfterMaturity with contexts = []; markCid = Some bund
+  submitMustFail p.lenderA do exerciseCmd t ClaimAfterMaturity with contexts = []; markCid = None
+  stale <- mark p "UST10Y" 98000.0
+  passTime (hours 24 + seconds 1)
+  submitMustFail p.lenderA do exerciseCmd t ClaimAfterMaturity with contexts = []; markCid = Some stale
+  low <- mark p "UST10Y" 90000.0
+  _ <- submit p.lenderA do exerciseCmd t ClaimAfterMaturity with contexts = []; markCid = Some low
+  held p.lenderA "UST10Y" >>= (=== 100.0)
+  held p.borrower "UST10Y" >>= (=== 0.0)
+  rs <- map snd <$> query @RepoReport p.regulator
+  [r.collateralQty | r <- rs, r.event == "DEFAULT"] === [100.0]
+
+-- The operator names the fee instrument; a fee paid in anything else is refused.
+collectFeeInstrument : Script ()
+collectFeeInstrument = do
+  t <- setupT
+  now <- getTime
+  va <- submit t.operator do
+    createCmd VenueAgreement with
+      operator = t.operator; borrower = t.borrower; feeBps = 10.0
+      feeInstrument = Some (InstrumentId with admin = t.usdcx; id = "USDCx")
+  junk <- mint t.cbtc "CBTC" t.borrower 0.001
+  a <- allocate t.cbtc junk t.borrower t.operator t.borrower "CBTC" 0.001 (addRelTime now (days 1))
+  submitMustFail t.borrower do exerciseCmd va CollectFee with allocCid = a; amount = 0.001; extraArgs = noExtra
+  fee <- mint t.usdcx "USDCx" t.borrower 2.0
+  b <- allocate t.usdcx fee t.borrower t.operator t.borrower "USDCx" 2.0 (addRelTime now (days 1))
+  submit t.borrower do exerciseCmd va CollectFee with allocCid = b; amount = 2.0; extraArgs = noExtra
+  owns t.usdcx t.operator "USDCx" >>= (=== 2.0)
+
+-- payOut pays every leg or none: a holding used up on the first leg no longer
+-- skips the rest (callers check the total first, so this is the backstop).
+template PayOutProbe
+  with
+    owner : Party
+  where
+    signatory owner
+    nonconsuming choice Pay : ()
+      with
+        cid : ContractId Holding
+        legs : [(Party, Decimal)]
+      controller owner
+      do payOut cid legs
+
+payOutEveryLeg : Script ()
+payOutEveryLeg = do
+  p <- setup
+  probe <- submit p.borrower do createCmd PayOutProbe with owner = p.borrower
+  h <- cash p p.borrower 100.0
+  submitMustFail p.borrower do exerciseCmd probe Pay with cid = h; legs = [(p.lenderA, 100.0), (p.agent, 5.0)]
+  submit p.borrower do exerciseCmd probe Pay with cid = h; legs = [(p.lenderA, 95.0), (p.agent, 5.0)]
+  held p.lenderA "USDC" >>= (=== 95.0)
+  held p.agent "USDC" >>= (=== 5.0)

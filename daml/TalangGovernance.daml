@@ -88,6 +88,11 @@ data LenderMove
       newRateBps : Decimal
       extraDays : Int
       expiresAt : Time
+  -- 1.2.2: a claim after maturity names the fresh mark it nets at; the old
+  -- ClaimMove carries none and is refused by ClaimAfterMaturity.
+  | ClaimAtMarkMove with
+      tradeCid : ContractId RepoTrade
+      markCid : ContractId Mark
   deriving (Eq, Show)
 
 moveLabel : LenderMove -> Text
@@ -100,6 +105,7 @@ moveLabel = \case
   DefaultMove {} -> "talang:Default"
   ClaimMove {} -> "talang:ClaimAfterMaturity"
   RollOfferMove {} -> "talang:OfferRoll"
+  ClaimAtMarkMove {} -> "talang:ClaimAfterMaturity"
 
 -- A syndicate member's proposed move. Registry contexts for token legs are
 -- left out on purpose: a governed move settles only desk escrows and registries
@@ -130,6 +136,7 @@ template SyndicateProposal
         ApproveSubstitutionMove {..} -> void $ exercise substitutionCid Approve with markCid; contexts = []
         DeclineSubstitutionMove {..} -> exercise substitutionCid Decline with contexts = []
         DefaultMove {..} -> exercise marginCallCid Default with contexts = []
-        ClaimMove {..} -> exercise tradeCid ClaimAfterMaturity with contexts = []
+        ClaimMove {..} -> exercise tradeCid ClaimAfterMaturity with contexts = []; markCid = None
+        ClaimAtMarkMove {..} -> exercise tradeCid ClaimAfterMaturity with contexts = []; markCid = Some markCid
         RollOfferMove {..} -> void $ create RollOffer with
           tradeCid; borrower; lender = syndicate; newRateBps; extraDays; expiresAt

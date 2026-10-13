@@ -209,10 +209,17 @@ claimAfterMaturity : Script ()
 claimAfterMaturity = do
   (p, t) <- opened
   passTime (days 89)
-  submitMustFail p.lenderA do exerciseCmd t ClaimAfterMaturity with contexts = []
+  m <- mark p "UST10Y" 98000.0
+  submitMustFail p.lenderA do exerciseCmd t ClaimAfterMaturity with contexts = []; markCid = Some m
   passTime (days 2)
-  _ <- submit p.lenderA do exerciseCmd t ClaimAfterMaturity with contexts = []
-  held p.lenderA "UST10Y" >>= (=== 100.0)
+  m2 <- mark p "UST10Y" 98000.0
+  -- 1.2.2: without a mark the claim is refused; with one, the lender keeps what
+  -- it is owed (9,627,273.61 / 98,000 = 98.2375 units, rounded up) and the
+  -- borrower gets the rest back.
+  submitMustFail p.lenderA do exerciseCmd t ClaimAfterMaturity with contexts = []; markCid = None
+  _ <- submit p.lenderA do exerciseCmd t ClaimAfterMaturity with contexts = []; markCid = Some m2
+  held p.lenderA "UST10Y" >>= (=== 98.2375)
+  held p.borrower "UST10Y" >>= (=== 1.7625)
 
 -- Everything the desk must refuse.
 refusals : Script ()
