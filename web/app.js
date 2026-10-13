@@ -154,7 +154,7 @@ function borrowerView() {
     <label>Cash wanted (USDC)<input id="n-cash" type="number" value="4800000" /></label>
     <label>Term (days)<input id="n-term" type="number" value="30" /></label>
     <label>Minimum transfer (USDC)<input id="n-mta" type="number" placeholder="none" /></label>
-    <div class="ask" role="group" aria-labelledby="n-ask"><span id="n-ask">Ask</span><span>${LENDERS.map((l) => `<label style="display:inline;flex-direction:row"><input type="checkbox" class="n-lender" value="${l}" ${l === 'lenderC' ? '' : 'checked'} style="width:auto" /> ${NAMES[l]}</label>`).join(' ')}</span></div>
+    <div class="ask" role="group" aria-labelledby="n-ask"><span id="n-ask">Ask</span><span>${LENDERS.filter((l) => CFG.parties[l]).map((l) => `<label style="display:inline;flex-direction:row"><input type="checkbox" class="n-lender" value="${l}" ${l === 'lenderC' ? '' : 'checked'} style="width:auto" /> ${NAMES[l]}</label>`).join(' ')}</span></div>
     <button data-act="request">Send request</button>
     <button class="ghost" data-act="bonds">Demo issuer: give me bonds</button></div></div>`;
 
@@ -463,19 +463,42 @@ const val = (id) => $(id)?.value;
 // A number field as the decimal text the ledger expects. A browser number input turns
 // blank or non-numeric text into "", and N("") is 0, so a cleared haircut would quote
 // 0%: refuse it here, naming the field. Whether the value is allowed stays the contract's call.
+// Plain decimal text only: the ledger's Numeric 10 takes no exponent ("1e3") and no 11th
+// decimal, and its refusal of either is not one a person can read.
 function num(id, label) {
   const v = val(id)?.trim();
-  if (!v || !Number.isFinite(N(v))) throw new Error(`${label}: enter a number`);
+  if (!v || !/^-?\d+(\.\d+)?$/.test(v)) throw new Error(`${label}: enter a number`);
+  if (/\.\d{11}/.test(v)) throw new Error(`${label}: at most 10 decimals`);
   return v;
+}
+// A count of days is an Int on the ledger; "30.5" would come back as a bare parse error.
+function whole(id, label) {
+  const v = num(id, label);
+  if (!/^-?\d+$/.test(v)) throw new Error(`${label}: enter whole days`);
+  return v;
+}
+// A ledger refusal arrives as the participant's JSON; show its reason, not the envelope.
+function readable(msg) {
+  msg = msg.replace(/^submit \d+: /, '');
+  let cause;
+  try { cause = JSON.parse(msg.slice(msg.indexOf('{'))).cause; } catch { return msg; }
+  if (!cause) return msg;
+  const pre = /Template precondition violated: (\w+)/.exec(cause);
+  if (pre) return `Refused by the contract: the ${pre[1]} terms are out of range (amounts, quantities and days must be above zero)`;
+  const why = /UNHANDLED_EXCEPTION[\s\S]*?\(error category \d+\): ([\s\S]*)$/.exec(cause);
+  if (why) return 'Refused by the contract: ' + why[1];
+  if (/CONTRACT_NOT_FOUND|could not be found/i.test(msg)) return 'That is no longer on the ledger (someone acted on it, or another tab did): the page has been refreshed';
+  return 'Refused by the ledger: ' + cause.split(/\. |, correlationId/)[0];
 }
 const ACTIONS = {
   async request() {
+    if (!document.querySelector('.n-lender:checked')) throw new Error('Ask: pick at least one lender');
     await act(create('RepoRFQ', { borrower: me(), regulator: CFG.parties.regulator, agent: CFG.parties.agent,
       venue: CFG.parties.venue ? { operator: CFG.parties.venue, feeBps: '10.0' } : null,
       lenders: [...document.querySelectorAll('.n-lender:checked')].map((x) => CFG.parties[x.value]), deadline: null, terms: {
         cashIssuer: CFG.parties.cashIssuer, cashInstrument: 'USDC', principal: num('#n-cash', 'Cash wanted'),
         collateralIssuer: CFG.parties.bondIssuer, collateralInstrument: val('#n-inst'),
-        collateralQty: num('#n-qty', 'Units'), termDays: num('#n-term', 'Term'),
+        collateralQty: num('#n-qty', 'Units'), termDays: whole('#n-term', 'Term'),
         // Blank: no minimum transfer, any shortfall may be called.
         minTransfer: val('#n-mta')?.trim() ? num('#n-mta', 'Minimum transfer') : null } }));
     return 'Request sent to the panel';
@@ -555,7 +578,7 @@ const ACTIONS = {
   async 'offer-roll'(b) {
     const t = of('RepoTrade').find((x) => x.cid === b.dataset.cid).arg, k = b.dataset.cid.slice(0, 12);
     await act(create('RollOffer', { tradeCid: b.dataset.cid, borrower: t.borrower, lender: me(),
-      newRateBps: num(`#ro-r-${k}`, 'Roll rate'), extraDays: num(`#ro-d-${k}`, 'Extra days'), expiresAt: new Date(Date.now() + 2 * DAY).toISOString() }));
+      newRateBps: num(`#ro-r-${k}`, 'Roll rate'), extraDays: whole(`#ro-d-${k}`, 'Extra days'), expiresAt: new Date(Date.now() + 2 * DAY).toISOString() }));
     return 'Roll offered to the borrower';
   },
   async refute(b) {
@@ -600,8 +623,11 @@ const ACTIONS = {
     return r ? `Closed out ${r.reposNetted} repos on ${r.trigger}: owed ${money(r.owed)}, kept ${money(r.valueKept)}, returned ${money(r.valueReturned)}` : 'Closed out';
   },
   async mark() {
-    await act(create('Mark', { agent: me(), instrument: val('#m-inst'), price: num('#m-price', 'Price'), asOf: new Date().toISOString(),
-      audience: [CFG.parties.borrower, ...LENDERS.map((l) => CFG.parties[l])] }));
+    const instrument = val('#m-inst')?.trim();
+    // The contract only checks the price; a mark on "" would be published and match nothing.
+    if (!instrument) throw new Error('Instrument: enter a name');
+    await act(create('Mark', { agent: me(), instrument, price: num('#m-price', 'Price'), asOf: new Date().toISOString(),
+      audience: [CFG.parties.borrower, ...LENDERS.map((l) => CFG.parties[l]).filter(Boolean)] }));
     return 'Mark published';
   },
 };
@@ -620,7 +646,7 @@ document.addEventListener('click', async (e) => {
   if (!b || busy || !canAct()) return;
   busy = true; b.disabled = true;
   try { toast(await ACTIONS[b.dataset.act](b)); await refresh(true); }
-  catch (err) { toast(err.message.replace(/^submit \d+: /, ''), true); b.disabled = false; }
+  catch (err) { toast(readable(err.message), true); b.disabled = false; if (/CONTRACT_NOT_FOUND/.test(err.message)) refresh(true); }
   finally { busy = false; }
 });
 
@@ -636,6 +662,23 @@ async function read(role) {
   return (LAST[role] = { offset: r.offset, contracts: r.contracts, same });
 }
 let painted = 0;
+// The 5 s repaint must not undo what the person typed or picked and has not sent yet: a
+// form reset to its defaults would send 4,800,000 when they typed 900,000. Fields they
+// changed are carried over to the new page by id (or class and instrument).
+const fieldKey = (e) => e.id || `${e.className}|${e.dataset.inst ?? e.value}`;
+const dirty = (e) => (e.type === 'checkbox' ? e.checked !== e.defaultChecked
+  : e.tagName === 'SELECT' ? [...e.options].some((o) => o.selected !== o.defaultSelected) : e.value !== e.defaultValue);
+function repaint(html) {
+  const kept = new Map([...$('#view').querySelectorAll('input, select')].filter(dirty)
+    .map((e) => [fieldKey(e), e.type === 'checkbox' ? e.checked : e.value]));
+  $('#view').innerHTML = html;
+  for (const e of $('#view').querySelectorAll('input, select')) {
+    const k = fieldKey(e);
+    if (!kept.has(k)) continue;
+    if (e.type === 'checkbox') e.checked = kept.get(k);
+    else if (e.tagName !== 'SELECT' || [...e.options].some((o) => o.value === kept.get(k))) e.value = kept.get(k);
+  }
+}
 async function refresh(force) {
   // Never repaint under a field being typed in.
   if (!force && (busy || document.activeElement?.matches('input, select.in'))) return;
@@ -652,7 +695,7 @@ async function refresh(force) {
     // clock-based labels (fresh/stale mark, past maturity) still move.
     if (!force && r.same && Date.now() - painted < 60000) return;
     painted = Date.now();
-    $('#view').innerHTML = (VIEWS[ROLE] ?? venueView)();
+    repaint((VIEWS[ROLE] ?? venueView)());
   } catch (err) {
     $('#status').textContent = '● ' + err.message; $('#status').className = 'status err';
   }

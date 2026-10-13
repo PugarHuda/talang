@@ -74,7 +74,9 @@ async function open(role, extra = '', base = BASE, pg = page) {
   await pg.goto(`${base}/desk?role=${role}${extra}`);
   await pg.waitForFunction(() => /live/.test(document.querySelector('#status')?.textContent) && !document.querySelector('#view .skel'));
 }
-const card = (text) => page.locator('#view .card', { hasText: text });
+// A card by its heading: an instrument's name also appears in Positions and in other repos'
+// substitute lists (posting exactly the units called leaves the rest free).
+const card = (text) => page.locator('#view .card').filter({ has: page.locator('h3', { hasText: text }) });
 // Click an action and wait for its toast; returns [ok, text].
 async function act(locator) {
   await page.evaluate(() => { const t = document.querySelector('#toast'); t.hidden = true; t.textContent = ''; });
