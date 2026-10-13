@@ -16,7 +16,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { PARTIES, AGREEMENTS, acs, submit, create, exercise, created, NO_CONTEXTS } from '../lib/ledger.mjs';
-import { assess, latestMark, lendable, owed, venueFee, N } from '../lib/repo.mjs';
+import { assess, latestMark, lendable, owed, venueFee, N, bucketFloor } from '../lib/repo.mjs';
 
 const ROLE = process.env.TALANG_ROLE ?? 'lenderA';
 const ME = PARTIES[ROLE];
@@ -521,7 +521,7 @@ async function run(name, a = {}) {
 
   if (name === 'best_execution') {
     return of('BestExecution').map((b) => ({ at: b.arg.at, quotesConsidered: N(b.arg.quotesConsidered), winnerRank: N(b.arg.winnerRank),
-      winningRateBps: N(b.arg.winningRateBps), winningHaircut: N(b.arg.winningHaircut), spreadToBestBps: N(b.arg.spreadToBestBps), spreadBucketBps: b.arg.spreadBucket ?? null }));
+      winningRateBps: N(b.arg.winningRateBps), winningHaircut: N(b.arg.winningHaircut), spreadToBestBps: bucketFloor(N(b.arg.spreadToBestBps)), spreadBucketBps: b.arg.spreadBucket ?? null }));
   }
 
   if (name === 'privacy_check') {

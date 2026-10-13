@@ -29,8 +29,13 @@ globalThis.fetch = async (url, opts = {}) => {
   if (mode === 'ledger-down') return reply(503, { code: 'UNAVAILABLE', cause: 'node is restarting' });
   if (url === LEDGER + '/v2/state/ledger-end' && method === 'GET') return reply(200, { offset: 42 });
   if (url === LEDGER + '/v2/state/active-contracts' && method === 'POST') {
-    const party = Object.keys(JSON.parse(body).eventFormat.filtersByParty)[0];
-    return reply(200, [{ contractEntry: { JsActiveContract: { createdEvent: { contractId: 'c1', createArgument: { owner: party } } } } }]);
+    const filters = JSON.parse(body).eventFormat.filtersByParty, party = Object.keys(filters)[0];
+    const row = (contractId, createArgument) => ({ contractEntry: { JsActiveContract: { createdEvent: { contractId, createArgument } } } });
+    // Best execution: one pre-1.2.0 record with the exact gap (3 bp), one 1.2.0 record already banded.
+    if (JSON.stringify(filters).includes(':BestExecution"')) return reply(200, [
+      row('be-old', { owner: party, winningRateBps: '520.0000000000', spreadToBestBps: '3.0000000000' }),
+      row('be-new', { owner: party, winningRateBps: '540.0000000000', spreadToBestBps: '6.0000000000', spreadBucket: '6-25' })]);
+    return reply(200, [row('c1', { owner: party })]);
   }
   return reply(404, { code: 'NOT_FOUND' });
 };
@@ -40,7 +45,7 @@ const acs = await load('acs.mjs'), config = await load('config.mjs');
 
 const res = () => ({ _s: 0, _j: null, status(c) { this._s = c; return this; }, json(o) { this._j = o; return this; },
   send() { return this; }, end() { return this; }, setHeader() {} });
-const call = async (h, method, body) => { calls = []; const r = res(); await h({ method, body, headers: {} }, r); return r; };
+const call = async (h, method, body, headers = {}) => { calls = []; const r = res(); await h({ method, body, headers }, r); return r; };
 const clean = (r) => !JSON.stringify(r._j ?? '').match(new RegExp([SECRET, CLIENT, TOKEN].join('|')));
 
 let fail = 0;
@@ -85,6 +90,27 @@ for (const [role, party] of Object.entries(PARTIES)) {
   ok(`acs ${role}: filter names ${role}'s party and no other`, scoped);
   ok(`acs ${role}: no secret or token in body`, clean(r));
 }
+
+// Regulator: a pre-1.2.0 best-execution record leaves with the band's lower edge, never the exact gap
+// (winning rate minus an exact gap is the best losing rate). Other roles and 1.2.0 records as read.
+r = await call(acs, 'POST', { role: 'regulator', since: 1 });
+const be = (id) => r._j.contracts.find((c) => c.cid === id)?.arg;
+ok('acs regulator: pre-1.2.0 gap 3 bp sent as band floor 1', be('be-old')?.spreadToBestBps === '1.0000000000');
+ok('acs regulator: 1.2.0 banded record untouched', be('be-new')?.spreadToBestBps === '6.0000000000' && be('be-new')?.spreadBucket === '6-25');
+r = await call(acs, 'POST', { role: 'borrower', since: 1 });
+ok('acs borrower: best execution as the ledger wrote it', r._j.contracts.find((c) => c.cid === 'be-old')?.arg.spreadToBestBps === '3.0000000000');
+
+// 30 identical reads at once share one ledger read (one ledger-end, not 30).
+calls = [];
+await Promise.all(Array.from({ length: 30 }, () => acs({ method: 'POST', body: { role: 'lenderA', since: 2 }, headers: { 'x-real-ip': '198.51.100.7' } }, res())));
+ok('acs 30 parallel identical reads: one ledger read', calls.filter((c) => c.url.endsWith('/v2/state/ledger-end')).length === 1);
+
+// One IP past its burst: 429 with Retry-After, and the ledger is not asked.
+const burst = [];
+for (let i = 0; i < 45; i++) burst.push((await call(acs, 'POST', { role: 'lenderB' }, { 'x-real-ip': '203.0.113.9' }))._s);
+r = await call(acs, 'POST', { role: 'lenderB' }, { 'x-real-ip': '203.0.113.9' });
+ok('acs one IP past 40 reads at once: 429, no ledger call', burst.slice(0, 40).every((s) => s === 200) && r._s === 429 && calls.length === 0);
+ok('acs another IP meanwhile: still served', (await call(acs, 'POST', { role: 'lenderB' }, { 'x-real-ip': '203.0.113.10' }))._s === 200);
 
 // Config: the role -> party map and readOnly, nothing else.
 r = await call(config, 'GET');
