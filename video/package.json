@@ -1,0 +1,21 @@
+{
+  "name": "talang-video",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Remotion source for the Talang narrated pitch video",
+  "scripts": {
+    "vo": "python vo/say.py",
+    "render": "remotion render src/index.ts TalangPitch ../media/talang-pitch.mp4 --codec=h264 --crf=20 --concurrency=2",
+    "studio": "remotion studio src/index.ts"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.443",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "remotion": "4.0.443"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.2",
+    "typescript": "5.9.3"
+  }
+}

@@ -1,0 +1,6 @@
+node_modules/
+out/
+public/vo/
+# copied in by vo/say.py from deck/shots and media/
+public/shots/
+public/*.mp4

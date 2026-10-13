@@ -13,7 +13,8 @@ const SHOTS = join(HERE, 'shots');
 await mkdir(SHOTS, { recursive: true });
 
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+// deviceScaleFactor 1.5: shots at 1920x1080, sharp enough for the pitch video.
+const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1.5 });
 // networkidle so the Google Fonts stylesheet lands; fonts.ready so glyphs are rasterised.
 await page.goto(SRC, { waitUntil: 'networkidle' });
 await page.evaluate(() => document.fonts.ready);
@@ -24,7 +25,7 @@ const n = await page.locator('.slide').count();
 await page.keyboard.press('Home');
 for (let k = 1; k <= n; k++) {
   if (k > 1) await page.keyboard.press('ArrowRight');
-  await page.waitForTimeout(400); // fade between slides
+  await page.waitForTimeout(900); // fade between slides (400 ms caught slide 6 mid-fade)
   await page.screenshot({ path: join(SHOTS, `${String(k).padStart(2, '0')}.png`) });
 }
 console.log('wrote', n, 'shots to', SHOTS);

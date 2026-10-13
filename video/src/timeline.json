@@ -1,0 +1,1046 @@
+{
+ "fps": 30,
+ "total": 235.155231,
+ "voice": "en-US-AndrewMultilingualNeural",
+ "scenes": [
+  {
+   "id": "title",
+   "kind": "slide",
+   "slide": "01",
+   "start": 0.0,
+   "dur": 4.560541
+  },
+  {
+   "id": "problem",
+   "kind": "slide",
+   "slide": "02",
+   "start": 4.560541,
+   "dur": 8.836831999999998
+  },
+  {
+   "id": "what",
+   "kind": "slide",
+   "slide": "03",
+   "start": 13.397372999999998,
+   "dur": 7.021041
+  },
+  {
+   "id": "desk-request",
+   "kind": "desk",
+   "segs": [
+    [
+     25.7,
+     41.6
+    ]
+   ],
+   "start": 20.418414,
+   "dur": 10.271041000000004,
+   "src": "talang-desk-typed.mp4"
+  },
+  {
+   "id": "desk-quote-a",
+   "kind": "desk",
+   "segs": [
+    [
+     41.8,
+     63.0
+    ]
+   ],
+   "start": 30.689455000000002,
+   "dur": 9.284207000000002,
+   "src": "talang-desk-typed.mp4"
+  },
+  {
+   "id": "desk-quote-bc",
+   "kind": "desk",
+   "segs": [
+    [
+     70.5,
+     81.6
+    ],
+    [
+     95.5,
+     111.6
+    ]
+   ],
+   "start": 39.973662000000004,
+   "dur": 10.879999999999995,
+   "src": "talang-desk-typed.mp4"
+  },
+  {
+   "id": "desk-award",
+   "kind": "desk",
+   "segs": [
+    [
+     111.9,
+     128.5
+    ]
+   ],
+   "start": 50.853662,
+   "dur": 11.599998,
+   "src": "talang-desk-typed.mp4"
+  },
+  {
+   "id": "desk-loss",
+   "kind": "desk",
+   "segs": [
+    [
+     128.7,
+     140.5
+    ]
+   ],
+   "start": 62.45366,
+   "dur": 8.231583,
+   "src": "talang-desk-typed.mp4"
+  },
+  {
+   "id": "desk-regulator",
+   "kind": "desk",
+   "segs": [
+    [
+     140.7,
+     152.5
+    ]
+   ],
+   "start": 70.685243,
+   "dur": 7.323706999999999,
+   "src": "talang-desk-typed.mp4"
+  },
+  {
+   "id": "desk-call",
+   "kind": "desk",
+   "segs": [
+    [
+     177.6,
+     191.6
+    ],
+    [
+     193.0,
+     207.6
+    ]
+   ],
+   "start": 78.00895,
+   "dur": 11.439999999999998,
+   "src": "talang-desk-typed.mp4"
+  },
+  {
+   "id": "dm-committee",
+   "kind": "decman",
+   "segs": [
+    [
+     0,
+     14.05
+    ]
+   ],
+   "start": 89.44895,
+   "dur": 12.284206999999995,
+   "src": "decman-demo.mp4"
+  },
+  {
+   "id": "dm-confirm",
+   "kind": "decman",
+   "segs": [
+    [
+     14.05,
+     41.28
+    ]
+   ],
+   "start": 101.73315699999999,
+   "dur": 10.891999999999996,
+   "src": "decman-demo.mp4"
+  },
+  {
+   "id": "dm-execute",
+   "kind": "decman",
+   "segs": [
+    [
+     41.28,
+     68.0
+    ]
+   ],
+   "start": 112.62515699999999,
+   "dur": 10.688000000000002,
+   "src": "decman-demo.mp4"
+  },
+  {
+   "id": "dm-margin",
+   "kind": "decman",
+   "segs": [
+    [
+     68.0,
+     76.4
+    ]
+   ],
+   "start": 123.31315699999999,
+   "dur": 5.271040999999997,
+   "src": "decman-demo.mp4"
+  },
+  {
+   "id": "committee",
+   "kind": "card",
+   "card": "committee",
+   "start": 128.584198,
+   "dur": 9.784165000000002
+  },
+  {
+   "id": "release",
+   "kind": "card",
+   "card": "release",
+   "start": 138.368363,
+   "dur": 14.573706999999985
+  },
+  {
+   "id": "tokens",
+   "kind": "card",
+   "card": "tokens",
+   "start": 152.94206999999997,
+   "dur": 12.481583
+  },
+  {
+   "id": "default",
+   "kind": "card",
+   "card": "default",
+   "start": 165.42365299999997,
+   "dur": 12.323666000000003
+  },
+  {
+   "id": "wallet",
+   "kind": "grofty",
+   "segs": [
+    [
+     7.0,
+     17.6
+    ],
+    [
+     17.64,
+     28.0
+    ],
+    [
+     32.31,
+     38.5
+    ],
+    [
+     41.05,
+     56.0
+    ]
+   ],
+   "start": 177.74731899999998,
+   "dur": 19.12629000000001,
+   "src": "grofty-wallet.mp4"
+  },
+  {
+   "id": "mcp",
+   "kind": "slide",
+   "slide": "09",
+   "start": 196.873609,
+   "dur": 9.942125000000004
+  },
+  {
+   "id": "fee",
+   "kind": "slide",
+   "slide": "10",
+   "start": 206.815734,
+   "dur": 9.849999999999994
+  },
+  {
+   "id": "next",
+   "kind": "card",
+   "card": "next",
+   "start": 216.665734,
+   "dur": 13.27108100000001
+  },
+  {
+   "id": "close",
+   "kind": "close",
+   "start": 229.936815,
+   "dur": 5.218415999999991
+  }
+ ],
+ "clips": [
+  {
+   "file": "vo/a4f853fb0bab.mp3",
+   "start": 0.35,
+   "dur": 4.104,
+   "text": "This is Talang, a sealed-bid repo desk on Canton."
+  },
+  {
+   "file": "vo/6a91c18f0088.mp3",
+   "start": 4.910540999999999,
+   "dur": 3.96,
+   "text": "Repo is how bond holders raise cash without selling."
+  },
+  {
+   "file": "vo/6db622af55ee.mp3",
+   "start": 8.726332,
+   "dur": 4.56,
+   "text": "But asking five lenders for a price tells all five you need money."
+  },
+  {
+   "file": "vo/7ccc06abde4f.mp3",
+   "start": 13.747372999999998,
+   "dur": 6.552,
+   "text": "On Talang, a quote goes to the borrower alone. Canton never sends it to a rival's node."
+  },
+  {
+   "file": "vo/98cf5ef91a81.mp3",
+   "start": 20.768414,
+   "dur": 9.816,
+   "text": "Here's the desk, typed in live. The borrower asks three lenders for five point three million USDC against sixty Treasury notes."
+  },
+  {
+   "file": "vo/941e28a295fd.mp3",
+   "start": 31.039455000000004,
+   "dur": 6.312,
+   "text": "Lender A types its rate and haircut, and seals the quote, with the cash locked behind it."
+  },
+  {
+   "file": "vo/69c87de5a9c6.mp3",
+   "start": 37.223662000000004,
+   "dur": 2.64,
+   "text": "Its node shows only its own quotes."
+  },
+  {
+   "file": "vo/1455e3bcfe25.mp3",
+   "start": 40.323662000000006,
+   "dur": 8.256,
+   "text": "Lender B quotes the lowest rate, with a six percent haircut. Lender C quotes four ninety-five, with three."
+  },
+  {
+   "file": "vo/94a318db8c99.mp3",
+   "start": 51.203662,
+   "dur": 7.512,
+   "text": "The borrower sees three sealed quotes. B's is short at the mark, so it takes the cheapest one that covers."
+  },
+  {
+   "file": "vo/4097a4003968.mp3",
+   "start": 58.585244,
+   "dur": 3.744,
+   "text": "Cash and collateral move in one transaction."
+  },
+  {
+   "file": "vo/c865a5383a02.mp3",
+   "start": 62.80366,
+   "dur": 7.776,
+   "text": "Lender B learns its rank, nothing else. Since version 1.2.0, it isn't even an informee of the award."
+  },
+  {
+   "file": "vo/eaad167caf8b.mp3",
+   "start": 71.035243,
+   "dur": 6.84,
+   "text": "The regulator sees best execution: the winner ranked second on rate, and no lender is named."
+  },
+  {
+   "file": "vo/9f0dc9f63fe9.mp3",
+   "start": 78.35895,
+   "dur": 7.44,
+   "text": "Then the valuation agent publishes a lower mark. Lender A's repo is now short, so it calls margin."
+  },
+  {
+   "file": "vo/9a8df36aa4b1.mp3",
+   "start": 89.79894999999999,
+   "dur": 9.84,
+   "text": "But one agent shouldn't set the mark alone. So a committee does: one decentralized party on three nodes, run through BitSafe's DecMan."
+  },
+  {
+   "file": "vo/360ecab3e37a.mp3",
+   "start": 99.52261599999999,
+   "dur": 2.088,
+   "text": "Two of three must confirm."
+  },
+  {
+   "file": "vo/a21a2faadbee.mp3",
+   "start": 102.08315699999999,
+   "dur": 8.976,
+   "text": "Node one proposes a markdown and confirms, which alone publishes nothing. Node two confirms in its own DecMan."
+  },
+  {
+   "file": "vo/38b873e9acbc.mp3",
+   "start": 112.97515699999998,
+   "dur": 8.352,
+   "text": "Execute, and the mark is published as the committee. Node three didn't vote, but its audit trail shows every step."
+  },
+  {
+   "file": "vo/bfa7acd255ef.mp3",
+   "start": 123.66315699999998,
+   "dur": 4.824,
+   "text": "The lender calls margin with that mark. No single pricer could have moved it."
+  },
+  {
+   "file": "vo/2eb916b30a0e.mp3",
+   "start": 128.93419799999998,
+   "dur": 5.064,
+   "text": "With one node stopped, the committee still published; with two, it couldn't."
+  },
+  {
+   "file": "vo/6f5203700c3b.mp3",
+   "start": 133.881531,
+   "dur": 4.368,
+   "text": "And the same flow ran on the NODERS DevNet participant."
+  },
+  {
+   "file": "vo/163aa9da2d6b.mp3",
+   "start": 138.71836299999998,
+   "dur": 4.296,
+   "text": "Version 1.2.0 of the contract is now vetted there too."
+  },
+  {
+   "file": "vo/7f17ca25a6d1.mp3",
+   "start": 142.87627899999998,
+   "dur": 9.936,
+   "text": "It adds a minimum transfer on margin calls, lender-signed haircut schedules, and a master agreement with close-out netting, all driven from the desk."
+  },
+  {
+   "file": "vo/5bf58d1492de.mp3",
+   "start": 153.29206999999997,
+   "dur": 12.024,
+   "text": "Both legs can be real tokens. On DevNet, a repo ran with Canton Coin cash and CBTC collateral, each allocated through its registry and settled at repurchase."
+  },
+  {
+   "file": "vo/d67928600cec.mp3",
+   "start": 165.77365299999997,
+   "dur": 11.856,
+   "text": "When a call on a stress mark went unanswered, the default ran too: 0.001 CBTC to lender A, through the DA Utility registry."
+  },
+  {
+   "file": "vo/2d428e9dc9e7.mp3",
+   "start": 178.09731899999997,
+   "dur": 4.536,
+   "text": "The desk also connects to a real Grofty wallet on Canton TestNet."
+  },
+  {
+   "file": "vo/b798b22c8f51.mp3",
+   "start": 182.51835999999997,
+   "dur": 8.976,
+   "text": "Each desk command is signed in Grofty and checked before it's submitted, and a one Canton Coin venue fee is paid from the wallet on TestNet."
+  },
+  {
+   "file": "vo/f216b9a3d728.mp3",
+   "start": 191.373609,
+   "dur": 5.4,
+   "text": "The signed Talang commands ran on a local sandbox, not yet on TestNet."
+  },
+  {
+   "file": "vo/345addd60313.mp3",
+   "start": 197.22360899999998,
+   "dur": 9.48,
+   "text": "Each desk can have an AI agent over MCP. It reads only its own node, so a lender's agent never sees a rival's rate."
+  },
+  {
+   "file": "vo/97613af08955.mp3",
+   "start": 207.165734,
+   "dur": 9.384,
+   "text": "The business is a venue fee, collected inside every repurchase and roll, so it can't be skipped. It's built, with no revenue yet."
+  },
+  {
+   "file": "vo/1e088662c2c5.mp3",
+   "start": 217.01573399999998,
+   "dur": 5.712,
+   "text": "Next: a two-week shadow book on DevNet, then small live repos on MainNet."
+  },
+  {
+   "file": "vo/bbb79f09ae6a.mp3",
+   "start": 222.59469099999998,
+   "dur": 7.224,
+   "text": "Not done yet: USDCx, Talang commands on TestNet, and any pilot user."
+  },
+  {
+   "file": "vo/2d3c62271c2e.mp3",
+   "start": 230.286815,
+   "dur": 4.752,
+   "text": "That's Talang. The live desk and the code are on screen now."
+  }
+ ],
+ "subs": [
+  {
+   "start": 0.35,
+   "rows": [
+    "This is Talang,",
+    "a sealed-bid repo desk on Canton."
+   ],
+   "end": 4.360541
+  },
+  {
+   "start": 4.910540999999999,
+   "rows": [
+    "Repo is how bond holders",
+    "raise cash without selling."
+   ],
+   "end": 8.726332
+  },
+  {
+   "start": 8.726332,
+   "rows": [
+    "But asking five lenders for a price",
+    "tells all five you need money."
+   ],
+   "end": 13.197372999999999
+  },
+  {
+   "start": 13.747372999999998,
+   "rows": [
+    "On Talang, a quote goes",
+    "to the borrower alone."
+   ],
+   "end": 17.365789
+  },
+  {
+   "start": 17.365789,
+   "rows": [
+    "Canton never sends it to a rival's node."
+   ],
+   "end": 20.218414
+  },
+  {
+   "start": 20.768414,
+   "rows": [
+    "Here's the desk, typed in live.",
+    "The borrower asks three lenders"
+   ],
+   "end": 25.676289
+  },
+  {
+   "start": 25.676289,
+   "rows": [
+    "for five point three million USDC",
+    "against sixty Treasury notes."
+   ],
+   "end": 30.489455000000003
+  },
+  {
+   "start": 31.039455000000004,
+   "rows": [
+    "Lender A types its rate and haircut,"
+   ],
+   "end": 34.184205000000006
+  },
+  {
+   "start": 34.184205000000006,
+   "rows": [
+    "and seals the quote,",
+    "with the cash locked behind it."
+   ],
+   "end": 37.223662000000004
+  },
+  {
+   "start": 37.223662000000004,
+   "rows": [
+    "Its node shows only its own quotes."
+   ],
+   "end": 39.773662
+  },
+  {
+   "start": 40.323662000000006,
+   "rows": [
+    "Lender B quotes the lowest rate,",
+    "with a six percent haircut."
+   ],
+   "end": 44.626287000000005
+  },
+  {
+   "start": 44.626287000000005,
+   "rows": [
+    "Lender C quotes four",
+    "ninety-five, with three."
+   ],
+   "end": 48.505244000000005
+  },
+  {
+   "start": 51.203662,
+   "rows": [
+    "The borrower sees three sealed quotes.",
+    "B's is short at the mark,"
+   ],
+   "end": 56.13787
+  },
+  {
+   "start": 56.13787,
+   "rows": [
+    "so it takes the cheapest one that covers."
+   ],
+   "end": 58.585244
+  },
+  {
+   "start": 58.585244,
+   "rows": [
+    "Cash and collateral",
+    "move in one transaction."
+   ],
+   "end": 62.253659999999996
+  },
+  {
+   "start": 62.80366,
+   "rows": [
+    "Lender B learns its rank, nothing else."
+   ],
+   "end": 66.13261800000001
+  },
+  {
+   "start": 66.13261800000001,
+   "rows": [
+    "Since version 1.2.0, it isn't",
+    "even an informee of the award."
+   ],
+   "end": 70.485243
+  },
+  {
+   "start": 71.035243,
+   "rows": [
+    "The regulator sees best execution:"
+   ],
+   "end": 74.179993
+  },
+  {
+   "start": 74.179993,
+   "rows": [
+    "the winner ranked second on rate,",
+    "and no lender is named."
+   ],
+   "end": 77.80895
+  },
+  {
+   "start": 78.35895,
+   "rows": [
+    "Then the valuation agent",
+    "publishes a lower mark."
+   ],
+   "end": 81.990533
+  },
+  {
+   "start": 81.990533,
+   "rows": [
+    "Lender A's repo is now short,",
+    "so it calls margin."
+   ],
+   "end": 85.724741
+  },
+  {
+   "start": 89.79894999999999,
+   "rows": [
+    "But one agent shouldn't set",
+    "the mark alone. So a committee does:"
+   ],
+   "end": 94.535783
+  },
+  {
+   "start": 94.535783,
+   "rows": [
+    "one decentralized party on three nodes,",
+    "run through BitSafe's DecMan."
+   ],
+   "end": 99.52261599999999
+  },
+  {
+   "start": 99.52261599999999,
+   "rows": [
+    "Two of three must confirm."
+   ],
+   "end": 101.53315699999999
+  },
+  {
+   "start": 102.08315699999999,
+   "rows": [
+    "Node one proposes a markdown and confirms,"
+   ],
+   "end": 106.05682299999998
+  },
+  {
+   "start": 106.05682299999998,
+   "rows": [
+    "which alone publishes nothing.",
+    "Node two confirms in its own DecMan."
+   ],
+   "end": 110.97528099999998
+  },
+  {
+   "start": 112.97515699999998,
+   "rows": [
+    "Execute, and the mark",
+    "is published as the committee."
+   ],
+   "end": 116.61990699999998
+  },
+  {
+   "start": 116.61990699999998,
+   "rows": [
+    "Node three didn't vote,",
+    "but its audit trail shows every step."
+   ],
+   "end": 121.23569799999999
+  },
+  {
+   "start": 123.66315699999998,
+   "rows": [
+    "The lender calls margin with that mark.",
+    "No single pricer could have moved it."
+   ],
+   "end": 128.384198
+  },
+  {
+   "start": 128.93419799999998,
+   "rows": [
+    "With one node stopped, the committee",
+    "still published; with two, it couldn't."
+   ],
+   "end": 133.881531
+  },
+  {
+   "start": 133.881531,
+   "rows": [
+    "And the same flow ran",
+    "on the NODERS DevNet participant."
+   ],
+   "end": 138.168363
+  },
+  {
+   "start": 138.71836299999998,
+   "rows": [
+    "Version 1.2.0 of the contract",
+    "is now vetted there too."
+   ],
+   "end": 142.87627899999998
+  },
+  {
+   "start": 142.87627899999998,
+   "rows": [
+    "It adds a minimum transfer on margin",
+    "calls, lender-signed haircut schedules,"
+   ],
+   "end": 147.968404
+  },
+  {
+   "start": 147.968404,
+   "rows": [
+    "and a master agreement with close-out",
+    "netting, all driven from the desk."
+   ],
+   "end": 152.74206999999998
+  },
+  {
+   "start": 153.29206999999997,
+   "rows": [
+    "Both legs can be real tokens. On DevNet,",
+    "a repo ran with Canton Coin cash and"
+   ],
+   "end": 159.64731999999998
+  },
+  {
+   "start": 159.64731999999998,
+   "rows": [
+    "CBTC collateral, each allocated through",
+    "its registry and settled at repurchase."
+   ],
+   "end": 165.22365299999998
+  },
+  {
+   "start": 165.77365299999997,
+   "rows": [
+    "When a call on a stress mark went",
+    "unanswered, the default ran too:"
+   ],
+   "end": 172.64206899999996
+  },
+  {
+   "start": 172.64206899999996,
+   "rows": [
+    "0.001 CBTC to lender A,",
+    "through the DA Utility registry."
+   ],
+   "end": 177.547319
+  },
+  {
+   "start": 178.09731899999997,
+   "rows": [
+    "The desk also connects to a real",
+    "Grofty wallet on Canton TestNet."
+   ],
+   "end": 182.51835999999997
+  },
+  {
+   "start": 182.51835999999997,
+   "rows": [
+    "Each desk command is signed in Grofty",
+    "and checked before it's submitted,"
+   ],
+   "end": 186.75519299999996
+  },
+  {
+   "start": 186.75519299999996,
+   "rows": [
+    "and a one Canton Coin venue fee",
+    "is paid from the wallet on TestNet."
+   ],
+   "end": 191.373609
+  },
+  {
+   "start": 191.373609,
+   "rows": [
+    "The signed Talang commands ran",
+    "on a local sandbox, not yet on TestNet."
+   ],
+   "end": 196.673609
+  },
+  {
+   "start": 197.22360899999998,
+   "rows": [
+    "Each desk can have an AI agent over MCP.",
+    "It reads only its own node,"
+   ],
+   "end": 202.42098399999998
+  },
+  {
+   "start": 202.42098399999998,
+   "rows": [
+    "so a lender's agent never",
+    "sees a rival's rate."
+   ],
+   "end": 206.615734
+  },
+  {
+   "start": 207.165734,
+   "rows": [
+    "The business is a venue fee, collected",
+    "inside every repurchase and roll,"
+   ],
+   "end": 212.73152499999998
+  },
+  {
+   "start": 212.73152499999998,
+   "rows": [
+    "so it can't be skipped.",
+    "It's built, with no revenue yet."
+   ],
+   "end": 216.465734
+  },
+  {
+   "start": 217.01573399999998,
+   "rows": [
+    "Next: a two-week shadow book on DevNet,",
+    "then small live repos on MainNet."
+   ],
+   "end": 222.59469099999998
+  },
+  {
+   "start": 222.59469099999998,
+   "rows": [
+    "Not done yet: USDCx, Talang commands",
+    "on TestNet, and any pilot user."
+   ],
+   "end": 229.736815
+  },
+  {
+   "start": 230.286815,
+   "rows": [
+    "That's Talang. The live desk",
+    "and the code are on screen now."
+   ],
+   "end": 235.155231
+  }
+ ],
+ "cards": {
+  "committee": {
+   "kicker": "BitSafe valuation committee · NODERS DevNet",
+   "title": "Two of three, ",
+   "hl": "on DevNet too",
+   "head": [
+    "STEP ON THE LEDGER",
+    "UPDATE ID"
+   ],
+   "rows": [
+    {
+     "l": "GovernanceRules: committee of 3 pricers, threshold 2",
+     "r": "122097c24fec…6617",
+     "bad": false
+    },
+    {
+     "l": "MarkProposal UST10Y 98,000 with 1 of 3 confirmations",
+     "r": "refused",
+     "bad": true
+    },
+    {
+     "l": "MarkProposal UST10Y 98,000 executed with 2 of 3: Mark signed by the committee",
+     "r": "1220165a52c6…6613",
+     "bad": false
+    },
+    {
+     "l": "repo opened on the committee mark (agent = the decentralized party)",
+     "r": "1220fe92bcd1…6d1a",
+     "bad": false
+    },
+    {
+     "l": "margin call on one pricer's own mark at 50,000",
+     "r": "refused",
+     "bad": true
+    },
+    {
+     "l": "governed markdown UST10Y 92,000 executed with 2 of 3",
+     "r": "1220cebaf0b0…768e",
+     "bad": false
+    },
+    {
+     "l": "margin call issued on the governed mark",
+     "r": "1220dafea1cd…eec7",
+     "bad": false
+    }
+   ],
+   "pill": "LOCALNET",
+   "foot": "One node stopped: still publishes (12203359acdb…4138). Two: cannot.",
+   "src": "docs/evidence/bitsafe-governed-marks-devnet.json · 2026-10-09"
+  },
+  "release": {
+   "kicker": "talang-repo 1.2.0 · vetted on NODERS DevNet, 12 October",
+   "title": "Repo terms, ",
+   "hl": "enforced by the contract",
+   "head": [
+    "ADDED IN 1.2.0",
+    "DAML"
+   ],
+   "rows": [
+    {
+     "l": "Sealed award: losing lenders are not informees",
+     "r": "AwardSealed"
+    },
+    {
+     "l": "Minimum transfer amount on margin calls",
+     "r": "Terms.minTransfer"
+    },
+    {
+     "l": "Lender-signed haircut schedules",
+     "r": "HaircutSchedule"
+    },
+    {
+     "l": "Master agreement with close-out netting",
+     "r": "MasterAgreement"
+    },
+    {
+     "l": "Desk: sign a schedule, set a minimum, offer, sign, close out",
+     "r": "web/app.js"
+    }
+   ],
+   "pill": "TESTED",
+   "foot": "AgreementsTest and SecurityTest in Daml; desk QA on a local sandbox.",
+   "src": "package 5125df18…a3c366 · README.md"
+  },
+  "tokens": {
+   "kicker": "Both legs in real tokens · NODERS DevNet",
+   "title": "Canton Coin cash, ",
+   "hl": "CBTC collateral",
+   "head": [
+    "STEP ON THE LEDGER",
+    "UPDATE ID"
+   ],
+   "rows": [
+    {
+     "l": "RepoRFQ: 50 Amulet against 0.001 CBTC, 1 day",
+     "r": "1220ed18c7a5…031b",
+     "bad": false
+    },
+    {
+     "l": "50 Amulet allocated lender A → borrower (cash)",
+     "r": "12206788ad8b…a94c",
+     "bad": false
+    },
+    {
+     "l": "sealed quote funded by an Amulet allocation",
+     "r": "1220c3554815…bd2b",
+     "bad": false
+    },
+    {
+     "l": "0.001 CBTC allocated borrower → lender A (collateral)",
+     "r": "1220896fca98…ee24",
+     "bad": false
+    },
+    {
+     "l": "award: Amulet to the borrower, CBTC held for the lender",
+     "r": "1220a909b433…2572",
+     "bad": false
+    },
+    {
+     "l": "repurchase notice: 50.01 Amulet due to lender A",
+     "r": "12203509316b…b5f6",
+     "bad": false
+    },
+    {
+     "l": "50.01 Amulet allocated borrower → lender A (repurchase)",
+     "r": "122094bc4fb1…6264",
+     "bad": false
+    },
+    {
+     "l": "repurchase: Amulet to the lender, CBTC home to the borrower",
+     "r": "12208b74e3f2…1ef6",
+     "bad": false
+    }
+   ],
+   "pill": "NOT YET",
+   "foot": "USDCx on DevNet: no registry there.",
+   "src": "docs/evidence/token-repo-amulet-cbtc-devnet.json · 2026-10-09"
+  },
+  "default": {
+   "kicker": "Default on DevNet · DA Utility registry",
+   "title": "An unanswered call: ",
+   "hl": "CBTC to the lender",
+   "head": [
+    "STEP ON THE LEDGER",
+    "UPDATE ID"
+   ],
+   "rows": [
+    {
+     "l": "0.001 CBTC allocated borrower → lender A, registry allocation",
+     "r": "122039eb2e82…bc26"
+    },
+    {
+     "l": "RepoRFQ: 51.25 USDC against 0.001 CBTC, 2 days (marker terms)",
+     "r": "12207236096a…ebaa"
+    },
+    {
+     "l": "sealed quote, principal escrowed in desk USDC",
+     "r": "12207b140f95…e3e5"
+    },
+    {
+     "l": "award at mark 62000: USDC to the borrower, CBTC allocation held as collateral",
+     "r": "12207b081477…ba71"
+    },
+    {
+     "l": "stress mark: 52000 USDC per CBTC",
+     "r": "12204009fdac…4949"
+    },
+    {
+     "l": "margin call by lender A, borrower to respond by 2026-10-09 13:46 UTC",
+     "r": "122024100b24…36bd"
+    },
+    {
+     "l": "default: 0.001 CBTC executed to lender A through the registry",
+     "r": "122099d77843…945a"
+    }
+   ],
+   "pill": "SCENARIO",
+   "foot": "The stress mark is a scenario, not a market price.",
+   "src": "docs/evidence/cbtc-default-devnet.json · 2026-10-12"
+  },
+  "next": {
+   "kicker": "Roadmap",
+   "title": "From a shadow book ",
+   "hl": "to live repos",
+   "head": [
+    "NEXT",
+    "WHEN"
+   ],
+   "rows": [
+    {
+     "l": "Shadow book on DevNet: one borrower, two lenders, no value moved",
+     "r": "2 weeks"
+    },
+    {
+     "l": "Small live repos on MainNet: USDCx cash, capped tickets",
+     "r": "4 weeks"
+    },
+    {
+     "l": "Committee run by independent price providers; an auditor's observer node",
+     "r": "then"
+    }
+   ],
+   "pill": "NOT YET",
+   "foot": "USDCx on DevNet · a Talang command on TestNet · any pilot user.",
+   "src": "SUBMISSION.md"
+  }
+ }
+}

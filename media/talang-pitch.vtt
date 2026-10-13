@@ -25,232 +25,215 @@ to the borrower alone.
 Canton never sends it to a rival's node.
 
 6
-00:00:20.768 --> 00:00:23.295
+00:00:20.768 --> 00:00:25.676
 Here's the desk, typed in live.
+The borrower asks three lenders
 
 7
-00:00:23.295 --> 00:00:29.097
-The borrower asks for five point three
-million USDC against sixty Treasury notes.
+00:00:25.676 --> 00:00:30.489
+for five point three million USDC
+against sixty Treasury notes.
 
 8
-00:00:29.097 --> 00:00:32.345
-It asks three lenders, Lender C included.
-
-9
-00:00:32.895 --> 00:00:36.039
+00:00:31.039 --> 00:00:34.184
 Lender A types its rate and haircut,
 
-10
-00:00:36.039 --> 00:00:39.079
+9
+00:00:34.184 --> 00:00:37.224
 and seals the quote,
 with the cash locked behind it.
 
-11
-00:00:39.079 --> 00:00:41.629
+10
+00:00:37.224 --> 00:00:39.774
 Its node shows only its own quotes.
 
-12
-00:00:42.179 --> 00:00:46.637
+11
+00:00:40.324 --> 00:00:44.626
 Lender B quotes the lowest rate,
-but asks a six percent haircut.
+with a six percent haircut.
+
+12
+00:00:44.626 --> 00:00:48.505
+Lender C quotes four
+ninety-five, with three.
 
 13
-00:00:47.187 --> 00:00:52.039
-Lender C types four ninety-five,
-with a three percent haircut.
+00:00:51.204 --> 00:00:56.138
+The borrower sees three sealed quotes.
+B's is short at the mark,
 
 14
-00:00:53.627 --> 00:00:58.969
-The borrower sees three sealed quotes.
-Lender B's is short at the mark.
+00:00:56.138 --> 00:00:58.585
+so it takes the cheapest one that covers.
 
 15
-00:00:58.969 --> 00:01:02.232
-So it takes the cheapest
-quote that covers.
-
-16
-00:01:02.232 --> 00:01:05.782
+00:00:58.585 --> 00:01:02.254
 Cash and collateral
 move in one transaction.
 
+16
+00:01:02.804 --> 00:01:06.133
+Lender B learns its rank, nothing else.
+
 17
-00:01:06.332 --> 00:01:09.422
-Lender B learns its rank,
-and nothing else.
+00:01:06.133 --> 00:01:10.485
+Since version 1.2.0, it isn't
+even an informee of the award.
 
 18
-00:01:11.052 --> 00:01:14.197
+00:01:11.035 --> 00:01:14.180
 The regulator sees best execution:
 
 19
-00:01:14.197 --> 00:01:17.826
+00:01:14.180 --> 00:01:17.809
 the winner ranked second on rate,
 and no lender is named.
 
 20
-00:01:18.376 --> 00:01:23.176
-Side by side, every node
-reads only its own ledger.
+00:01:18.359 --> 00:01:21.991
+Then the valuation agent
+publishes a lower mark.
 
 21
-00:01:23.726 --> 00:01:28.526
-Then the valuation agent types a lower
-mark for the notes, and publishes it.
+00:01:21.991 --> 00:01:25.725
+Lender A's repo is now short,
+so it calls margin.
 
 22
-00:01:29.326 --> 00:01:34.165
-At that mark, Lender A's repo
-is short, so it calls margin.
+00:01:29.799 --> 00:01:34.536
+But one agent shouldn't set
+the mark alone. So a committee does:
 
 23
-00:01:35.166 --> 00:01:39.416
-But one agent shouldn't set
-the mark alone. So a committee does.
+00:01:34.536 --> 00:01:39.523
+one decentralized party on three nodes,
+run through BitSafe's DecMan.
 
 24
-00:01:39.416 --> 00:01:43.745
-It's one decentralized
-party on three Canton nodes,
-
-25
-00:01:43.745 --> 00:01:47.126
-run through BitSafe's
-Decentralization Manager.
-
-26
-00:01:47.126 --> 00:01:49.137
+00:01:39.523 --> 00:01:41.533
 Two of three must confirm.
 
+25
+00:01:42.083 --> 00:01:46.057
+Node one proposes a markdown and confirms,
+
+26
+00:01:46.057 --> 00:01:50.975
+which alone publishes nothing.
+Node two confirms in its own DecMan.
+
 27
-00:01:49.687 --> 00:01:54.961
-Node one proposes a markdown,
-as a BitSafe governable action.
-
-28
-00:01:55.511 --> 00:02:00.811
-It confirms. But one confirmation
-isn't enough, so nothing is published.
-
-29
-00:02:01.361 --> 00:02:06.805
-Node two, in its own DecMan,
-confirms. Now the threshold is met.
-
-30
-00:02:07.355 --> 00:02:10.774
+00:01:52.975 --> 00:01:56.620
 Execute, and the mark
 is published as the committee.
 
-31
-00:02:11.579 --> 00:02:16.235
+28
+00:01:56.620 --> 00:02:01.236
 Node three didn't vote,
 but its audit trail shows every step.
 
-32
-00:02:18.043 --> 00:02:22.764
+29
+00:02:03.663 --> 00:02:08.384
 The lender calls margin with that mark.
 No single pricer could have moved it.
 
+30
+00:02:08.934 --> 00:02:13.882
+With one node stopped, the committee
+still published; with two, it couldn't.
+
+31
+00:02:13.882 --> 00:02:18.168
+And the same flow ran
+on the NODERS DevNet participant.
+
+32
+00:02:18.718 --> 00:02:22.876
+Version 1.2.0 of the contract
+is now vetted there too.
+
 33
-00:02:23.314 --> 00:02:25.314
-With one of three nodes stopped,
+00:02:22.876 --> 00:02:27.968
+It adds a minimum transfer on margin
+calls, lender-signed haircut schedules,
 
 34
-00:02:25.314 --> 00:02:28.841
-the committee still published.
-With two stopped, it couldn't.
+00:02:27.968 --> 00:02:32.742
+and a master agreement with close-out
+netting, all driven from the desk.
 
 35
-00:02:28.841 --> 00:02:34.470
-That was on a DecMan LocalNet. On DevNet,
-it's still waiting on rights from NODERS.
+00:02:33.292 --> 00:02:39.647
+Both legs can be real tokens. On DevNet,
+a repo ran with Canton Coin cash and
 
 36
-00:02:35.020 --> 00:02:39.743
-Both legs can be real tokens.
-On the NODERS DevNet participant,
+00:02:39.647 --> 00:02:45.224
+CBTC collateral, each allocated through
+its registry and settled at repurchase.
 
 37
-00:02:39.743 --> 00:02:44.585
-a repo ran with Canton Coin
-as cash and CBTC as collateral,
+00:02:45.774 --> 00:02:52.642
+When a call on a stress mark went
+unanswered, the default ran too:
 
 38
-00:02:44.585 --> 00:02:47.967
-each allocated through its registry.
+00:02:52.642 --> 00:02:57.547
+0.001 CBTC to lender A,
+through the DA Utility registry.
 
 39
-00:02:47.967 --> 00:02:53.664
-At repurchase, the Canton Coin went
-to the lender and the CBTC went home.
+00:02:58.097 --> 00:03:02.518
+The desk also connects to a real
+Grofty wallet on Canton TestNet.
 
 40
-00:02:53.664 --> 00:02:56.096
-Every step has an update ID.
+00:03:02.518 --> 00:03:06.755
+Each desk command is signed in Grofty
+and checked before it's submitted,
 
 41
-00:02:56.646 --> 00:03:01.817
-With Grofty, the wallet's key
-authorizes each desk command,
+00:03:06.755 --> 00:03:11.374
+and a one Canton Coin venue fee
+is paid from the wallet on TestNet.
 
 42
-00:03:01.817 --> 00:03:05.356
-by signing a one-time
-challenge with CIP-0103.
+00:03:11.374 --> 00:03:16.674
+The signed Talang commands ran
+on a local sandbox, not yet on TestNet.
 
 43
-00:03:05.356 --> 00:03:09.617
-It's tested with a stub wallet,
-but not yet with a live Grofty wallet.
+00:03:17.224 --> 00:03:22.421
+Each desk can have an AI agent over MCP.
+It reads only its own node,
 
 44
-00:03:10.167 --> 00:03:14.154
-Each desk can also have
-an AI agent, over MCP.
-
-45
-00:03:14.154 --> 00:03:16.614
-It reads only its own party's node.
-
-46
-00:03:16.614 --> 00:03:20.099
-A lender's agent never
+00:03:22.421 --> 00:03:26.616
+so a lender's agent never
 sees a rival's rate.
 
-47
-00:03:20.649 --> 00:03:25.149
-The business is a venue fee,
-in basis points on the principal.
+45
+00:03:27.166 --> 00:03:32.732
+The business is a venue fee, collected
+inside every repurchase and roll,
 
-48
-00:03:25.149 --> 00:03:28.833
-It's collected inside
-every repurchase and roll,
-
-49
-00:03:28.833 --> 00:03:32.725
+46
+00:03:32.732 --> 00:03:36.466
 so it can't be skipped.
 It's built, with no revenue yet.
 
-50
-00:03:33.275 --> 00:03:38.854
+47
+00:03:37.016 --> 00:03:42.595
 Next: a two-week shadow book on DevNet,
 then small live repos on MainNet.
 
-51
-00:03:38.854 --> 00:03:46.272
-Not done yet: the committee on DevNet,
-USDCx, a live wallet, and any pilot user.
+48
+00:03:42.595 --> 00:03:49.737
+Not done yet: USDCx, Talang commands
+on TestNet, and any pilot user.
 
-52
-00:03:46.822 --> 00:03:51.335
-That's Talang. The desk
-is at talang-desk.vercel.app.
-
-53
-00:03:51.335 --> 00:03:56.783
-The code is at
-github.com/PugarHuda/talang.
+49
+00:03:50.287 --> 00:03:55.155
+That's Talang. The live desk
+and the code are on screen now.
 
