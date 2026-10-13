@@ -7,6 +7,9 @@
 - Pledges are validated once, in `pledgeQty`, wherever collateral enters (open, margin, substitution).
 - Every lifecycle event calls `report` so the regulator observes it; nothing upstream of a trade is ever observed by the regulator.
 - A mark is trusted only via `freshMark agent ...`; the agent can be a BitSafe decentralized party (`MarkProposal`).
+- Upgrades are SCU (1.0.0 -> 1.1.0 -> 1.2.0, all vetted on the NODERS DevNet participant): never change an existing template's shape or remove a choice; add optional fields, new choices, or new templates in `TalangAgreements.daml`. Check with `daml build --upgrades devnet/talang-repo-1.1.0.dar`.
+- 1.2.0 awards go through the nonconsuming `AwardSealed` / `AwardSealedWithTokenCollateral` (losing lenders are not informees); the consuming `Award` is kept for the upgrade and refuses.
+- Time limits are named constants: `markMaxAge` (24 h), `marginMarkMaxAge` (1 h, 1.2.0), `marginResponseMin` (2 h), `defaultWindow` (1 day after respondBy, 1.2.0).
 
 ## Gotchas found here
 - Daml is strict: `zip xs [1 ..]` exhausts the heap; use `[1 .. n]`.

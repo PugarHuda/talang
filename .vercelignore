@@ -7,3 +7,4 @@ localnet
 .daml/package-database
 test/.daml
 docs/img
+web/CLAUDE.md
