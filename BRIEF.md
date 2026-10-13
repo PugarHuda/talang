@@ -87,7 +87,7 @@ marks, and wallets for the parties (CIP-0103).
 
 ## Evidence today
 
-- Contract: 31 Daml scripts covering the full lifecycle, default paths, every refusal,
+- Contract: 58 Daml scripts covering the full lifecycle, default paths, every refusal,
   best execution, the venue fee, rolls, both legs in CIP-0056 assets and BitSafe
   governance on BitSafe's own `GovernanceRules` (`test/daml/`).
 - On a running Canton 3.4.11 participant: one repo in every state seeded through the
@@ -107,7 +107,7 @@ marks, and wallets for the parties (CIP-0103).
 - Real CBTC on DevNet: allocated through the DA Utility registry as repo collateral and released at repurchase (`docs/evidence/cbtc-rail-devnet.json`, 7 of 7 steps).
 - A CBTC default on DevNet: a margin call left unanswered, then lender A's default executed 0.001 CBTC to it through the DA Utility registry (`docs/evidence/cbtc-default-devnet.json`, 9 of 9 steps, 9 and 12 October).
 - Both legs in real tokens on DevNet: Canton Coin as cash and CBTC as collateral, each allocated through its registry, awarded and repurchased (`docs/evidence/token-repo-amulet-cbtc-devnet.json`, 12 of 12 steps).
-- The desk in a browser: 29/29 Playwright checks through every role and button (`npm run qa:desk`, 9 October; the 1.2.0 flows were added to it on 12 October); the hosted read-only API: 45/45 checks (`npm run test:proxy`).
+- The desk in a browser: 39/39 Playwright checks through every role and button (`npm run qa:desk`) and 38/38 clicks-only checks as a person would use it (`scripts/qa-real-user.mjs`), local sandbox, 13 October; the hosted read-only API: 53/53 checks (`npm run test:proxy`).
 - Live Grofty wallet on TestNet: connect, two desk commands signed in Grofty and accepted (executed on a local sandbox), a 1 CC venue fee executed on TestNet to Grofty's QA party as a stand-in venue (`docs/evidence/grofty-wallet-testnet.json`, `media/grofty-wallet.mp4`).
 - Not yet: USDCx on DevNet, a Talang command on TestNet, any pilot user.
 

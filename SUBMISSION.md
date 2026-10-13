@@ -43,15 +43,15 @@ no single operator can move it.
 
 ## Metrics
 
-Measured on a Canton 3.4.11 sandbox (`npm run e2e:mcp`, `npm run governance` and the Daml scripts in CI run 38272515745 on 12 October; `npm run qa:desk` on 9 October), and with fetch stubbed for the hosted API (`npm run test:proxy`, 13 October):
+Measured on a Canton 3.4.11 sandbox (`npm run e2e:mcp`, `npm run qa:desk`, `node scripts/qa-real-user.mjs` and the Daml scripts locally on 13 October with talang-repo 1.2.2; `npm run governance` in CI run 38272515745 on 12 October), and with fetch stubbed for the hosted API (`npm run test:proxy`, 13 October):
 
 | Metric | Value |
 |---|---|
 | Rival quotes visible on any lender node | 0, checked on every run |
 | Requests, quotes or loss notices visible to the regulator | 0 |
 | Repo states seeded through the Ledger API | 6 (sealed, live, substitution pending, margin call, roll, closed with fee) |
-| Daml scripts / MCP end-to-end checks | 31 / 41 |
-| Playwright desk checks (9 October, before the 1.2.0 flows were added) / read-only API checks | 29 / 45 |
+| Daml scripts / MCP end-to-end checks | 58 / 41 |
+| Playwright desk checks / clicks-only real-user checks / read-only API checks / offline checks | 39 / 38 / 53 / 15 |
 | Governed mark below threshold | refused by BitSafe's `GovernanceRules` |
 
 Targets for the pilot (BRIEF.md):
@@ -88,7 +88,7 @@ repurchase and every roll, so it cannot be skipped. Built and tested.
   agreements with close-out netting, plus fixes: sealed award (losing lenders are not
   informees), substitute issuer check, substitution withdraw, one-hour marks for calls with
   margin refutation, a one-day default window, the best-execution gap as a band.
-- **Tests:** 31 Daml scripts including every refusal, the token rail against a
+- **Tests:** 58 Daml scripts including every refusal and the adversarial QA, the token rail against a
   registry implementing the Splice interfaces, and BitSafe's own `GovernanceRules`.
 - **Desk** (`web/`, `server.mjs`): one page per role, each reading only its own node.
 - **AI agents** (`mcp/server.mjs`): lender, borrower and regulator desks over MCP.
