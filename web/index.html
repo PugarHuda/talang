@@ -16,7 +16,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@200..700&family=Geist+Mono:wght@400;500&display=swap" />
   <link rel="stylesheet" href="/landing.css" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%23120d24%22/%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%227%22 fill=%22%237b4dff%22/%3E%3C/svg%3E" />
+  <link rel="icon" href="/favicon.ico" sizes="32x32" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%23120d24%22/%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%227%22 fill=%22%237b4dff%22/%3E%3C/svg%3E" />
   <script type="importmap">
     { "imports": {
       "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
@@ -33,7 +34,10 @@
       <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><path d="M16 3 28 10v12L16 29 4 22V10z" fill="#120d24"/><path d="M16 3 28 10 16 17 4 10z" fill="#3a2b66"/><path d="M16 17v12L4 22V10z" fill="#1d1538"/><circle cx="16" cy="17" r="3.2" fill="#8b5cff"/></svg>
       <span>talang</span>
     </a>
-    <nav class="pills" aria-label="Sections">
+    <button class="menu-btn btn-glass" type="button" aria-expanded="false" aria-controls="sections" aria-label="Sections menu">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+    <nav class="pills" id="sections" aria-label="Sections">
       <a href="#top" aria-current="page">Home</a>
       <a href="#lifecycle">Lifecycle</a>
       <a href="#privacy">Privacy</a>

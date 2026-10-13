@@ -1,3 +1,16 @@
+// Sections menu under 760 px (landing.css shows .pills when .nav has .open). Escape or a
+// click outside closes it; Escape hands focus back to the button, a link choice follows the link.
+const nav = document.querySelector('.nav'), menuBtn = document.querySelector('.menu-btn');
+const setMenu = (open, refocus) => {
+  nav.classList.toggle('open', open); menuBtn.setAttribute('aria-expanded', String(open));
+  if (open) nav.querySelector('.pills a')?.focus(); else if (refocus) menuBtn.focus();
+};
+menuBtn?.addEventListener('click', () => setMenu(menuBtn.getAttribute('aria-expanded') !== 'true'));
+nav?.addEventListener('keydown', (e) => { if (e.key === 'Escape' && nav.classList.contains('open')) setMenu(false, true); });
+nav?.querySelector('.pills').addEventListener('click', (e) => e.target.closest('a') && setMenu(false));
+document.addEventListener('click', (e) => { if (nav.classList.contains('open') && !nav.contains(e.target)) setMenu(false); });
+nav?.addEventListener('focusout', (e) => { if (nav.classList.contains('open') && !nav.querySelector('.pills').contains(e.relatedTarget) && e.relatedTarget !== menuBtn) setMenu(false); });
+
 // Hero scene: a sealed quote (glossy blob) behind glass (a transmissive cube), and a
 // rival's quote in its own smaller cube. The SVG fallback stays unless a frame renders.
 const visual = document.querySelector('.visual');

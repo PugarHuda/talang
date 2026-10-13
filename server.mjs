@@ -6,13 +6,14 @@ import { readFile } from 'node:fs/promises';
 import { join, extname, dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PARTIES, deskAcs, submit } from './lib/ledger.mjs';
+import { bandBestExecution } from './lib/repo.mjs';
 import { walletConfig, walletSubmit, receiptsFor, checkWalletSignature } from './api/wallet-verify.mjs';
 
 const WEB = join(dirname(fileURLToPath(import.meta.url)), 'web');
 const PORT = Number(process.env.PORT ?? 8090);
 // READ_ONLY=1 serves the hosted copy's behaviour locally: reads only, no submit.
 const READ_ONLY = process.env.READ_ONLY === '1';
-const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png' };
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.txt': 'text/plain' };
 
 // 1 MB is far above any Daml command the desk sends; past it the request is dropped, not buffered.
 const MAX_BODY = 1 << 20;
@@ -39,7 +40,9 @@ createServer(async (req, res) => {
     if (req.url === '/api/acs' && req.method === 'POST') {
       const { role } = (await body(req)) ?? {};
       if (!Object.hasOwn(PARTIES, role)) return send(res, 400, { error: 'unknown role' });
-      return send(res, 200, await deskAcs(PARTIES[role]));
+      const r = await deskAcs(PARTIES[role]);
+      // As api/acs.mjs: the regulator gets pre-1.2.0 best-execution gaps as a band.
+      return send(res, 200, role === 'regulator' ? { ...r, contracts: bandBestExecution(r.contracts) } : r);
     }
     if (req.url === '/api/submit' && req.method === 'POST') {
       if (READ_ONLY) return send(res, 403, { error: 'read-only desk' });

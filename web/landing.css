@@ -66,6 +66,10 @@ code { font-family: var(--mono); font-size: .88em; }
 .pills a:hover { color: var(--ink); background: rgba(255,255,255,.6); }
 .pills a[aria-current] { background: #fff; color: var(--ink); box-shadow: 0 1px 0 rgba(255, 140, 170, .6), 0 4px 14px -6px rgba(80, 50, 160, .3); }
 
+/* Sections menu: a button under 760 px; the same glass pills open as a column below it. */
+.menu-btn { display: none; place-items: center; width: 44px; height: 44px; margin-left: auto; border-radius: 12px; color: var(--ink); cursor: pointer; }
+.menu-btn[aria-expanded="true"] { background: #fff; }
+
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; text-decoration: none; font-weight: 450; font-size: 17px; padding: 16px 30px; border-radius: 14px; transition: transform .2s, box-shadow .2s; white-space: nowrap; }
 .btn:hover { transform: translateY(-2px); }
 .btn-sm { font-size: 15px; padding: 12px 24px; }
@@ -263,6 +267,9 @@ h2 { margin: 0; font-weight: 250; font-size: clamp(38px, 5vw, 66px); line-height
 }
 @media (max-width: 760px) {
   .pills { display: none; }
+  .menu-btn { display: grid; }
+  .nav.open .pills { display: flex; flex-direction: column; position: absolute; top: calc(100% + 8px); right: 16px; min-width: 200px; background: rgba(255, 255, 255, .9); box-shadow: var(--shadow-chip); }
+  .nav.open .pills a { padding: 12px 16px; font-size: 16px; }
   .frame { margin: 12px 8px 0; border-radius: 22px; }
   .nav { padding: 16px 16px 0; }
   .hero { padding: 24px 16px 120px; min-height: 0; }
