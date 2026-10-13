@@ -8,7 +8,7 @@ on:
 
 jobs:
   daml:
-    name: Daml build + 22 scripts
+    name: Daml build + 31 scripts
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -19,7 +19,7 @@ jobs:
           curl -sSL https://get.daml.com/ | sh -s 3.4.11
           echo "$HOME/.daml/bin" >> "$GITHUB_PATH"
       - run: daml build --all --no-legacy-assistant-warning
-      - name: daml test (core, desk, CIP-0056 tokens, BitSafe governance)
+      - name: daml test (core, desk, CIP-0056 tokens, BitSafe governance, 1.2.0 agreements and fixes)
         working-directory: test
         run: daml test --no-legacy-assistant-warning
 
