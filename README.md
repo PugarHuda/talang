@@ -5,7 +5,7 @@
 
 | Sponsor | What runs, and where the proof is |
 |---|---|
-| **NODERS DevNet** | `talang-repo` 1.0.0 (package `24fdd6f4…3fc3bb`) vetted on `hackcanton-devnet-3` and seeded; the hosted desk reads it live ([run log](docs/evidence/devnet-run.log)). The 1.1.0 upgrade (`a3dc67f1…07bc8`) is vetted on `hackcanton-devnet-3` too (uploaded through the NODERS console on 9 October; the console lists it as Vetted, package id matches `devnet/talang-repo-1.1.0.dar`) and runs on the local sandbox, LocalNet and CI. The 1.2.0 upgrade (`5125df18…a3c366`, matches `devnet/talang-repo-1.2.0.dar`) was uploaded through the console on 12 October and is listed as Vetted. A CBTC-collateral repo defaulted there: 0.001 CBTC executed to lender A through the DA Utility registry ([evidence](docs/evidence/cbtc-default-devnet.json)) |
+| **NODERS DevNet** | `talang-repo` 1.0.0 (package `24fdd6f4…3fc3bb`) vetted on `hackcanton-devnet-3` and seeded; the hosted desk reads it live ([run log](docs/evidence/devnet-run.log)). The 1.1.0 upgrade (`a3dc67f1…07bc8`) is vetted on `hackcanton-devnet-3` too (uploaded through the NODERS console on 9 October; the console lists it as Vetted, package id matches `devnet/talang-repo-1.1.0.dar`) and runs on the local sandbox, LocalNet and CI. The 1.2.0 upgrade (`5125df18…a3c366`, matches `devnet/talang-repo-1.2.0.dar`) was uploaded through the console on 12 October and is listed as Vetted. 1.2.1 (QA fixes: no double pledge, roll vs allocation expiry, close-out default window) is built in `devnet/talang-repo-1.2.1.dar` and not yet uploaded. A CBTC-collateral repo defaulted there: 0.001 CBTC executed to lender A through the DA Utility registry ([evidence](docs/evidence/cbtc-default-devnet.json)) |
 | **CIP-0056 tokens** | A repo with **Canton Coin cash and CBTC collateral** on DevNet, both allocated through their registries and settled at repurchase, 12 of 12 steps ([evidence](docs/evidence/token-repo-amulet-cbtc-devnet.json)); any CIP-0056 instrument by env ([docs/token-legs.md](docs/token-legs.md)). USDCx: not run (no DevNet registry) |
 | **BitSafe DecMan** | Valuation committee hosted on 3 participants, in one command: `bash localnet/demo.sh reset`; 1-of-3 refused, 2-of-3 executed, survives one node down ([docs/bitsafe.md](docs/bitsafe.md)); the same flow clicked through DecMan's own UI in the [DecMan demo](media/decman-demo-captioned.mp4). On DevNet the same `GovernanceRules` flow runs with a committee and three pricers on the NODERS participant: 1-of-3 refused, 2-of-3 executed, a repo and a margin call on the committee mark, 8 of 8 steps ([evidence](docs/evidence/bitsafe-governed-marks-devnet.json)); there all four parties sit on one node, so it shows shared control, not distributed hosting |
 | **Grofty / CIP-0103** | Run with the live Grofty extension on Canton TestNet ([evidence](docs/evidence/grofty-wallet-testnet.json), [video](media/grofty-wallet.mp4)): the desk connects, two borrower commands are signed in Grofty and accepted by `api/wallet-verify.mjs` (also by the hosted copy), and a 1 CC venue fee prepared by the desk is approved in Grofty and executed on TestNet. The signed Talang commands run on a local Canton ledger, since Grofty's participant cannot host Talang's package |
@@ -15,7 +15,7 @@
 1. **Live desk, one role at a time** (read-only, NODERS DevNet): [regulator](https://talang-desk.vercel.app/desk?role=regulator) sees lifecycle reports and best-execution records with no lender named and no requests or quotes; [lender B](https://talang-desk.vercel.app/desk?role=lenderB) sees its own quotes only; [borrower](https://talang-desk.vercel.app/desk?role=borrower) sees every quote made to it. The same data as JSON: `curl -s -X POST -H 'content-type: application/json' -d '{"role":"regulator"}' https://talang-desk.vercel.app/api/acs`.
 2. **Evidence with update ids** (as returned by the participant; there is no public explorer for it): [Canton Coin + CBTC repo on DevNet](docs/evidence/token-repo-amulet-cbtc-devnet.json) (12 steps), [CBTC collateral on DevNet](docs/evidence/cbtc-rail-devnet.json) (7), [CBTC default on DevNet](docs/evidence/cbtc-default-devnet.json) (9), [Grofty on TestNet](docs/evidence/grofty-wallet-testnet.json) (4), [committee on 3 LocalNet nodes](docs/evidence/bitsafe-governed-marks-localnet.json) (8), [one node down, then two](docs/evidence/bitsafe-node-offline-localnet.json) (6).
 3. **BitSafe LocalNet, one command** (Docker, Node 20, `daml build --all` once): `bash localnet/demo.sh reset`. Or watch it: [media/decman-demo-captioned.mp4](media/decman-demo-captioned.mp4) (79 s).
-4. **Tests**: `cd test && daml test` (31 scripts) and `npm run test:proxy` (45 checks, no network). CI [run 38272515745](https://github.com/PugarHuda/talang/actions/runs/38272515745) (commit `f9e539b`) runs the 31 Daml scripts, then the 41 MCP end-to-end checks, governance and the token rail on a Canton sandbox.
+4. **Tests**: `cd test && daml test` (52 scripts) and `npm run test:proxy` (45 checks, no network). CI [run 38272515745](https://github.com/PugarHuda/talang/actions/runs/38272515745) (commit `f9e539b`) runs the 31 Daml scripts, then the 41 MCP end-to-end checks, governance and the token rail on a Canton sandbox.
 
 DevNet party ids carry the `tirai-` prefix of the NODERS tenant's earlier project; `parties.json` maps them to the desk roles.
 
@@ -40,7 +40,7 @@ be real Canton Token Standard assets such as USDCx and CBTC.
 | Default | lender | After an unanswered call (within a day of its deadline, 1.2.0) or past maturity, the lender keeps collateral worth what is owed and the rest goes back |
 | Haircut schedule (1.2.0) | lender signs, borrower sees | Quotes and substitution approvals made through it are refused below the lender's floor for that collateral, or for collateral it does not list |
 | Master agreement (1.2.0) | one side offers, the other signs | On an event of default (a repo past maturity, or a call past its deadline) the lender closes out every repo it names under the agreement in one transaction, at fresh marks with no haircut; excess on one repo covers a shortfall on another; one `CloseOutReport` to the regulator |
-| Report | regulator | Every lifecycle event of an open repo, nothing upstream of it |
+| Report | regulator | Every lifecycle event of an open repo (a master-agreement close-out as one `CloseOutReport` for its netting set), nothing upstream of it |
 
 ## Why Canton for a sealed-bid repo RFQ
 
@@ -74,7 +74,7 @@ The desk is at `/desk` (`?role=lenderB` opens it as a role); the landing page is
 
 ```
 daml build --all
-cd test && daml test        # 31 scripts: core, desk, CIP-0056 tokens, BitSafe governance, 1.2.0 agreements
+cd test && daml test        # 52 scripts: core, desk, CIP-0056 tokens, BitSafe governance, 1.2.0 agreements, adversarial QA
 npm run test:proxy          # hosted read-only API, no network or credentials
 ```
 
@@ -86,7 +86,7 @@ Counts are what was observed, with where. "CI" is GitHub Actions run
 
 | Suite | Covers | Result | Where observed |
 |---|---|---|---|
-| `daml test` (`test/daml/`) | Core lifecycle, default paths and refusals (`TalangTest`); venue fee, best execution, rolls (`DeskTest`); CIP-0056 legs against `MockRegistry` (`TokenTest`); BitSafe valuation committee and lender syndicate on the real `GovernanceRules` (`GovernanceTest`); 1.1.0 rules: 2-hour minimum margin window, default keeps only what is owed and returns the excess (`marginWindowFloor`, `defaultReturnsExcess`, `defaultAcrossPledges`); 1.2.0 fixes (`SecurityTest`) and minimum transfer, haircut schedules, close-out netting (`AgreementsTest`) | 31 of 31 scripts ok (two are setup fixtures) | In CI |
+| `daml test` (`test/daml/`) | Core lifecycle, default paths and refusals (`TalangTest`); venue fee, best execution, rolls (`DeskTest`); CIP-0056 legs against `MockRegistry` (`TokenTest`); BitSafe valuation committee and lender syndicate on the real `GovernanceRules` (`GovernanceTest`); 1.1.0 rules: 2-hour minimum margin window, default keeps only what is owed and returns the excess (`marginWindowFloor`, `defaultReturnsExcess`, `defaultAcrossPledges`); 1.2.0 fixes (`SecurityTest`) and minimum transfer, haircut schedules, close-out netting (`AgreementsTest`); adversarial QA and the 1.2.1 fixes: authorization, privacy, time edges, arithmetic edges, double pledge, roll vs allocation expiry (`AdversarialTest`) | 52 of 52 scripts ok (four are setup fixtures), local run 13 Oct | In CI |
 | `npm run test:proxy` | `api/acs.mjs`, `api/config.mjs` and `api/wallet-verify.mjs` with fetch stubbed (wallet-verify POST only, never reaches the ledger); only POST acs and GET config served, bad roles rejected before the ledger is reached, every ledger call a read scoped to one desk party, no client secret or bearer token in any response, no other file in `api/` | 45 of 45 checks | Locally on 13 October |
 | `npm run e2e:mcp` | Every MCP desk end to end: tool lists per role, privacy read from each node, award, roll offered and withdrawn, substitution declined, margin call refused under 2 hours then answered, claim and default refused early, cancel and withdraw unlock cash, repurchase, regulator exposure | 41 of 41 checks | In CI |
 | `npm run qa:desk` | Playwright through every role and every desk button, outcomes re-read from each node; refusals (short haircut, stale mark, early default, bad inputs, double click), privacy in page and API, read-only mode, server hardening, accessible names, 390 px layout | 29 of 29 checks | Local sandbox on 9 October; the 1.2.0 flows (haircut schedule, minimum transfer refusal, margin refutation, substitution withdraw, master agreement, close-out) added on 12 October (commit `298ae6d`) |
@@ -102,7 +102,7 @@ Counts are what was observed, with where. "CI" is GitHub Actions run
 ## Run the whole stack locally, no credentials
 
 ```
-daml sandbox --json-api-port 7575 --dar .daml/dist/talang-repo-1.2.0.dar --wall-clock-time
+daml sandbox --json-api-port 7575 --dar .daml/dist/talang-repo-1.2.1.dar --wall-clock-time
 npm ci
 npm run local                               # allocate the desk's parties on the sandbox
 ENV_FILE=.env.local npm run seed            # one repo in every state

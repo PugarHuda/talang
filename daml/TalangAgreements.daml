@@ -12,6 +12,7 @@ module TalangAgreements where
 
 import DA.Action (foldlA)
 import DA.List (dedup)
+import DA.Time (addRelTime)
 import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.AllocationV1 (Allocation)
@@ -155,6 +156,11 @@ template MasterAgreement
              mc <- fetch c
              assertMsg "margin call on a repo not being closed out" (mc.tradeCid `elem` tradeCids)
              assertMsg "the borrower still has time to respond" (now > mc.respondBy)
+             -- 1.2.1: the default window holds here as on MarginCall.Default; a
+             -- borrower cannot refute after the deadline, so an older call would
+             -- stay an event of default for ever.
+             assertMsg "the call is more than a day past its deadline: call again on a fresh mark"
+               (now <= addRelTime mc.respondBy defaultWindow)
              archive c
              pure True
          let matured = any (\t -> now > t.maturity) ts

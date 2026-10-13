@@ -212,6 +212,22 @@ pledgeQty borrower lender issuer instrument _ (Escrowed e) = do
 pledgeQty borrower lender issuer instrument liveUntil (Allocated a) =
   checkAllocation a borrower lender borrower (InstrumentId with admin = issuer; id = instrument) None liveUntil
 
+-- 1.2.1: a desk escrow enters a repo only as a fresh offer, and is re-locked
+-- as it enters. Open takes its pledge as an argument and the borrower can call
+-- it directly, so without this an escrow already backing one repo (or offered
+-- in a pending substitution) could back a second repo with the same lender,
+-- and the lender would fund twice against one pledge.
+offeredPledge : Text
+offeredPledge = "talang: offered as repo collateral"
+
+enterRepo : Party -> Locked -> Update Locked
+enterRepo lender (Escrowed e) = do
+  x <- fetch e
+  assertMsg "collateral already pledged: only a fresh offer enters a repo" (x.purpose == offeredPledge)
+  h <- exercise e Release with recipient = x.owner
+  Escrowed <$> exercise h Lock with counterparty = lender; purpose = "talang: pledged under an open repo"
+enterRepo _ l = pure l
+
 -- ---------------------------------------------------------------------------
 -- Money arithmetic
 -- ---------------------------------------------------------------------------
@@ -406,7 +422,7 @@ template RepoRFQ
       controller borrower
       do q <- fetch winner
          pledge <- exercise collateralCid Lock with
-           counterparty = q.lender; purpose = "talang: pledged under an open repo"
+           counterparty = q.lender; purpose = offeredPledge
          t <- award this self winner losers contexts (Escrowed pledge) markCid
          archive self
          pure t
@@ -553,6 +569,7 @@ template RepoQuote
          m <- freshMark agent terms.collateralInstrument markCid
          assertMsg "collateral does not cover the cash after the haircut"
            (lendable haircut qty m.price >= terms.principal)
+         pledged <- enterRepo lender pledge
          deliver contexts borrower funding
          let trade = RepoTrade with
                borrower; lender; regulator; agent; terms; venue; rateBps; haircut
@@ -560,7 +577,7 @@ template RepoQuote
                collateralIssuer = terms.collateralIssuer
                collateralInstrument = terms.collateralInstrument
                collateralQty = qty
-               collateral = [pledge]
+               collateral = [pledged]
          report trade "OPEN" terms.principal 0.0 now
          create trade
 
@@ -736,6 +753,8 @@ template RepoTrade
         qty : Decimal
       controller borrower, lender
       do now <- getTime
+         -- 1.2.1: the same allocation twice would count its units twice.
+         assertMsg "collateral already pledged to this repo" (extra `notElem` collateral)
          let next = this with collateralQty = collateralQty + qty; collateral = extra :: collateral
          report next "MARGIN_POSTED" 0.0 0.0 now
          create next
@@ -748,7 +767,10 @@ template RepoTrade
         newQty : Decimal
         contexts : Contexts
       controller borrower, lender
-      do forA_ collateral (unwind contexts borrower)
+      do -- 1.2.1: a pledge offered as its own substitute is unwound below and
+         -- would leave the repo holding a cancelled allocation.
+         assertMsg "collateral already pledged to this repo" (newCollateral `notElem` collateral)
+         forA_ collateral (unwind contexts borrower)
          now <- getTime
          let next = this with
                collateralIssuer = newIssuer; collateralInstrument = newInstrument
@@ -778,10 +800,19 @@ template RepoTrade
          m <- freshMark agent collateralInstrument markCid
          assertMsg "collateral does not cover the principal to roll"
            (lendable haircut collateralQty m.price >= terms.principal)
+         -- 1.2.1: every pledged allocation must stay executable through the
+         -- rolled maturity's claim window, as Open required for the original one.
+         let newMaturity = addRelTime maturity (days extraDays)
+         forA_ collateral \case
+           Allocated a -> do
+             v <- view <$> fetch a
+             assertMsg "a pledged allocation lapses before the rolled repo's claim window"
+               (v.allocation.settlement.settleBefore >= addRelTime newMaturity claimWindow)
+           Escrowed _ -> pure ()
          payOut cashCid ((lender, accrued) :: venueLegs venue fee)
          let next = this with
                rateBps = newRateBps; openedAt = now
-               maturity = addRelTime maturity (days extraDays)
+               maturity = newMaturity
          report next "ROLL" accrued fee now
          create next
 
@@ -1034,7 +1065,8 @@ template Substitution
 -- ---------------------------------------------------------------------------
 
 -- One row per lifecycle event of an open repo. The regulator observes these and
--- nothing upstream of them: no request, no quote, no losing rate.
+-- nothing upstream of them: no request, no quote, no losing rate. A master-
+-- agreement close-out is reported once for its netting set (CloseOutReport).
 template RepoReport
   with
     regulator : Party

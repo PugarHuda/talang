@@ -1,0 +1,602 @@
+-- Adversarial QA of the desk: what an attacker or a sloppy counterparty tries,
+-- and what the ledger must answer. Grouped by angle: authorization, privacy,
+-- time, arithmetic, substitution, ordering and double use, upgrade data.
+module AdversarialTest where
+
+import DA.Action (void)
+import DA.Assert ((===))
+import DA.Foldable (forA_)
+import DA.List (head)
+import DA.Optional (isNone, isSome)
+import DA.TextMap qualified as TextMap
+import DA.Time (addRelTime, days, hours, minutes, seconds)
+import Daml.Script
+
+import Talang
+import TalangAgreements
+import TalangTest
+import TokenTest
+import AgreementsTest (openOn, signedMaster)
+
+-- ---------------------------------------------------------------------------
+-- Authorization
+-- ---------------------------------------------------------------------------
+
+-- Nobody acts for anybody else: a lender cannot quote, withdraw or call for
+-- another lender, the borrower cannot forge a mark or seize, outsiders and the
+-- regulator cannot touch a live repo.
+authorization : Script ()
+authorization = do
+  p <- setup
+  outsider <- allocateParty "Outsider"
+  r <- rfq p
+  cA <- cash p p.lenderA loanAmount
+  -- B quotes in A's name with A's cash: refused (controller is the named lender).
+  submitMustFail p.lenderB do
+    exerciseCmd r SubmitQuote with lender = p.lenderA; rateBps = 500.0; haircut = 0.02; cashCid = cA
+  qA <- submit p.lenderA do
+    exerciseCmd r SubmitQuote with lender = p.lenderA; rateBps = 530.0; haircut = 0.02; cashCid = cA
+  -- B cannot pull A's quote; the borrower cannot use the lender's withdraw.
+  submitMustFail p.lenderB do exerciseCmd qA WithdrawQuote with contexts = []
+  submitMustFail p.lenderA do exerciseCmd qA RejectQuote with contexts = []
+  -- A cannot award its own quote; an outsider cannot cancel the request.
+  col <- bond p "UST10Y" 100.0
+  m <- mark p "UST10Y" 98000.0
+  submitMustFail p.lenderA do
+    exerciseCmd r AwardSealed with winner = qA; losers = []; collateralCid = col; markCid = m; contexts = []
+  submitMustFail outsider do exerciseCmd r CancelRFQ
+  -- The borrower cannot open the quote against the lender's cash escrow.
+  Some q <- queryContractId p.borrower qA
+  submitMustFail p.borrower do exerciseCmd qA Open with pledge = q.funding; markCid = m; contexts = []
+  -- A mark is the agent's: the borrower cannot publish one in its name.
+  now <- getTime
+  submitMustFail p.borrower do
+    createCmd Mark with agent = p.agent; instrument = "UST10Y"; price = 200000.0; asOf = now; audience = [p.borrower]
+  -- Neither side can make a trade, a report or a roll offer alone.
+  submitMustFail p.borrower do
+    createCmd RepoTrade with
+      borrower = p.borrower; lender = p.lenderA; regulator = p.regulator; agent = p.agent
+      terms = stdTerms p; venue = None; rateBps = 1.0; haircut = 0.0; openedAt = now; maturity = now
+      collateralIssuer = p.bondIssuer; collateralInstrument = "UST10Y"; collateralQty = 0.0; collateral = []
+  submitMustFail p.lenderA do
+    createCmd RepoReport with
+      regulator = p.regulator; borrower = p.borrower; lender = p.lenderA; event = "CLOSE"
+      terms = stdTerms p; rateBps = 1.0; haircut = 0.0; collateralInstrument = "UST10Y"
+      collateralQty = 0.0; cashMoved = 0.0; feePaid = 0.0; at = now
+
+  t <- submit p.borrower do
+    exerciseCmd r AwardSealed with winner = qA; losers = []; collateralCid = col; markCid = m; contexts = []
+  submitMustFail p.borrower do
+    createCmd RollOffer with
+      tradeCid = t; borrower = p.borrower; lender = p.lenderA; newRateBps = 1.0; extraDays = 30
+      expiresAt = addRelTime now (days 1)
+  passTime (days 10)
+  now2 <- getTime
+  low <- markFor p [p.borrower, p.lenderA, p.lenderB, outsider, p.regulator] "UST10Y" 90000.0
+  -- Only the repo's own lender calls margin; the borrower never does.
+  forA_ [p.lenderB, outsider, p.regulator, p.borrower, p.agent] \x ->
+    submitMustFail x do exerciseCmd t CallMargin with markCid = low; respondBy = addRelTime now2 (days 1)
+  call <- submit p.lenderA do exerciseCmd t CallMargin with markCid = low; respondBy = addRelTime now2 (hours 2)
+  passTime (hours 3)
+  -- The borrower cannot default itself, nor can a rival lender.
+  submitMustFail p.borrower do exerciseCmd call Default with contexts = []
+  submitMustFail p.lenderB do exerciseCmd call Default with contexts = []
+  -- Only the borrower repurchases; only the lender claims.
+  pay <- cash p p.lenderA 10000000.0
+  submitMustFail p.lenderA do exerciseCmd t Repurchase with cashCid = pay; contexts = []
+  passTime (days 90)
+  submitMustFail p.borrower do exerciseCmd t ClaimAfterMaturity with contexts = []
+  submitMustFail outsider do exerciseCmd t ClaimAfterMaturity with contexts = []
+  submitMustFail p.borrower do exerciseCmd t Seize with contexts = []
+  _ <- submit p.lenderA do exerciseCmd t ClaimAfterMaturity with contexts = []
+  pure ()
+
+-- A substitution is answered by the repo's lender only, and a schedule speaks
+-- for its own lender only.
+substitutionAuthority : Script ()
+substitutionAuthority = do
+  (p, t) <- opened
+  bunds <- bond p "BUND10" 120.0
+  sub <- submit p.borrower do exerciseCmd t ProposeSubstitution with holdingCid = bunds
+  bm <- mark p "BUND10" 85000.0
+  submitMustFail p.borrower do exerciseCmd sub Approve with markCid = bm; contexts = []
+  submitMustFail p.lenderB do exerciseCmd sub Approve with markCid = bm; contexts = []
+  submitMustFail p.lenderB do exerciseCmd sub Decline with contexts = []
+  sB <- submit p.lenderB do
+    createCmd HaircutSchedule with
+      lender = p.lenderB; audience = [p.borrower]; floors = TextMap.fromList [("BUND10", 0.0)]
+  submitMustFail p.lenderB do
+    exerciseCmd sB ApproveWithinSchedule with substitutionCid = sub; markCid = bm; contexts = []
+  -- An outsider cannot propose a master agreement in the borrower's name.
+  outsider <- allocateParty "Outsider"
+  submitMustFail outsider do
+    createCmd MasterAgreementProposal with
+      borrower = p.borrower; lender = p.lenderA; regulator = p.regulator; form = "GMRA 2011"; proposer = p.borrower
+  pure ()
+
+-- ---------------------------------------------------------------------------
+-- Privacy
+-- ---------------------------------------------------------------------------
+
+-- Three lenders. Each quote reaches the borrower only; after the award each
+-- loser holds its own notice and its cash and nothing else; the regulator holds
+-- the best-execution record (no lender in it) and the OPEN report, and never a
+-- request, a quote or a notice.
+privacyThreeLenders : Script ()
+privacyThreeLenders = do
+  p <- setup
+  lenderC <- allocateParty "LenderC"
+  r <- submit p.borrower do
+    createCmd RepoRFQ with
+      borrower = p.borrower; regulator = p.regulator; agent = p.agent
+      lenders = [p.lenderA, p.lenderB, lenderC]; terms = stdTerms p; deadline = None; venue = None
+  qA <- quote p r p.lenderA 530.0 0.02
+  qB <- quote p r p.lenderB 545.0 0.03
+  qC <- quote p r lenderC 560.0 0.02
+  forA_ [(qA, [p.lenderB, lenderC]), (qB, [p.lenderA, lenderC]), (qC, [p.lenderA, p.lenderB])] \(q, rivals) ->
+    forA_ (rivals <> [p.regulator, p.agent]) \x -> isNone <$> queryContractId x q >>= assert
+  isNone <$> queryContractId p.regulator r >>= assert
+  isNone <$> queryContractId p.agent r >>= assert
+  -- A lender sees the request but not the other lenders' cash behind quotes.
+  (map snd <$> query @Escrow p.lenderB) >>= \es -> all (\e -> e.owner == p.lenderB) es === True
+
+  col <- bond p "UST10Y" 100.0
+  m <- mark p "UST10Y" 98000.0
+  t <- submit p.borrower do
+    exerciseCmd r AwardSealed with winner = qA; losers = [qB, qC]; collateralCid = col; markCid = m; contexts = []
+
+  forA_ [(p.lenderB, 2), (lenderC, 3)] \(x, rank) -> do
+    ns <- map snd <$> query @LossNotice x
+    map (\n -> (n.lender, n.rank, n.outOf)) ns === [(x, rank, 3)]
+    (length <$> query @RepoTrade x) >>= (=== 0)
+    (length <$> query @BestExecution x) >>= (=== 0)
+    (length <$> query @RepoReport x) >>= (=== 0)
+    (length <$> query @Escrow x) >>= (=== 0)
+    isNone <$> queryContractId x t >>= assert
+    held x "USDC" >>= (=== loanAmount)
+
+  (length <$> query @RepoQuote p.regulator) >>= (=== 0)
+  (length <$> query @RepoRFQ p.regulator) >>= (=== 0)
+  (length <$> query @LossNotice p.regulator) >>= (=== 0)
+  (length <$> query @Escrow p.regulator) >>= (=== 0)
+  [be] <- map snd <$> query @BestExecution p.regulator
+  (be.quotesConsidered, be.winnerRank, be.spreadToBestBps, be.spreadBucket) === (3, 1, 0.0, Some "0")
+  evs <- events p
+  evs === ["OPEN"]
+  -- The agent publishes marks and sees no trade.
+  isNone <$> queryContractId p.agent t >>= assert
+
+-- ---------------------------------------------------------------------------
+-- Time
+-- ---------------------------------------------------------------------------
+
+-- Every deadline on its edge: a call two hours less a second is refused, two
+-- hours exactly is accepted; default is refused at the deadline itself and
+-- accepted a day after it to the second; a refutation after the deadline is
+-- refused; a second call on the same repo dies with the first default.
+timeEdges : Script ()
+timeEdges = do
+  (p, t) <- opened
+  passTime (days 10)
+  now <- getTime
+  low <- mark p "UST10Y" 90000.0
+  submitMustFail p.lenderA do
+    exerciseCmd t CallMargin with markCid = low; respondBy = addRelTime now (hours 2 - seconds 1)
+  c1 <- submit p.lenderA do exerciseCmd t CallMargin with markCid = low; respondBy = addRelTime now (hours 2)
+  c2 <- submit p.lenderA do exerciseCmd t CallMargin with markCid = low; respondBy = addRelTime now (hours 2)
+  passTime (hours 2)
+  submitMustFail p.lenderA do exerciseCmd c1 Default with contexts = []
+  passTime (seconds 1)
+  up <- mark p "UST10Y" 98000.0
+  submitMustFail p.borrower do exerciseCmd c1 RefuteMarginCall with markCid = up
+  passTime (days 1 - seconds 1)
+  _ <- submit p.lenderA do exerciseCmd c1 Default with contexts = []
+  submitMustFail p.lenderA do exerciseCmd c2 Default with contexts = []
+
+-- A mark is good for 24 hours to the second and never from the future; a
+-- margin call takes one exactly an hour old.
+markAges : Script ()
+markAges = do
+  p <- setup
+  r <- rfq p
+  qA <- quote p r p.lenderA 530.0 0.02
+  m <- mark p "UST10Y" 98000.0
+  now <- getTime
+  future <- submit p.agent do
+    createCmd Mark with
+      agent = p.agent; instrument = "UST10Y"; price = 98000.0; asOf = addRelTime now (minutes 1)
+      audience = [p.borrower, p.lenderA]
+  col <- bond p "UST10Y" 100.0
+  submitMustFail p.borrower do
+    exerciseCmd r AwardSealed with winner = qA; losers = []; collateralCid = col; markCid = future; contexts = []
+  passTime (hours 24 + seconds 1)
+  submitMustFail p.borrower do
+    exerciseCmd r AwardSealed with winner = qA; losers = []; collateralCid = col; markCid = m; contexts = []
+  m24 <- mark p "UST10Y" 98000.0
+  passTime (hours 24)
+  t <- submit p.borrower do
+    exerciseCmd r AwardSealed with winner = qA; losers = []; collateralCid = col; markCid = m24; contexts = []
+  passTime (days 10)
+  low <- mark p "UST10Y" 90000.0
+  passTime (hours 1)
+  now2 <- getTime
+  _ <- submit p.lenderA do exerciseCmd t CallMargin with markCid = low; respondBy = addRelTime now2 (hours 2)
+  pure ()
+
+-- Strict edges elsewhere: a quote at the RFQ deadline, a claim at maturity, a
+-- roll at maturity, a roll offer at its expiry, a notice settling now.
+strictEdges : Script ()
+strictEdges = do
+  p <- setup
+  now <- getTime
+  r <- submit p.borrower do
+    createCmd RepoRFQ with
+      borrower = p.borrower; regulator = p.regulator; agent = p.agent
+      lenders = [p.lenderA]; terms = stdTerms p; deadline = Some (addRelTime now (hours 1)); venue = None
+  passTime (hours 1)
+  c <- cash p p.lenderA loanAmount
+  submitMustFail p.lenderA do
+    exerciseCmd r SubmitQuote with lender = p.lenderA; rateBps = 530.0; haircut = 0.02; cashCid = c
+
+  (p2, t) <- opened
+  now2 <- getTime
+  offer <- submit p2.lenderA do
+    createCmd RollOffer with
+      tradeCid = t; borrower = p2.borrower; lender = p2.lenderA
+      newRateBps = 500.0; extraDays = 30; expiresAt = addRelTime now2 (days 91)
+  submitMustFail p2.borrower do exerciseCmd t NoticeRepurchase with settleBefore = now2
+  passTime (days 90)
+  m <- mark p2 "UST10Y" 98000.0
+  pay <- cash p2 p2.borrower 200000.0
+  submitMustFail p2.borrower do exerciseCmd offer AcceptRoll with cashCid = pay; markCid = m
+  submitMustFail p2.lenderA do exerciseCmd t ClaimAfterMaturity with contexts = []
+  passTime (seconds 1)
+  _ <- submit p2.lenderA do exerciseCmd t ClaimAfterMaturity with contexts = []
+  pure ()
+
+-- 1.2.0's default window holds on the master agreement too: a margin call more
+-- than a day past its deadline cannot be the event of default for a close-out.
+closeOutStaleCall : Script ()
+closeOutStaleCall = do
+  p <- setup
+  ma <- signedMaster p
+  t <- openOn p (stdTerms p) 98000.0
+  passTime (days 10)
+  now <- getTime
+  low <- mark p "UST10Y" 90000.0
+  call <- submit p.lenderA do exerciseCmd t CallMargin with markCid = low; respondBy = addRelTime now (hours 2)
+  passTime (days 3)
+  -- The price has recovered; the call is three days stale.
+  u <- mark p "UST10Y" 98000.0
+  submitMustFail p.lenderA do
+    exerciseCmd ma CloseOut with tradeCids = [t]; markCids = [u]; defaultedCall = Some call; contexts = []
+  -- An empty netting set is refused too.
+  submitMustFail p.lenderA do
+    exerciseCmd ma CloseOut with tradeCids = []; markCids = []; defaultedCall = None; contexts = []
+
+-- ---------------------------------------------------------------------------
+-- Arithmetic
+-- ---------------------------------------------------------------------------
+
+-- The pure money functions on their edges.
+moneyEdges : Script ()
+moneyEdges = do
+  operator <- allocateParty "Operator"
+  now <- getTime
+  -- One day minimum, whole days only, commercial rounding to the cent.
+  interest 1000.0 18.0 now now === 0.01               -- 0.005 rounds up
+  interest 1000.0 17.0 now now === 0.0                -- 0.0047 rounds down
+  interest 1000.0 18.0 now (addRelTime now (days (-5))) === 0.01
+  interest 360000.0 100.0 now (addRelTime now (hours 47)) === 10.0
+  interest 360000.0 100.0 now (addRelTime now (hours 48)) === 20.0
+  -- Unit counts round up, never down.
+  ceil4 1.0 === 1.0
+  ceil4 1.00001 === 1.0001
+  ceil4 1.000049 === 1.0001
+  ceil4 1.00005 === 1.0001
+  lendable 0.0 100.0 95000.0 === 9500000.0
+  -- The best-execution band edges.
+  map bucketName [-3.0, 0.0, 0.0000000001, 5.0, 5.0000000001, 25.0, 25.01] === ["0", "0", "1-5", "1-5", "6-25", "6-25", ">25"]
+  map bucketFloor [0.0, 5.0, 25.0, 25.01] === [0.0, 1.0, 6.0, 26.0]
+  venueFee None 1000000.0 now now === 0.0
+  venueFee (Some (Venue with operator; feeBps = 0.0)) 1000000.0 now now === 0.0
+
+-- Quote bounds: rate in (0, 10000] bp, haircut in [0, 50%). A 0% haircut that
+-- covers the cash exactly opens; a cent less does not.
+quoteBounds : Script ()
+quoteBounds = do
+  p <- setup
+  r <- rfq p
+  spare <- cash p p.lenderA loanAmount
+  forA_ [(0.0, 0.02), (-1.0, 0.02), (10000.01, 0.02), (530.0, -0.01), (530.0, 0.5), (530.0, 1.0), (530.0, 1.5)] \(rate, hc) ->
+    submitMustFail p.lenderA do
+      exerciseCmd r SubmitQuote with lender = p.lenderA; rateBps = rate; haircut = hc; cashCid = spare
+  qMax <- quote p r p.lenderB 10000.0 0.0
+  qZero <- quote p r p.lenderA 530.0 0.0
+  col <- bond p "UST10Y" 100.0
+  short <- mark p "UST10Y" 94999.99
+  submitMustFail p.borrower do
+    exerciseCmd r AwardSealed with winner = qZero; losers = [qMax]; collateralCid = col; markCid = short; contexts = []
+  exact <- mark p "UST10Y" 95000.0
+  t <- submit p.borrower do
+    exerciseCmd r AwardSealed with winner = qZero; losers = [qMax]; collateralCid = col; markCid = exact; contexts = []
+  -- Repurchased the same day: one day of interest, 1,398.61, paid to the cent.
+  loan <- heldCid p.borrower "USDC"
+  due <- cash p p.borrower 1398.61
+  pot <- submit p.borrower do exerciseCmd loan Merge with other = due
+  submit p.borrower do exerciseCmd t Repurchase with cashCid = pot; contexts = []
+  -- (plus the spare cash the refused quotes never took)
+  held p.lenderA "USDC" >>= (=== 2.0 * loanAmount + 1398.61)
+  held p.borrower "USDC" >>= (=== 0.0)
+  held p.borrower "UST10Y" >>= (=== 100.0)
+
+-- The request's own rules: a panel without duplicates, without the borrower,
+-- not empty; positive principal, quantity and term; a fee under 1000 bp.
+rfqShape : Script ()
+rfqShape = do
+  p <- setup
+  let mk lenders terms venue = submitMustFail p.borrower do
+        createCmd RepoRFQ with
+          borrower = p.borrower; regulator = p.regulator; agent = p.agent
+          lenders; terms; deadline = None; venue
+      t = stdTerms p
+  mk [] t None
+  mk [p.lenderA, p.lenderA] t None
+  mk [p.lenderA, p.borrower] t None
+  mk [p.lenderA] (t with principal = 0.0) None
+  mk [p.lenderA] (t with collateralQty = -1.0) None
+  mk [p.lenderA] (t with termDays = 0) None
+  mk [p.lenderA] t (Some Venue with operator = p.agent; feeBps = 1000.0)
+  mk [p.lenderA] t (Some Venue with operator = p.agent; feeBps = -1.0)
+  submitMustFail p.agent do createCmd VenueAgreement with operator = p.agent; borrower = p.borrower; feeBps = 1000.0
+  submitMustFail p.lenderA do
+    createCmd HaircutSchedule with lender = p.lenderA; audience = []; floors = TextMap.fromList [("UST10Y", 0.5)]
+
+-- Minimum transfer on its edge. Ten days in, 9,513,986.11 is owed; at 96,500
+-- the pledge lends 9,457,000, so the shortfall is 56,986.11: called when the
+-- minimum is exactly that, refused when it is a cent more.
+minTransferEdge : Script ()
+minTransferEdge = do
+  forA_ [(56986.11, True), (56986.12, False)] \(mta, ok) -> do
+    p <- setup
+    t <- openOn p ((stdTerms p) with minTransfer = Some mta) 98000.0
+    passTime (days 10)
+    now <- getTime
+    m <- mark p "UST10Y" 96500.0
+    let cmd = exerciseCmd t CallMargin with markCid = m; respondBy = addRelTime now (days 1)
+    if ok then void (submit p.lenderA cmd) else submitMustFail p.lenderA cmd
+
+-- Close-out at the edges: collateral worth exactly what is owed goes to the
+-- lender whole with nothing back; collateral worth less goes whole and the
+-- report shows the lender kept less than it was owed.
+closeOutEdges : Script ()
+closeOutEdges = do
+  -- 91 days at 530 bp on 9,500,000: 9,627,273.61 owed; 100 units at 96,272.7361
+  -- are worth exactly that.
+  forA_ [(96272.7361, 9627273.61), (90000.0, 9000000.0)] \(px, value) -> do
+    p <- setup
+    ma <- signedMaster p
+    t <- openOn p (stdTerms p) 98000.0
+    passTime (days 91)
+    m <- mark p "UST10Y" px
+    rep <- submit p.lenderA do
+      exerciseCmd ma CloseOut with tradeCids = [t]; markCids = [m]; defaultedCall = None; contexts = []
+    Some r <- queryContractId p.regulator rep
+    (r.owed, r.collateralValue, r.valueKept, r.valueReturned) === (9627273.61, value, value, 0.0)
+    held p.lenderA "UST10Y" >>= (=== 100.0)
+    held p.borrower "UST10Y" >>= (=== 0.0)
+
+-- ---------------------------------------------------------------------------
+-- Substitution
+-- ---------------------------------------------------------------------------
+
+-- An approved substitution cannot be approved again; a second offer on the
+-- same repo dies with the first swap and the borrower takes its bonds back; a
+-- declined offer goes home; a mark for another instrument is refused.
+substitutionOrdering : Script ()
+substitutionOrdering = do
+  (p, t) <- opened
+  b1 <- bond p "BUND10" 120.0
+  b2 <- bond p "BUND10" 130.0
+  s1 <- submit p.borrower do exerciseCmd t ProposeSubstitution with holdingCid = b1
+  s2 <- submit p.borrower do exerciseCmd t ProposeSubstitution with holdingCid = b2
+  ust <- mark p "UST10Y" 98000.0
+  submitMustFail p.lenderA do exerciseCmd s1 Approve with markCid = ust; contexts = []
+  bm <- mark p "BUND10" 85000.0
+  t2 <- submit p.lenderA do exerciseCmd s1 Approve with markCid = bm; contexts = []
+  submitMustFail p.lenderA do exerciseCmd s1 Approve with markCid = bm; contexts = []
+  submitMustFail p.lenderA do exerciseCmd s2 Approve with markCid = bm; contexts = []
+  submit p.borrower do exerciseCmd s2 WithdrawSubstitution with contexts = []
+  held p.borrower "BUND10" >>= (=== 130.0)
+  held p.borrower "UST10Y" >>= (=== 100.0)
+  b3 <- bond p "BUND10" 10.0
+  s3 <- submit p.borrower do exerciseCmd t2 ProposeSubstitution with holdingCid = b3
+  submit p.lenderA do exerciseCmd s3 Decline with contexts = []
+  held p.borrower "BUND10" >>= (=== 140.0)
+  Some live <- queryContractId p.lenderA t2
+  (live.collateralInstrument, live.collateralQty) === ("BUND10", 120.0)
+
+-- ---------------------------------------------------------------------------
+-- Ordering and double use
+-- ---------------------------------------------------------------------------
+
+-- A closed repo cannot be defaulted, claimed, rolled or closed again; a
+-- defaulted one cannot be repurchased.
+closedStaysClosed : Script ()
+closedStaysClosed = do
+  (p, t) <- opened
+  passTime (days 10)
+  now <- getTime
+  low <- mark p "UST10Y" 90000.0
+  call <- submit p.lenderA do exerciseCmd t CallMargin with markCid = low; respondBy = addRelTime now (hours 2)
+  offer <- submit p.lenderA do
+    createCmd RollOffer with
+      tradeCid = t; borrower = p.borrower; lender = p.lenderA
+      newRateBps = 500.0; extraDays = 30; expiresAt = addRelTime now (days 1)
+  loan <- heldCid p.borrower "USDC"
+  more <- cash p p.borrower 100000.0
+  pot <- submit p.borrower do exerciseCmd loan Merge with other = more
+  submit p.borrower do exerciseCmd t Repurchase with cashCid = pot; contexts = []
+  passTime (hours 3)
+  submitMustFail p.lenderA do exerciseCmd call Default with contexts = []
+  m <- mark p "UST10Y" 98000.0
+  pay <- cash p p.borrower 100000.0
+  submitMustFail p.borrower do exerciseCmd offer AcceptRoll with cashCid = pay; markCid = m
+  passTime (days 90)
+  submitMustFail p.lenderA do exerciseCmd t ClaimAfterMaturity with contexts = []
+
+  (p2, t2) <- opened
+  passTime (days 10)
+  now2 <- getTime
+  low2 <- mark p2 "UST10Y" 90000.0
+  call2 <- submit p2.lenderA do exerciseCmd t2 CallMargin with markCid = low2; respondBy = addRelTime now2 (hours 2)
+  passTime (hours 3)
+  _ <- submit p2.lenderA do exerciseCmd call2 Default with contexts = []
+  pay2 <- cash p2 p2.borrower 10000000.0
+  submitMustFail p2.borrower do exerciseCmd t2 Repurchase with cashCid = pay2; contexts = []
+
+-- After an award the request is gone: no new quotes, no second award. A quote
+-- the borrower left out is still its lender's to withdraw, cash and all.
+afterAward : Script ()
+afterAward = do
+  p <- setup
+  r <- rfq p
+  qA <- quote p r p.lenderA 530.0 0.02
+  qB <- quote p r p.lenderB 545.0 0.03
+  col <- bond p "UST10Y" 100.0
+  m <- mark p "UST10Y" 98000.0
+  _ <- submit p.borrower do
+    exerciseCmd r AwardSealed with winner = qA; losers = []; collateralCid = col; markCid = m; contexts = []
+  c <- cash p p.lenderA loanAmount
+  submitMustFail p.lenderA do
+    exerciseCmd r SubmitQuote with lender = p.lenderA; rateBps = 500.0; haircut = 0.02; cashCid = c
+  col2 <- bond p "UST10Y" 100.0
+  submitMustFail p.borrower do
+    exerciseCmd r AwardSealed with winner = qB; losers = []; collateralCid = col2; markCid = m; contexts = []
+  submit p.lenderB do exerciseCmd qB WithdrawQuote with contexts = []
+  held p.lenderB "USDC" >>= (=== loanAmount)
+
+-- A holding cannot be merged with itself (that would double it) or split to
+-- nothing or to all of it.
+holdingEdges : Script ()
+holdingEdges = do
+  p <- setup
+  h <- cash p p.borrower 100.0
+  submitMustFail p.borrower do exerciseCmd h Merge with other = h
+  submitMustFail p.borrower do exerciseCmd h Split with splitAmount = 0.0
+  submitMustFail p.borrower do exerciseCmd h Split with splitAmount = 100.0
+  other <- cash p p.lenderA 50.0
+  submitMustFail p.borrower do exerciseCmd h Merge with other
+  held p.borrower "USDC" >>= (=== 100.0)
+
+-- Double pledge: the borrower opens a second repo with the same lender by
+-- calling Open on its quote directly and handing it the escrow that already
+-- backs the first repo. The lender would fund twice against one pledge.
+escrowDoublePledge : Script ()
+escrowDoublePledge = do
+  (p, t) <- opened
+  Some trade <- queryContractId p.borrower t
+  r2 <- rfq p
+  q2 <- quote p r2 p.lenderA 530.0 0.02
+  m <- mark p "UST10Y" 98000.0
+  submitMustFail p.borrower do
+    exerciseCmd q2 Open with pledge = head trade.collateral; markCid = m; contexts = []
+  held p.borrower "USDC" >>= (=== loanAmount)
+
+-- The same for an escrow offered as a substitute and not yet answered.
+substituteEscrowReuse : Script ()
+substituteEscrowReuse = do
+  (p, t) <- opened
+  b <- bond p "UST10Y" 100.0
+  sub <- submit p.borrower do exerciseCmd t ProposeSubstitution with holdingCid = b
+  Some s <- queryContractId p.borrower sub
+  r2 <- rfq p
+  q2 <- quote p r2 p.lenderA 530.0 0.02
+  m <- mark p "UST10Y" 98000.0
+  submitMustFail p.borrower do exerciseCmd q2 Open with pledge = s.newCollateral; markCid = m; contexts = []
+
+-- Token collateral: the allocation already pledged to the repo is posted again
+-- as margin, or offered as its own substitute. Either would count one CBTC twice
+-- (or leave the lender holding a cancelled allocation).
+tokenDoubleCount : Script ()
+tokenDoubleCount = do
+  (t, trade) <- tokenOpened
+  Some tr <- queryContractId t.borrower trade
+  let pledged = case head tr.collateral of
+        Allocated a -> a
+        _ -> error "expected an allocation"
+  passTime (days 3)
+  now <- getTime
+  m <- markT t 54000.0
+  call <- submit t.lenderA do exerciseCmd trade CallMargin with markCid = m; respondBy = addRelTime now (days 1)
+  submitMustFail t.borrower do exerciseCmd call PostTokenMargin with allocCid = pledged
+  sub <- submit t.borrower do
+    exerciseCmd trade ProposeTokenSubstitution with allocCid = pledged; newIssuer = t.cbtc; newInstrument = "CBTC"
+  up <- markT t 62000.0
+  submitMustFail t.lenderA do exerciseCmd sub Approve with markCid = up; contexts = []
+  owns t.cbtc t.borrower "CBTC" >>= (=== 0.0)
+
+-- A roll moves maturity out; a pledged allocation that lapses before the new
+-- maturity's claim window would leave the lender nothing to claim. The pledge
+-- runs to day 40: a 5-day roll (claim window to day 38) is fine, 30 days is not.
+tokenRollPastPledge : Script ()
+tokenRollPastPledge = do
+  (t, trade) <- tokenOpened
+  passTime (days 5)
+  now <- getTime
+  let offer days_ = submit t.lenderA do
+        createCmd RollOffer with
+          tradeCid = trade; borrower = t.borrower; lender = t.lenderA
+          newRateBps = 600.0; extraDays = days_; expiresAt = addRelTime now (days 1)
+      desk amt = submit t.usdcx do
+        createCmd Holding with issuer = t.usdcx; owner = t.borrower; instrument = "USDCx"; amount = amt
+  m <- markT t 62000.0
+  long <- offer 30
+  pay <- desk 100.0
+  submitMustFail t.borrower do exerciseCmd long AcceptRoll with cashCid = pay; markCid = m
+  short <- offer 5
+  _ <- submit t.borrower do exerciseCmd short AcceptRoll with cashCid = pay; markCid = m
+  pure ()
+
+-- ---------------------------------------------------------------------------
+-- Upgrade data (1.1.0 shapes under 1.2.x)
+-- ---------------------------------------------------------------------------
+
+-- The 1.1.0 token award is refused like the 1.1.0 desk award. A margin call
+-- written by 1.1.0 (no markAsOf) is refuted by any fresh mark that shows cover,
+-- and is still defaultable inside the window.
+upgradeData : Script ()
+upgradeData = do
+  (t, _) <- tokenOpened
+  now <- getTime
+  rfq2 <- submit t.borrower do
+    createCmd RepoRFQ with
+      borrower = t.borrower; regulator = t.regulator; agent = t.agent
+      lenders = [t.lenderA]; terms = termsT t; deadline = None; venue = None
+  cashA <- mint t.usdcx "USDCx" t.lenderA loan
+  allocA <- allocate t.usdcx cashA t.lenderA t.borrower t.borrower "USDCx" loan (addRelTime now (days 1))
+  q <- submit t.lenderA do
+    exerciseCmd rfq2 SubmitTokenQuote with lender = t.lenderA; rateBps = 600.0; haircut = 0.10; allocCid = allocA
+  btc <- mint t.cbtc "CBTC" t.borrower 1.0
+  pledge <- allocate t.cbtc btc t.borrower t.lenderA t.borrower "CBTC" 1.0 (addRelTime now (days 40))
+  m <- markT t 62000.0
+  submitMustFail t.borrower do
+    exerciseCmd rfq2 AwardWithTokenCollateral with
+      winner = q; losers = []; collateralAlloc = pledge; markCid = m; contexts = []
+  isSome <$> queryContractId t.borrower rfq2 >>= assert
+
+  (p, tr) <- opened
+  passTime (days 10)
+  now2 <- getTime
+  let oldCall = MarginCall with
+        tradeCid = tr; borrower = p.borrower; lender = p.lenderA; regulator = p.regulator
+        issuer = p.bondIssuer; instrument = "UST10Y"; unitsDue = 1.0; price = 90000.0
+        owed = 9513986.11; respondBy = addRelTime now2 (hours 2)
+        maturity = addRelTime now2 (days 80); markAsOf = None
+  c1 <- submitMulti [p.borrower, p.lenderA] [] do createCmd oldCall
+  up <- mark p "UST10Y" 98000.0
+  submit p.borrower do exerciseCmd c1 RefuteMarginCall with markCid = up
+  c2 <- submitMulti [p.borrower, p.lenderA] [] do createCmd oldCall
+  passTime (hours 3)
+  _ <- submit p.lenderA do exerciseCmd c2 Default with contexts = []
+  held p.lenderA "UST10Y" >>= \x -> assert (x > 0.0)
