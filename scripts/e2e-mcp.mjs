@@ -2,6 +2,7 @@
 // a live ledger (DevNet, or the local sandbox with ENV_FILE=.env.local).
 //   node scripts/e2e-mcp.mjs        (after `npm run seed`)
 // Works with two lenders; lender C's agent and checks run only if the parties file has lenderC.
+import { execFileSync } from 'node:child_process';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { PARTIES as p, AGREEMENTS, acs, submit, create, exercise } from '../lib/ledger.mjs';
@@ -18,6 +19,17 @@ async function agent(role) {
     return { error: r.isError ? r.content[0].text : null, data: r.isError ? null : JSON.parse(r.content[0].text) };
   };
   return { c, call, tools: (await c.listTools()).tools.map((t) => t.name) };
+}
+
+// The run consumes what the seed leaves (a request with two sealed quotes, a margin call, a
+// pending roll), so a second run on the same ledger would skip those checks. Seed again
+// when no request with two quotes is waiting; the seed adds fresh repos and leaves others alone.
+const waiting = (await acs(p.borrower)).contracts.filter((c) => c.tpl === 'RepoQuote')
+  .reduce((m, q) => m.set(q.arg.rfqId, (m.get(q.arg.rfqId) ?? 0) + 1), new Map());
+const rfqs = (await acs(p.borrower)).contracts.filter((c) => c.tpl === 'RepoRFQ');
+if (!rfqs.some((r) => (waiting.get(r.cid) ?? 0) >= 2)) {
+  console.log('· no request with two sealed quotes waiting: seeding first');
+  execFileSync('node', ['scripts/seed.mjs'], { stdio: 'inherit', env: process.env });
 }
 
 const HAS_C = !!p.lenderC;
@@ -99,7 +111,8 @@ if (awarded) {
 }
 
 // ---- margin call answered by the borrower agent ----
-const called = (await BOR.call('book')).data.find((t) => t.marginCall);
+// Only the seed's calls (UST instruments): a call a desk QA run left open is that run's to default.
+const called = (await BOR.call('book')).data.find((t) => t.marginCall && /^UST/.test(t.collateral.split(' ')[1]));
 if (called) {
   const [, instrument] = called.collateral.split(' ');
   await submit(p.bondIssuer, create('Holding', { issuer: p.bondIssuer, owner: p.borrower, instrument,

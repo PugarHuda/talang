@@ -204,7 +204,8 @@ await check('privacy: each lender sees only its own quote, in /api/acs and in th
     assert.match(await page.locator('.proof').textContent(), /Rival quotes never reached you/);
   }
   const reg = await acs('regulator');
-  assert.ok(reg.every((c) => c.tpl === 'RepoReport' || c.tpl === 'BestExecution'), 'regulator sees only reports');
+  // Close-out reports from earlier runs on the same sandbox are reports too.
+  assert.ok(reg.every((c) => ['RepoReport', 'BestExecution', 'CloseOutReport'].includes(c.tpl)), 'regulator sees only reports');
 });
 await check('lender C withdraws; its cash comes back', async () => {
   await open('lenderC');
