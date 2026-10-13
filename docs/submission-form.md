@@ -11,7 +11,7 @@ than README and docs/evidence show.
 
 **Track:** Financial Applications
 
-**Challenges:** BitSafe — Contribution Pool · NODERS (DevNet / NaaS) · Grofty Wallet (live run on TestNet: docs/evidence/grofty-wallet-testnet.json) · BitSafe — Gold (only after NODERS + BitSafe confirm late entry)
+**Challenges:** BitSafe — Contribution Pool · NODERS (DevNet / NaaS) · Grofty Wallet (live run on TestNet: docs/evidence/grofty-wallet-testnet.json)
 
 **Elevator pitch (≤2000):**
 Talang is a sealed-bid repo desk on Canton. A fund that holds tokenized Treasuries asks a panel of lenders for cash against them; each lender's rate and haircut is sealed to the borrower alone, because on Canton a quote that names only the lender and the borrower is never sent to anyone else's node. The borrower takes the cheapest quote that covers the loan, and in one atomic transaction the bonds are pledged, the cash is delivered and the losing lenders are refunded, told only their rank. The repo then lives on the ledger: margin calls computed from a signed mark and refused when the repo is still covered, substitution only with the lender's consent, rolls, repurchase with a venue fee that cannot be skipped, and default that returns any excess collateral to the borrower. The regulator observes every lifecycle event and gets best-execution records with no lender names and no losing rates.
