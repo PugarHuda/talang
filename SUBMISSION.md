@@ -4,7 +4,7 @@
 **Sponsor challenges:** BitSafe Decentralization Manager (Contribution Pool); NODERS DevNet; Grofty Wallet (CIP-0103); CIP-0056 token settlement (Canton Coin, CBTC; USDCx not yet)
 **Repo:** https://github.com/PugarHuda/talang
 **Live desk:** https://talang-desk.vercel.app/desk (read-only, NODERS DevNet)
-**Videos:** pitch https://youtu.be/gQIWB3Taq6g (also `media/talang-pitch.mp4`, subtitled); Grofty wallet run `media/grofty-wallet.mp4` (captioned, live extension on TestNet); desk walkthrough `media/talang-desk-captioned.mp4` (73 s, captioned, recorded against a seeded local ledger by `scripts/record-desk.mjs`); BitSafe DecMan demo `media/decman-demo-captioned.mp4` (79 s, DecMan's own UI on the three-participant LocalNet)
+**Videos:** pitch https://youtu.be/gQlWB3Taq6g (also `media/talang-pitch.mp4`, subtitled); Grofty wallet run `media/grofty-wallet.mp4` (captioned, live extension on TestNet); desk walkthrough `media/talang-desk-captioned.mp4` (73 s, captioned, recorded against a seeded local ledger by `scripts/record-desk.mjs`); BitSafe DecMan demo `media/decman-demo-captioned.mp4` (79 s, DecMan's own UI on the three-participant LocalNet)
 **Verify in 2 minutes:** README.md, section "Verify in 2 minutes".
 
 ## One line
