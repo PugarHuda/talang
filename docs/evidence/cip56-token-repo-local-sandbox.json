@@ -1,27 +1,27 @@
 {
   "ledger": "local Canton sandbox 3.4.11",
-  "ranAt": "2026-10-09T05:20:49.849Z",
+  "ranAt": "2026-10-13T08:25:41.645Z",
   "registries": "test/daml/MockRegistry.daml (implements Splice HoldingV1 / AllocationV1)",
   "steps": [
     {
       "step": "two registries implementing Splice HoldingV1 / AllocationV1: USDCx and CBTC",
-      "usdcx": "talang-usdcx-registry-mv0iodro::122098a7cc84cec29979a2d6130078e96e5eba38f5fb678f97706c11af0758872c30",
-      "cbtc": "talang-cbtc-registry-mv0ioe10::122098a7cc84cec29979a2d6130078e96e5eba38f5fb678f97706c11af0758872c30"
+      "usdcx": "talang-usdcx-registry-mv6f1pc2::1220a2d9604f308fcf959c71ab45e2732ddc65cc80bc78a7bbb0ef0e98c27661c587",
+      "cbtc": "talang-cbtc-registry-mv6f1pfx::1220a2d9604f308fcf959c71ab45e2732ddc65cc80bc78a7bbb0ef0e98c27661c587"
     },
     {
       "step": "RepoRFQ: 50,000 USDCx against 1 CBTC, 30 days, venue 10 bp",
-      "updateId": "12203d76a554a23efa7b4a58e0a1f2b15b6157cdde690298e522eb89e71295cf4829",
-      "offset": 334
+      "updateId": "1220e520b308c090e3b3abbcb5791ba96baaf7e514c50030baab9d51a54d8164b0ce",
+      "offset": 883
     },
     {
       "step": "sealed quote funded by a USDCx allocation (600 bp)",
-      "updateId": "122068aacc7c5ac2095f64cb9e4e84049b69b7c0436369a561e154c27f3cf7792cb5",
-      "offset": 343
+      "updateId": "12206c36f46dca0ac0594ff8b85253db7d7c6d9d34b309bfc5c461deaffe5f40bdd9",
+      "offset": 892
     },
     {
       "step": "sealed quote funded by a USDCx allocation (620 bp)",
-      "updateId": "12207c46349b09d396859997203e028496b6d316a2daca904d2d630670fe8c9f3a65",
-      "offset": 352
+      "updateId": "1220ae26d82af0cd9ee4ba6a45c68b67c6cb4a53275a96627ff3946d3dcb4cf26628",
+      "offset": 901
     },
     {
       "step": "lender B's node holds 0 rival quotes",
@@ -29,16 +29,16 @@
     },
     {
       "step": "award: USDCx allocation executed to the borrower, B's cancelled back to B, CBTC held for A",
-      "updateId": "12206a96e80be0dc79fbb42b83f9abc4619dbee2ecce27bdb5887f7847377cfecc42",
-      "offset": 361,
+      "updateId": "122000e7634b89fb8c819eac7f94116ed88cbd8efaae2a054797d9ec53a6bcbc9e8f",
+      "offset": 910,
       "borrowerUSDCx": 50000,
       "lenderBUSDCx": 50000,
       "borrowerCBTC": 0
     },
     {
       "step": "repurchase notice read through the standard AllocationRequest interface",
-      "updateId": "1220c4f84e8531ef899289a6fdbc9cb1bba5827c525d1aeb77ac1302b01d6f32d07d",
-      "offset": 364,
+      "updateId": "12207e9077e0f6c9c70f815d2a7b45a309f3219b6d83c24b0bbced8100bed14e33be",
+      "offset": 913,
       "legs": [
         {
           "leg": "repurchase",
@@ -54,8 +54,8 @@
     },
     {
       "step": "settled: USDCx to the lender and the venue, CBTC allocation cancelled back to the borrower",
-      "updateId": "122072ff6ef5db82c3e51b04bed58b5931c9c828a147ec5b40a34325c3b0df8fc77c",
-      "offset": 382,
+      "updateId": "122014e8a4a022d5b009715bde1ba2ff1d04789ca98af1f2e62c004a64f016039cda",
+      "offset": 931,
       "lenderAUSDCx": 50008.33,
       "venueUSDCx": 0.14,
       "borrowerCBTC": 1

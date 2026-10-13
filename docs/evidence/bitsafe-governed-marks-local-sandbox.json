@@ -1,8 +1,8 @@
 {
   "ledger": "local Canton sandbox 3.4.11",
-  "ranAt": "2026-10-09T05:12:53.291Z",
+  "ranAt": "2026-10-13T08:25:49.223Z",
   "packages": [
-    "talang-repo-1.0.0",
+    "talang-repo (1.0.0, or its 1.1.0 upgrade where vetted)",
     "governance-core-v1-0.1.0 (BitSafe, unmodified)",
     "governance-action-v1-0.1.0 (BitSafe, unmodified)"
   ],
@@ -12,13 +12,13 @@
     },
     {
       "step": "GovernanceRules: committee of 3 pricers, threshold 2",
-      "updateId": "122046615ca6ca26718d6b29816fe6e00019b8fc64c8b028d6c1659d855c9eef22f8",
-      "offset": 270,
-      "committee": "talang-valuation-committee-mv0iecmf::122098a7cc84cec29979a2d6130078e96e5eba38f5fb678f97706c11af0758872c30",
+      "updateId": "1220dd38fad8f02a28b959fe75287195ff82aa0fb3ab79d3c2342aaf10f432dee705",
+      "offset": 946,
+      "committee": "talang-valuation-committee-mv6f1w73::1220a2d9604f308fcf959c71ab45e2732ddc65cc80bc78a7bbb0ef0e98c27661c587",
       "members": [
-        "talang-pricerA-mv0iecpk::122098a7cc84cec29979a2d6130078e96e5eba38f5fb678f97706c11af0758872c30",
-        "talang-pricerB-mv0iecs9::122098a7cc84cec29979a2d6130078e96e5eba38f5fb678f97706c11af0758872c30",
-        "talang-pricerC-mv0iecus::122098a7cc84cec29979a2d6130078e96e5eba38f5fb678f97706c11af0758872c30"
+        "talang-pricerA-mv6f1wax::1220a2d9604f308fcf959c71ab45e2732ddc65cc80bc78a7bbb0ef0e98c27661c587",
+        "talang-pricerB-mv6f1we9::1220a2d9604f308fcf959c71ab45e2732ddc65cc80bc78a7bbb0ef0e98c27661c587",
+        "talang-pricerC-mv6f1who::1220a2d9604f308fcf959c71ab45e2732ddc65cc80bc78a7bbb0ef0e98c27661c587"
       ]
     },
     {
@@ -28,15 +28,15 @@
     },
     {
       "step": "MarkProposal UST10Y 98,000 executed with 2 of 3: Mark signed by the committee",
-      "updateId": "1220c71366015a8d742ac7ea0a86ec77e2d955d9df6eabcf4e416cfa71cee2872105",
-      "offset": 288,
-      "mark": "00388c31d74433766117af98640ac75bed4f0a92bca9636a2611063e5ab13efb41ca121220746937b4c7baa7bb017abbe585bd63d95e996b592b79c354f863cda3c8a6c754"
+      "updateId": "122055396abfc8f552f7168a09730cb0ae38b033742528ada48064e2f5182c9e43bc",
+      "offset": 964,
+      "mark": "0070a66de92aa9bfb27779266fe9dcda7b0f643619af705e2f2ff47e2e68d230d3ca1212201ec71495e1cc53dcff07f4069229e3a859973fa8a986b72ad495cb2e8396ad95"
     },
     {
       "step": "repo opened on the committee mark (agent = the decentralized party)",
-      "updateId": "12202533135bbb04a54343ea785ebaadca95fe9a3727a390ea981aac99392369e7b6",
-      "offset": 303,
-      "trade": "000ec4cbddc5d45934f4e65798277de23eff393ecaefd21f8ce5e38804652c892aca1212207ef01ecad1f390c5df0b8c64705e11dbc6389c4551dd8bcbe25b2554fea74ad3"
+      "updateId": "1220b3977569b74ddb0bdf61272670ceb57e83a50b75c23caba754bc2de8e146230a",
+      "offset": 979,
+      "trade": "009b454ef8309dad8df40fc5f64586bbd90c5ace2fd6f9f72e7290ada30ea10b27ca121220cf5f5e6c7265e29200e09988f7e31d8d57573fc8b8d1b68466b560015460d955"
     },
     {
       "step": "margin call on one pricer's own mark at 50,000",
@@ -45,15 +45,15 @@
     },
     {
       "step": "governed markdown UST10Y 92,000 executed with 2 of 3",
-      "updateId": "12203f9ac732f769c452620773b9c3a1b200221bb340fad071c4c1b4e73c43c34f10",
-      "offset": 318,
-      "mark": "00df0f107e94b151e098256db2b78a690051c378ee1af6cd6cdf60873c3da2f048ca12122083bb5af4278adeeddbe2bb7304b1a24e924107ca5e4e2815d13315f9ed8229bc"
+      "updateId": "12209a95dad4406517bc303825b93b6345801497d8dd4ff96a047eeb630e4f39863f",
+      "offset": 994,
+      "mark": "009b7c90fd620d0e8a68a21d5d7b493af813a8cbcb31c5df5ac40653584d354728ca1212203db2a8d51ae32d32b085f5a731a857e70e002914d7437929964218444639fd84"
     },
     {
       "step": "margin call issued on the governed mark",
-      "updateId": "1220041d7f6e4d9b9a3290144cf413aab2498114df39393483212a032d7e2567ec57",
-      "offset": 321,
-      "marginCall": "00a679ef50af5ef04dd5a9b644c48dbb1b445f728006277215308f581e7be381ceca12122030169cbc02306a80dacb62e90ee631d3557eb679f2a4f826401e2b6ad18f43fe"
+      "updateId": "12201604efa31edfb80780954ba059bc40d09a9ca55111b68aa441be7392a337431d",
+      "offset": 997,
+      "marginCall": "006fd938d5c4ca7f6e0e362e99a96eb068a65022054918436dcda07c38ab3ac8dfca121220b8f37b189b7476a62d075f4c661e405351c1e8078174d52695108cee5be71973"
     }
   ]
 }
