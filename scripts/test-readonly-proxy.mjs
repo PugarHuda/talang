@@ -67,7 +67,8 @@ for (const m of ['GET', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'])
 for (const [name, body] of [['no body', undefined], ['empty body', {}], ['unknown role', { role: 'intruder' }],
   ['party id instead of role', { role: PARTIES.borrower }], ['__proto__', { role: '__proto__' }],
   ['constructor', { role: 'constructor' }], ['hasOwnProperty', { role: 'hasOwnProperty' }],
-  ['null role', { role: null }], ['object role', { role: { toString: () => 'x' } }], ['raw string body', '{"role":"borrower"}']])
+  ['null role', { role: null }], ['object role', { role: { toString: () => 'x' } }],
+  ['array role', { role: ['borrower'] }], ['object role, toString not a function', { role: { toString: 'x' } }], ['raw string body', '{"role":"borrower"}']])
   ok(`acs bad input (${name}): 400, no ledger call`, (r = await call(acs, 'POST', body))._s === 400 && calls.length === 0);
 
 // A good read, per role: only ledger-end and active-contracts, scoped to that role's party alone.

@@ -107,8 +107,14 @@ async function start() {
   const ptr = { x: 0, y: 0, tx: 0, ty: 0 };
   addEventListener('pointermove', (e) => { ptr.tx = e.clientX / innerWidth - 0.5; ptr.ty = e.clientY / innerHeight - 0.5; }, { passive: true });
 
-  let raf = 0, visible = true, first = true;
-  function frame() {
+  // Without a GPU (software WebGL) a frame takes over a second and the page stops answering
+  // clicks; after three such frames in a row (the first one also compiles shaders) the scene
+  // stays on its last frame instead of animating.
+  let raf = 0, visible = true, first = true, last = 0, slow = 0;
+  function frame(now) {
+    slow = last && now - last > 250 ? slow + 1 : 0;
+    if (slow >= 3) { raf = -1; return; }
+    last = now;
     const t = performance.now() / 1000;
     ptr.x += (ptr.tx - ptr.x) * 0.05; ptr.y += (ptr.ty - ptr.y) * 0.05;
     main.group.rotation.set(0.42 + ptr.y * 0.25 + Math.sin(t * 0.4) * 0.03, -0.62 + ptr.x * 0.45 + Math.sin(t * 0.25) * 0.12, 0.04);
@@ -120,8 +126,8 @@ async function start() {
     if (first) { first = false; document.documentElement.classList.add('gl'); }
     raf = requestAnimationFrame(frame);
   }
-  const run = () => { if (!raf && visible && !document.hidden) raf = requestAnimationFrame(frame); };
-  const stop = () => { cancelAnimationFrame(raf); raf = 0; };
+  const run = () => { if (!raf && visible && !document.hidden) { last = 0; raf = requestAnimationFrame(frame); } };
+  const stop = () => { if (raf > 0) { cancelAnimationFrame(raf); raf = 0; } };
   document.addEventListener('visibilitychange', () => (document.hidden ? stop() : run()));
   new IntersectionObserver(([e]) => { visible = e.isIntersecting; visible ? run() : stop(); }).observe(canvas);
   run();

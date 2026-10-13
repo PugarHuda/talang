@@ -5,7 +5,8 @@ import { PARTIES, deskAcs } from '../lib/ledger.mjs';
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
   const role = req.body?.role;
-  if (!Object.hasOwn(PARTIES, role)) return res.status(400).json({ error: 'unknown role' });
+  // A string only: an array would coerce to a role name, an object with a bad toString would throw.
+  if (typeof role !== 'string' || !Object.hasOwn(PARTIES, role)) return res.status(400).json({ error: 'unknown role' });
   // `since`: the offset of this page's last read, so an unchanged view is not re-sent every poll.
   try { return res.status(200).json(await deskAcs(PARTIES[role], req.body?.since)); }
   // The detail (node URLs, ledger error text) stays in the server log, not the public reply.

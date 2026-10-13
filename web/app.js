@@ -347,6 +347,9 @@ const closeOutTable = (reps) => `<h2>Close-outs</h2>` + (reps.length ? `<div cla
   <p class="empty">Valued at fresh marks with no haircut; excess collateral on one repo covers a shortfall on another.</p></div>`
   : '<p class="empty">None.</p>');
 
+// A record from before 1.2.0 carries the exact gap; winning rate minus it is the best losing
+// rate, so the page shows it as the same band the contract now writes (bucketName in Talang.daml).
+const band = (gap) => (gap <= 0 ? '0' : gap <= 5 ? '1-5' : gap <= 25 ? '6-25' : '>25');
 function regulatorView() {
   const reps = of('RepoReport').sort((a, b) => b.arg.at.localeCompare(a.arg.at));
   const bex = of('BestExecution').sort((a, b) => b.arg.at.localeCompare(a.arg.at));
@@ -356,7 +359,7 @@ function regulatorView() {
     <h2>Best execution</h2><div class="card">${bex.length ? `<table><tr><th>When</th><th>Quotes weighed</th><th>Winner's rank</th><th>Rate taken</th><th>Haircut</th><th>Over best rate (band)</th></tr>
     ${bex.map((b) => `<tr><td>${when(b.arg.at)}</td><td>${esc(b.arg.quotesConsidered)}</td>
       <td>${N(b.arg.winnerRank) === 1 ? '<span class="pill ok">1 · best</span>' : `<span class="pill warn">${esc(b.arg.winnerRank)}</span>`}</td>
-      <td>${N(b.arg.winningRateBps)} bp</td><td>${pct(b.arg.winningHaircut)}</td><td>${b.arg.spreadBucket != null ? (b.arg.spreadBucket === '0' ? '—' : esc(b.arg.spreadBucket) + ' bp') : N(b.arg.spreadToBestBps) ? N(b.arg.spreadToBestBps) + ' bp' : '—'}</td></tr>`).join('')}</table>
+      <td>${N(b.arg.winningRateBps)} bp</td><td>${pct(b.arg.winningHaircut)}</td><td>${((s) => (s === '0' ? '—' : esc(s) + ' bp'))(b.arg.spreadBucket ?? band(N(b.arg.spreadToBestBps)))}</td></tr>`).join('')}</table>
       <p class="empty">No lender is named and no losing quote is shown: the regulator learns how price discovery went, not who lost.</p>`
     : '<p class="empty">No awards yet.</p>'}</div>
     <h2>Repo lifecycle reports</h2><div class="card">${reps.length ? `<table><tr><th>When</th><th>Event</th><th>Borrower</th><th>Lender</th>

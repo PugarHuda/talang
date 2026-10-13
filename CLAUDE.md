@@ -12,7 +12,7 @@ Sealed-bid repo desk on Canton (HackCanton Season 3, Financial Applications trac
 - Local ledger, no credentials: `daml sandbox --json-api-port 7575 --dar .daml/dist/talang-repo-1.2.1.dar --wall-clock-time`, then `npm run local`, and `ENV_FILE=.env.local npm run seed | e2e:mcp | governance | desk`
 - DevNet: credentials in `.env.noders` (gitignored), same scripts without `ENV_FILE`; the app user cannot upload DARs (403), packages go in through the NODERS console. Vetted there (NODERS console lists them): 1.0.0 (`24fdd6f4…`), 1.1.0 (`a3dc67f1…`, 9 Oct), 1.2.0 (`5125df18…a3c366`, 12 Oct); 1.2.1 (`devnet/talang-repo-1.2.1.dar`, QA fixes) not yet uploaded
 - DevNet evidence runs happen inside a Vercel build (`scripts/devnet-ci.mjs`, `DEVNET_STEPS=...`); results go to `docs/evidence/`. Pushing `main` auto-deploys Vercel production (expected)
-- Other checks: `npm run test:proxy` (45, no network), `npm run test:offline` (15, no network), `npm run qa:desk` (Playwright, local sandbox), `node scripts/test-cbtc-default.mjs` (offline), `scripts/sec-*.mjs` (security regressions, local sandbox)
+- Other checks: `npm run test:proxy` (47, no network), `npm run test:offline` (15, no network), `npm run qa:desk` (Playwright, local sandbox), `node scripts/test-cbtc-default.mjs` (offline), `scripts/sec-*.mjs` (security regressions, local sandbox)
 - BitSafe LocalNet (3 participants, DecMan): `bash localnet/demo.sh reset` (Docker)
 - On Windows from Git Bash call `daml.cmd`; start the sandbox from PowerShell (Java must be on the Windows PATH)
 
