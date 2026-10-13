@@ -587,7 +587,12 @@ const ACTIONS = {
     return 'Margin called';
   },
   async default(b) { await act(exercise('MarginCall', b.dataset.cid, 'Default', { contexts: NO_CONTEXTS })); return 'Default declared: you keep collateral up to what is owed, the rest goes back to the borrower'; },
-  async claim(b) { await act(exercise('RepoTrade', b.dataset.cid, 'ClaimAfterMaturity', { contexts: NO_CONTEXTS })); return 'Collateral claimed'; },
+  async claim(b) {
+    // 1.2.2: the claim nets at a fresh mark; the excess goes back to the borrower.
+    const t = of('RepoTrade').find((x) => x.cid === b.dataset.cid).arg;
+    await act(exercise('RepoTrade', b.dataset.cid, 'ClaimAfterMaturity', { contexts: NO_CONTEXTS, markCid: mark(t.collateralInstrument, t.agent)?.cid ?? null }));
+    return 'Collateral claimed: you keep collateral up to what is owed, the rest goes back to the borrower';
+  },
   async 'offer-roll'(b) {
     const t = of('RepoTrade').find((x) => x.cid === b.dataset.cid).arg, k = b.dataset.cid.slice(0, 12);
     await act(create('RollOffer', { tradeCid: b.dataset.cid, borrower: t.borrower, lender: me(),

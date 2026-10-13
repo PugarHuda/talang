@@ -38,11 +38,12 @@ const mint = async (registry, tag, owner, amount) =>
   createdOf(await submit(registry, { CreateCommand: { templateId: REG('MockHolding'),
     createArguments: { registry, owner, instrumentTag: tag, amount: String(amount) } } }), ':MockHolding')[0];
 // What a wallet does when asked to fund a leg.
-async function allocateLeg(registry, tag, holding, sender, receiver, amount, settleBefore) {
+// `bound`: the settlement a collateral leg pledges to (1.2.2 checks settlementRef.cid).
+async function allocateLeg(registry, tag, holding, sender, receiver, amount, settleBefore, bound = null) {
   const now = new Date().toISOString();
   const tx = await submit(sender, { ExerciseCommand: { templateId: REG('MockHolding'), contractId: holding, choice: 'MockAllocate',
     choiceArgument: { spec: {
-      settlement: { executor: p.borrower, settlementRef: { id: 'talang', cid: null }, requestedAt: now,
+      settlement: { executor: p.borrower, settlementRef: { id: 'talang', cid: bound }, requestedAt: now,
         allocateBefore: settleBefore, settleBefore, meta },
       transferLegId: 'leg',
       transferLeg: { sender, receiver, amount: String(amount), instrumentId: { admin: registry, id: tag }, meta } } } } });
@@ -77,7 +78,7 @@ for (const [lender, rate, haircut] of [[p.lenderA, '600', '0.10'], [p.lenderB, '
 const rivalSees = (await acs(p.lenderB)).contracts.filter((c) => c.tpl === 'RepoQuote' && c.arg.lender !== p.lenderB).length;
 step(`lender B's node holds ${rivalSees} rival quotes`, null, { rivalQuotesOnLenderB: rivalSees });
 
-const pledge = await allocateLeg(cbtc, 'CBTC', await mint(cbtc, 'CBTC', p.borrower, 1), p.borrower, p.lenderA, 1, inDays(40));
+const pledge = await allocateLeg(cbtc, 'CBTC', await mint(cbtc, 'CBTC', p.borrower, 1), p.borrower, p.lenderA, 1, inDays(40), rfq);
 const awardTx = await submit(p.borrower, exercise('RepoRFQ', rfq, 'AwardSealedWithTokenCollateral',
   { winner: quotes[0], losers: [quotes[1]], collateralAlloc: pledge, markCid: mark, contexts: [] }));
 const trade = created(awardTx, 'RepoTrade');

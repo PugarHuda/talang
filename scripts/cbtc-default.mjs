@@ -143,11 +143,21 @@ try {
     const inputs = [];
     for (let s = 0, i = 0; s < Number(QTY); i++) { inputs.push(holdings[i].cid); s += Number(holdings[i].view.amount); }
     step(`borrower holds ${sum(holdings)} CBTC (HoldingV1)`, null, { borrowerCBTC: sum(holdings) });
+    // RFQ first (1.2.2: the pledge names it in settlementRef.cid), with the marker terms.
+    const mark = created(await submit(p.agent, create('Mark', { agent: p.agent, instrument: 'CBTC', price: MARK,
+      asOf: new Date().toISOString(), audience: [p.borrower, p.lenderA] })), 'Mark');
+    const rfqTx = await submit(p.borrower, create('RepoRFQ', { borrower: p.borrower, regulator: p.regulator, agent: p.agent,
+      lenders: [p.lenderA], deadline: at(D), venue: null,
+      terms: { cashIssuer: p.cashIssuer, cashInstrument: 'USDC', principal: PRINCIPAL, collateralIssuer: ADMIN,
+        collateralInstrument: 'CBTC', collateralQty: QTY, termDays: String(TERM_DAYS) } }));
+    const rfq = created(rfqTx, 'RepoRFQ');
+    step(`RepoRFQ: ${PRINCIPAL} USDC against ${QTY} CBTC, ${TERM_DAYS} days (marker terms)`, rfqTx);
+    // 2. Collateral allocated to lender A, bound to the RFQ; desk USDC quote; award at the market-level mark.
     const ref = `talang-cbtc-default-${Date.now().toString(36)}`;
     const requestedAt = at(-MIN);   // registries refuse a request time in the future
     const args = { expectedAdmin: ADMIN, requestedAt, inputHoldingCids: inputs, extraArgs: { context: { values: {} }, meta },
       // settleBefore past maturity + the 3-day claim window (Open checks it).
-      allocation: { settlement: { executor: p.borrower, settlementRef: { id: ref, cid: null }, requestedAt, allocateBefore: at(H),
+      allocation: { settlement: { executor: p.borrower, settlementRef: { id: ref, cid: rfq }, requestedAt, allocateBefore: at(H),
         settleBefore: at((TERM_DAYS + 4) * D), meta },
       transferLegId: 'collateral', transferLeg: { sender: p.borrower, receiver: p.lenderA, amount: QTY, instrumentId: CBTC, meta } } };
     const fac = await allocationFactory(ADMIN, args);
@@ -163,15 +173,6 @@ try {
     step(`${QTY} CBTC allocated borrower -> lender A through the registry AllocationFactory`, allocTx,
       { allocationCid: alloc.cid, allocationTemplate: alloc.templateId, factoryId: fac.factoryId });
 
-    // 2. RFQ with the marker terms, desk USDC quote, award at the market-level mark.
-    const mark = created(await submit(p.agent, create('Mark', { agent: p.agent, instrument: 'CBTC', price: MARK,
-      asOf: new Date().toISOString(), audience: [p.borrower, p.lenderA] })), 'Mark');
-    const rfqTx = await submit(p.borrower, create('RepoRFQ', { borrower: p.borrower, regulator: p.regulator, agent: p.agent,
-      lenders: [p.lenderA], deadline: at(D), venue: null,
-      terms: { cashIssuer: p.cashIssuer, cashInstrument: 'USDC', principal: PRINCIPAL, collateralIssuer: ADMIN,
-        collateralInstrument: 'CBTC', collateralQty: QTY, termDays: String(TERM_DAYS) } }));
-    const rfq = created(rfqTx, 'RepoRFQ');
-    step(`RepoRFQ: ${PRINCIPAL} USDC against ${QTY} CBTC, ${TERM_DAYS} days (marker terms)`, rfqTx);
     const cash = created(await submit(p.cashIssuer, create('Holding', { issuer: p.cashIssuer, owner: p.lenderA, instrument: 'USDC', amount: PRINCIPAL })), 'Holding');
     const quoteTx = await submit(p.lenderA, exercise('RepoRFQ', rfq, 'SubmitQuote', { lender: p.lenderA, rateBps: RATE, haircut: HAIRCUT, cashCid: cash }));
     step('sealed quote, principal escrowed in desk USDC', quoteTx);

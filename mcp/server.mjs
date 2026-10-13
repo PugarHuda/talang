@@ -345,8 +345,13 @@ async function run(name, a = {}) {
 
   if (name === 'claim_collateral') {
     const t = pick(of('RepoTrade').filter((x) => x.arg.lender === ME), a.repo, 'repo of yours');
-    await submit(ME, exercise('RepoTrade', t.cid, 'ClaimAfterMaturity', { contexts: NO_CONTEXTS }));
-    return { claimed: `${N(t.arg.collateralQty)} ${t.arg.collateralInstrument}`, maturity: t.arg.maturity };
+    // 1.2.2: the claim nets at a fresh mark, as a default does; the excess goes home.
+    const m = latestMark(contracts, t.arg.collateralInstrument, t.arg.agent);
+    if (!m?.fresh) throw new Error(`no ${t.arg.collateralInstrument} mark under a day old from the repo's agent: ask for one first`);
+    await submit(ME, exercise('RepoTrade', t.cid, 'ClaimAfterMaturity', { contexts: NO_CONTEXTS, markCid: m.cid }));
+    const due = owed(t.arg), keep = Math.ceil(due / m.price * 1e4) / 1e4, held = N(t.arg.collateralQty);
+    return { claimed: `${Math.min(keep, held)} ${t.arg.collateralInstrument}`, owedToday: due, mark: m.price,
+      returnedToBorrower: Math.max(0, Math.round((held - keep) * 1e4) / 1e4), maturity: t.arg.maturity };
   }
 
   if (name === 'loss_history') {

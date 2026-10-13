@@ -48,13 +48,14 @@ const unlockedCbtc = async (owner) => (await views(owner, HOLDING))
 // CBTC, settleBefore past maturity + the 3-day claim window (Talang.daml claimWindow).
 const ref = `talang-cbtc-${Date.now().toString(36)}`;
 const requestedAt = at(-60e3);   // registries refuse a request time in the future
-const spec = {
-  settlement: { executor: p.borrower, settlementRef: { id: ref, cid: null }, requestedAt,
+// 1.2.2: settlementRef.cid names the RFQ the pledge is for, so it backs one repo only.
+const spec = (bound = null) => ({
+  settlement: { executor: p.borrower, settlementRef: { id: ref, cid: bound }, requestedAt,
     allocateBefore: at(H), settleBefore: at((TERM_DAYS + 4) * D), meta },
   transferLegId: 'collateral',
   transferLeg: { sender: p.borrower, receiver: p.lenderA, amount: QTY, instrumentId: CBTC, meta },
-};
-const factoryArgs = (inputHoldingCids) => ({ expectedAdmin: ADMIN, allocation: spec, requestedAt, inputHoldingCids,
+});
+const factoryArgs = (inputHoldingCids, bound = null) => ({ expectedAdmin: ADMIN, allocation: spec(bound), requestedAt, inputHoldingCids,
   extraArgs: { context: { values: {} }, meta } });
 
 if (DRY) {
@@ -92,11 +93,19 @@ try {
   for (let s = 0, i = 0; s < Number(QTY); i++) { inputs.push(holdings[i].cid); s += Number(holdings[i].view.amount); }
   step(`borrower holds ${total} CBTC in ${holdings.length} holdings (HoldingV1)`, null, { borrowerCBTC: total, inputs, holdingTemplate: holdings[0].templateId });
 
-  // 2. Allocate through the registry's factory with its context and disclosed contracts.
-  const fac = await allocationFactory(ADMIN, factoryArgs(inputs));
+  // 2. RFQ first: the pledge names it. Then allocate through the registry's factory.
+  const mark = created(await submit(p.agent, create('Mark', { agent: p.agent, instrument: 'CBTC', price: '62000',
+    asOf: new Date().toISOString(), audience: [p.borrower, p.lenderA] })), 'Mark');
+  const rfqTx = await submit(p.borrower, create('RepoRFQ', { borrower: p.borrower, regulator: p.regulator, agent: p.agent,
+    lenders: [p.lenderA], deadline: at(D), venue: null,
+    terms: { cashIssuer: p.cashIssuer, cashInstrument: 'USDC', principal: PRINCIPAL, collateralIssuer: ADMIN,
+      collateralInstrument: 'CBTC', collateralQty: QTY, termDays: String(TERM_DAYS) } }));
+  const rfq = created(rfqTx, 'RepoRFQ');
+  step(`RepoRFQ: ${PRINCIPAL} USDC against ${QTY} CBTC, ${TERM_DAYS} day`, rfqTx);
+  const fac = await allocationFactory(ADMIN, factoryArgs(inputs, rfq));
   const allocTx = await submit(p.borrower, { ExerciseCommand: { templateId: FACTORY, contractId: fac.factoryId,
     choice: 'AllocationFactory_Allocate',
-    choiceArgument: { ...factoryArgs(inputs), extraArgs: { context: fac.choiceContext.choiceContextData, meta } } } },
+    choiceArgument: { ...factoryArgs(inputs, rfq), extraArgs: { context: fac.choiceContext.choiceContextData, meta } } } },
   [], { disclosedContracts: disclosed(fac.choiceContext.disclosedContracts),
     transactionFormat: { transactionShape: 'TRANSACTION_SHAPE_LEDGER_EFFECTS', eventFormat: { verbose: true,
       filtersByParty: { [p.borrower]: { cumulative: [{ identifierFilter: { WildcardFilter: { value: { includeCreatedEventBlob: false } } } }] } } } } });
@@ -113,15 +122,7 @@ try {
     { factoryId: fac.factoryId, allocationCid: alloc.cid, allocationTemplate: alloc.templateId, factoryOutput: result?.output?.tag,
       disclosedContracts: fac.choiceContext.disclosedContracts.map((d) => d.templateId) });
 
-  // 3. RFQ, one sealed quote in desk USDC, award with the CBTC allocation as collateral.
-  const mark = created(await submit(p.agent, create('Mark', { agent: p.agent, instrument: 'CBTC', price: '62000',
-    asOf: new Date().toISOString(), audience: [p.borrower, p.lenderA] })), 'Mark');
-  const rfqTx = await submit(p.borrower, create('RepoRFQ', { borrower: p.borrower, regulator: p.regulator, agent: p.agent,
-    lenders: [p.lenderA], deadline: at(D), venue: null,
-    terms: { cashIssuer: p.cashIssuer, cashInstrument: 'USDC', principal: PRINCIPAL, collateralIssuer: ADMIN,
-      collateralInstrument: 'CBTC', collateralQty: QTY, termDays: String(TERM_DAYS) } }));
-  const rfq = created(rfqTx, 'RepoRFQ');
-  step(`RepoRFQ: ${PRINCIPAL} USDC against ${QTY} CBTC, ${TERM_DAYS} day`, rfqTx);
+  // 3. One sealed quote in desk USDC, award with the CBTC allocation as collateral.
   const cash = created(await submit(p.cashIssuer, create('Holding', { issuer: p.cashIssuer, owner: p.lenderA, instrument: 'USDC', amount: PRINCIPAL })), 'Holding');
   const quoteTx = await submit(p.lenderA, exercise('RepoRFQ', rfq, 'SubmitQuote', { lender: p.lenderA, rateBps: RATE, haircut: HAIRCUT, cashCid: cash }));
   step('sealed quote, principal escrowed in desk USDC', quoteTx);

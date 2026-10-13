@@ -75,11 +75,12 @@ const step = (label, tx, extra = {}) => {
 };
 
 // AllocationFactory_Allocate arguments; the borrower always executes (Talang.daml checkAllocation).
-const allocArgs = (l, sender, receiver, amount, settleBefore, ref, legId, inputHoldingCids) => {
+// 1.2.2: collateral names the RFQ it pledges to in settlementRef.cid (`bound`), so it backs one repo only.
+const allocArgs = (l, sender, receiver, amount, settleBefore, ref, legId, inputHoldingCids, bound = null) => {
   const requestedAt = at(-60e3);   // registries refuse a request time in the future
   const allocateBefore = new Date(Math.min(Date.now() + H, Date.parse(settleBefore))).toISOString();
   return { expectedAdmin: l.admin, requestedAt, inputHoldingCids, extraArgs: { context: { values: {} }, meta },
-    allocation: { settlement: { executor: p.borrower, settlementRef: { id: ref, cid: null }, requestedAt, allocateBefore, settleBefore, meta },
+    allocation: { settlement: { executor: p.borrower, settlementRef: { id: ref, cid: bound }, requestedAt, allocateBefore, settleBefore, meta },
       transferLegId: legId, transferLeg: { sender, receiver, amount: String(amount), instrumentId: l.instrumentId, meta } } };
 };
 
@@ -153,7 +154,7 @@ async function acceptOffers(l, party) {
 }
 
 // Lock `amount` of `l` from sender to receiver through the registry's AllocationFactory.
-async function allocate(l, sender, receiver, amount, settleBefore, legId) {
+async function allocate(l, sender, receiver, amount, settleBefore, legId, bound = null) {
   const hs = await unlocked(l, sender);
   const total = hs.reduce((s, h) => s + Number(h.view.amount), 0);
   if (total < Number(amount)) throw new Error(`${short(sender)} holds ${total} unlocked ${l.id}, needs ${amount}`);
@@ -161,7 +162,7 @@ async function allocate(l, sender, receiver, amount, settleBefore, legId) {
   const inputs = [];
   for (let s = 0, i = 0; i < hs.length && i < 20 && s < Number(amount) * 1.05; i++) { inputs.push(hs[i].cid); s += Number(hs[i].view.amount); }
   const ref = `talang-${legId}-${Date.now().toString(36)}`;
-  const args = allocArgs(l, sender, receiver, amount, settleBefore, ref, legId, inputs);
+  const args = allocArgs(l, sender, receiver, amount, settleBefore, ref, legId, inputs, bound);
   const fac = await l.reg.allocationFactory(args);
   const tx = await submit(sender, { ExerciseCommand: { templateId: FACTORY, contractId: fac.factoryId, choice: 'AllocationFactory_Allocate',
     choiceArgument: { ...args, extraArgs: { context: fac.choiceContext.choiceContextData, meta } } } },
@@ -220,7 +221,7 @@ try {
   const awardCtx = contexts(CASH ? [[cashAlloc, await CASH.reg.allocationContext(cashAlloc, 'execute-transfer')]] : []);
   let awardTx;
   if (COLL) {
-    collAlloc = await allocate(COLL, p.borrower, p.lenderA, QTY, at((TERM_DAYS + 4) * D), 'collateral');
+    collAlloc = await allocate(COLL, p.borrower, p.lenderA, QTY, at((TERM_DAYS + 4) * D), 'collateral', rfq);
     awardTx = await submit(p.borrower, exercise('RepoRFQ', rfq, 'AwardSealedWithTokenCollateral',
       { winner: created(quoteTx, 'RepoQuote'), losers: [], collateralAlloc: collAlloc, markCid: mark, contexts: awardCtx.contexts }),
     [], { disclosedContracts: awardCtx.disclosedContracts });
